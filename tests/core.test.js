@@ -33,6 +33,19 @@ assert.equal(matched.warnings.length,0);
 const summary=C.selectedSummary([{email:'sample@example.com',pdfStatus:'PDF作成済み',sendStatus:'未送信',warnings:[]},{email:'',pdfStatus:'未作成',sendStatus:'送信済み',warnings:['メール未登録']}]);
 assert.deepEqual(summary,{selected:2,sendable:1,missingEmail:1,invalidEmail:0,missingPdf:1,alreadySent:1,errors:1});
 
+const selection=C.classifySendSelection([
+  {invoiceNumber:'A',email:'first@example.com',pdfStatus:'PDF作成済み',sendStatus:'未送信'},
+  {invoiceNumber:'B',email:'resend@example.com',pdfStatus:'PDF作成済み',sendStatus:'再送済み'},
+  {invoiceNumber:'C',email:'',pdfStatus:'PDF作成済み',sendStatus:'未送信'},
+  {invoiceNumber:'D',email:'stopped@example.com',pdfStatus:'PDF作成済み',sendStatus:'配信停止'},
+  {invoiceNumber:'E',email:'sending@example.com',pdfStatus:'PDF作成済み',sendStatus:'送信中'}
+]);
+assert.deepEqual(selection.unsent.map(x=>x.invoiceNumber),['A']);
+assert.deepEqual(selection.resend.map(x=>x.invoiceNumber),['B']);
+assert.deepEqual(selection.blocked.map(x=>x.invoiceNumber),['C','D','E']);
+assert.equal(C.isInitialSendable(selection.selected[0]),true);
+assert.equal(C.isInitialSendable(selection.selected[1]),false);
+
 const quoted=C.parseCsv('a,b\n"x,y","z"\n');
 assert.deepEqual(quoted,[['a','b'],['x,y','z']]);
 console.log('core tests passed');

@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260802-logo">
+  <link rel="stylesheet" href="assets/styles.css?v=20260802-resend-modal">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
-  <script src="assets/core.js" defer></script>
+  <script src="assets/core.js?v=20260802-resend-modal" defer></script>
   <script src="assets/invoice-pdf.js?v=20260802-logo" defer></script>
-  <script src="assets/app.js?v=20260802-bridge" defer></script>
+  <script src="assets/app.js?v=20260802-resend-modal" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -46,8 +46,8 @@
       <section id="view-invoices" class="view">
         <div class="page-heading"><div><h1>請求書一覧・送信</h1><p>送信状態とPDF取得状況を別々に管理します。</p></div><button id="refreshInvoices" class="button secondary">最新状態を取得</button></div>
         <div class="selection-toolbar">
-          <button data-select="visible">表示中をすべて選択</button><button data-select="all">全件を選択</button><button data-select="none">選択解除</button><button data-select="unsent">未送信のみ</button><button data-select="failed">送信失敗のみ</button><button data-select="expired">期限切れのみ</button>
-          <button id="bulkSend" class="button primary">一括送信</button>
+          <button data-select="unsent">未送信のみ選択</button><button data-select="visible">表示中をすべて選択</button><button data-select="all">全件を選択</button><button data-select="none">選択を解除</button><button data-select="failed">送信失敗のみ</button><button data-select="expired">期限切れのみ</button>
+          <button id="bulkSend" class="button primary">選択した請求書を送信</button>
         </div>
         <div class="table-wrap wide"><table id="invoiceTable"><thead><tr><th>選択</th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>メール</th><th>CC</th><th>請求金額</th><th>PDF</th><th>送信状態</th><th>送信日時</th><th>DL状態</th><th>DL日時</th><th>有効期限</th><th>操作</th></tr></thead><tbody><tr class="empty"><td colspan="14">請求書がありません。</td></tr></tbody></table></div>
       </section>
@@ -93,5 +93,21 @@
 
   <dialog id="previewDialog" class="preview-dialog"><div class="dialog-head"><h2>PDFプレビュー</h2><button data-close aria-label="閉じる">×</button></div><div id="invoicePreviewHost"></div><div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="downloadPreview" class="button primary">PDFを保存</button></div></dialog>
   <dialog id="sendDialog"><div class="dialog-head"><h2>送信前の最終確認</h2><button data-close aria-label="閉じる">×</button></div><div id="sendSummary" class="summary-grid"></div><div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="reviewMessages" class="button secondary">送信内容を確認</button><button id="confirmSend" class="button primary">選択した0件を送信</button></div></dialog>
+  <dialog id="resendDialog" class="resend-dialog">
+    <div class="dialog-head"><h2>請求書再送の確認</h2><button data-close aria-label="閉じる">×</button></div>
+    <div class="resend-modal-body">
+      <div class="resend-warning" role="alert"><strong>⚠ 送信済みの請求書が選択されています。</strong><span>以下の請求書を再送しますか。</span></div>
+      <div id="resendSummary" class="summary-grid resend-summary"></div>
+      <h3>再送対象一覧</h3>
+      <div class="resend-table-scroll"><table><thead><tr><th>請求書番号</th><th>顧客名</th><th>送信先メールアドレス</th><th>前回送信日時</th><th>現在のDL状態</th></tr></thead><tbody id="resendTableBody"></tbody></table></div>
+      <div class="resend-explanation"><p>再送すると、新しいダウンロードURLを発行します。</p><p>以前のダウンロードURLは無効になります。</p><p>再送の履歴は配信履歴に保存されます。</p></div>
+    </div>
+    <div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="confirmResend" class="button danger">再送する</button></div>
+  </dialog>
+  <dialog id="disableDialog">
+    <div class="dialog-head"><h2>配信停止の確認</h2><button data-close aria-label="閉じる">×</button></div>
+    <div class="dialog-message"><p>この操作を行うと、送信済みメール内のURLから請求書を取得できなくなります。</p><p id="disableTarget"></p></div>
+    <div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="confirmDisable" class="button danger">配信停止する</button></div>
+  </dialog>
 </body>
 </html>

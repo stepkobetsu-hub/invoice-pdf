@@ -82,12 +82,21 @@
   }
 
   function validateEmail(value){return EMAIL.test(String(value||''));}
+  function isSentStatus(status){return ['送信済み','再送済み'].includes(String(status||''));}
+  function isInitialSendable(item){return String(item?.sendStatus||'')==='未送信'&&validateEmail(item?.email)&&item?.pdfStatus==='PDF作成済み';}
+  function isResendable(item){return isSentStatus(item?.sendStatus)&&validateEmail(item?.email)&&item?.pdfStatus==='PDF作成済み';}
+  function classifySendSelection(items){
+    const selected=Array.isArray(items)?items:[];
+    const unsent=selected.filter(isInitialSendable);
+    const resend=selected.filter(isResendable);
+    return {selected,unsent,resend,blocked:selected.filter(x=>!unsent.includes(x)&&!resend.includes(x))};
+  }
   function maskName(value){const chars=Array.from(String(value||''));if(chars.length<=1)return '＊';return chars[0]+'＊'.repeat(Math.max(1,chars.length-1));}
   function renderTemplate(text,data){return String(text).replace(/{{([^{}]+)}}/g,(_,key)=>String(data[key.trim()]??''));}
   function selectedSummary(items){
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,parseInvoiceRows,parsePartners,matchPartners,validateEmail,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,parseInvoiceRows,parsePartners,matchPartners,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
