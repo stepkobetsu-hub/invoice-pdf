@@ -34,3 +34,9 @@ Secret slots reserved for later phases:
 - Production: disabled configuration named `step-invoice-api-production`; no custom domain and no deployment in Phase 1
 
 The custom domain `invoice.step-edu.net` is connected only after a separate approval.
+
+## STEP shared-cloud evolution
+
+Migration `0002_step_common_foundation.sql` adds module-neutral file, token, and audit tables. Shared response security and opaque-token hashing live under `src/core/`. See `docs/step-common-cloud-foundation.md` for the recommended expansion path.
+
+R2 usage is checked in **Cloudflare Dashboard > R2 Object Storage > Overview > Usage**. This shows total storage, Class A operations, Class B operations, and current billable usage. Free-tier proximity is reported to an administrator; the application does not change configuration or stop services automatically.

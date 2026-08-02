@@ -10,6 +10,12 @@
     "TEST_SEND_APPROVED": "false",
     "PARENT_LINK_TTL_DAYS": "60"
   },
+  "r2_buckets": [
+    {
+      "binding": "PDFS",
+      "bucket_name": "step-invoice-pdfs"
+    }
+  ],
   "env": {
     "production": {
       "name": "step-invoice-api-production",
@@ -19,7 +25,13 @@
         "PRODUCTION_SEND_APPROVED": "false",
         "TEST_SEND_APPROVED": "false",
         "PARENT_LINK_TTL_DAYS": "60"
-      }
+      },
+      "r2_buckets": [
+        {
+          "binding": "PDFS",
+          "bucket_name": "step-invoice-pdfs"
+        }
+      ]
     }
   }
 }

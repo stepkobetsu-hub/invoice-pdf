@@ -1,10 +1,5 @@
-const SECURITY_HEADERS = {
-  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
-  "referrer-policy": "no-referrer",
-  "x-content-type-options": "nosniff",
-  "x-frame-options": "DENY",
-  "permissions-policy": "camera=(), microphone=(), geolocation=()",
-};
+import { html, json } from "./core/http.js";
+import { hashOpaqueToken, isOpaqueToken } from "./core/token.js";
 
 export default {
   async fetch(request, env) {
@@ -121,11 +116,11 @@ async function validateDelivery(env, token) {
   if (!env.DB || !env.PDFS) {
     return { ok: false, status: 503, reason: "テスト環境の保存領域を準備中です。" };
   }
-  if (!/^[A-Za-z0-9_-]{43,128}$/.test(token)) {
+  if (!isOpaqueToken(token)) {
     return { ok: false, status: 404, reason: "このURLは利用できません。" };
   }
 
-  const tokenHash = await sha256(token);
+  const tokenHash = await hashOpaqueToken(token);
   const row = await env.DB.prepare(`
     SELECT d.delivery_id, d.status, d.expires_at, d.revoked_at,
            i.invoice_number, i.r2_object_key,
@@ -145,12 +140,6 @@ async function validateDelivery(env, token) {
     return { ok: false, status: 410, reason: "このURLの有効期限が切れています。" };
   }
   return { ok: true, row };
-}
-
-async function sha256(value) {
-  const bytes = new TextEncoder().encode(value);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function downloadPage({ token, invoiceNumber, partnerName, expiresAt }) {
@@ -190,18 +179,4 @@ function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (char) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[char]);
-}
-
-function html(body, status = 200) {
-  return new Response(body, {
-    status,
-    headers: { "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store", ...SECURITY_HEADERS },
-  });
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...SECURITY_HEADERS },
-  });
 }
