@@ -25,10 +25,10 @@ function doGet(e) {
     const tpl = HtmlService.createTemplateFromFile('Download');
     tpl.token = token;
     tpl.delivery = delivery.publicData;
-    return tpl.evaluate().setTitle('個別指導ステップ 請求書ダウンロード').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    return tpl.evaluate().setTitle('個別指導ステップ 請求書ダウンロード');
   } catch (err) {
     log_('URLアクセス','','','','失敗',safeError_(err));
-    return HtmlService.createHtmlOutput('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>リンクをご利用いただけません</title><style>body{font-family:system-ui,sans-serif;background:#f5f7fb;color:#1b2a4a;margin:0;padding:48px 20px}.card{max-width:640px;margin:auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 10px 30px #1b2a4a18}h1{font-size:22px}p{line-height:1.8}</style></head><body><main class="card"><h1>このリンクはご利用いただけません</h1><p>有効期限切れ、または無効化された可能性があります。請求書の再送をご希望の場合は、個別指導ステップまでお問い合わせください。</p><p>電話: 0568-41-8937</p></main></body></html>').setTitle('リンクをご利用いただけません').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.DENY);
+    return HtmlService.createHtmlOutput('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>リンクをご利用いただけません</title><style>body{font-family:system-ui,sans-serif;background:#f5f7fb;color:#1b2a4a;margin:0;padding:48px 20px}.card{max-width:640px;margin:auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 10px 30px #1b2a4a18}h1{font-size:22px}p{line-height:1.8}</style></head><body><main class="card"><h1>このリンクはご利用いただけません</h1><p>有効期限切れ、または無効化された可能性があります。請求書の再送をご希望の場合は、個別指導ステップまでお問い合わせください。</p><p>電話: 0568-41-8937</p></main></body></html>').setTitle('リンクをご利用いただけません');
   }
 }
 
