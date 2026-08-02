@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.9. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.11. */
 const STEP = Object.freeze({
   SHEETS: {
     PARTNERS: '取引先マスタ', SETTINGS: '基本設定', TEMPLATES: 'メール定型文', INVOICES: '請求書データ',
@@ -46,6 +46,8 @@ function doPost(e) {
     const routes = {
       getDashboard: () => getDashboard_(), importPartners: () => importPartners_(payload.partners || []),
       savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || ''), enqueueSend: () => enqueueSend_(payload),
+      prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true})),
+      releasePreparedSend: () => releasePreparedSend_(payload.deliveryId),
       disableDelivery: () => disableDelivery_(payload.invoiceNumber), saveSettings: () => saveSettings_(payload),
       recoverQueue: () => recoverStuckQueue_()
     };
@@ -166,14 +168,35 @@ function enqueueSend_(payload) {
       const deliveryId = Utilities.getUuid(), queueId = Utilities.getUuid(), token = createToken_(), tokenHash = hashToken_(token), now = new Date();
       const settings=settings_(), expires=new Date(now.getTime()+Number(settings.validDays||45)*86400000);
       const subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
-      sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],email,inv.values[invoices.map['CCメールアドレス']],subject,'','送信待ち','',tokenHash,now,expires,'','','',0,0,'送信待ち',inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
+      const prepared = payload.preflight === true, initialStatus = prepared ? '送信前確認' : '送信待ち';
+      sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],email,inv.values[invoices.map['CCメールアドレス']],subject,'',initialStatus,'',tokenHash,now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
       cacheTokenForQueue_(deliveryId,token);
-      queue.appendRow([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,'送信待ち',0,now,'','','']);
-      results.push({invoiceNumber:number,deliveryId,queueId});
+      queue.appendRow([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','']);
+      const baseUrl=settings.webAppUrl||ScriptApp.getService().getUrl()||'';
+      results.push({invoiceNumber:number,deliveryId,queueId,preflightUrl:prepared?baseUrl+'?t='+encodeURIComponent(token):''});
       log_(payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','');
     });
     return {queued:results.length,items:results,testMode};
   } finally { lock.releaseLock(); }
+}
+
+function releasePreparedSend_(deliveryId) {
+  requirePermission_('メール送信');
+  const id=String(deliveryId||''); if(!id) throw new Error('配信IDがありません。');
+  const queueSheet=sheet_(STEP.SHEETS.QUEUE), queue=table_(queueSheet);
+  const q=queue.rows.find(r=>String(r.values[queue.map['配信ID']])===id); if(!q) throw new Error('送信前確認キューがありません。');
+  if(q.values[queue.map['状態']]!=='送信前確認') throw new Error('送信前確認中のキューではありません。');
+  const delivery=findDeliveryById_(id); if(!delivery) throw new Error('配信履歴がありません。');
+  const d=delivery.values,m=delivery.map,settings=settings_();
+  if(String(q.values[queue.map['テストモード']])!=='true'&&q.values[queue.map['テストモード']]!==true) throw new Error('本番送信はこの確認処理では解除できません。');
+  if(String(settings.testRecipient||'').toLowerCase()!==String(d[m['送信先メールアドレス']]||'').toLowerCase()) throw new Error('テスト送信先が請求書の送信先と一致しません。');
+  if(d[m['無効化日時']]) throw new Error('このURLは既に無効です。');
+  if(new Date(d[m['トークン有効期限']]).getTime()<Date.now()) throw new Error('このURLは期限切れです。');
+  const now=new Date();
+  updateRow_(queueSheet,q.rowNumber,queue.map,{'状態':'送信待ち','開始日時':'','完了日時':'','エラー':''});
+  updateDeliveryById_(id,{'送信状態':'送信待ち','送信エラー':'','初回アクセス日時':'','初回ダウンロード日時':'','最終アクセス日時':'','アクセス回数':0,'ダウンロード回数':0,'現在状態':'送信待ち','更新日時':now});
+  log_('送信前URL確認',d[m['請求書番号']],d[m['顧客コード']],id,'成功','');
+  return {released:true,invoiceNumber:d[m['請求書番号']]};
 }
 
 function sendOne_(queueValues, queueMap, settings) {
@@ -224,7 +247,7 @@ function validateToken_(token, recordAccess) {
   return {row:{sheet:sh,rowNumber:row.rowNumber,map:m,values:v},publicData:{name:settings.nameDisplay==='full'?v[m['宛名']]:maskName_(v[m['宛名']]),subject:invoice.対象年月||'',invoiceNumber:v[m['請求書番号']],amount:settings.amountDisplay==='hide'?'非表示':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円',expiresAt:formatDate_(v[m['トークン有効期限']])}};
 }
 
-function getDashboard_() { requirePermission_('履歴閲覧'); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])];return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?d.values[deliveries.map['現在状態']]:'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
+function getDashboard_() { requirePermission_('履歴閲覧'); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)), activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])];return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?d.values[deliveries.map['現在状態']]:'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
 
 function upsertInvoice_(inv,fileId,fileName){const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),now=new Date(),existing=t.rows.find(r=>String(r.values[t.map['請求書番号']])===String(inv.invoiceNumber));const partner=findPartner_(inv.customerCode,inv.partnerName);const row={'請求書番号':String(inv.invoiceNumber),'顧客コード':String(inv.customerCode||''),'宛名':inv.partnerName||'','敬称':inv.honorific||'様','対象年月':inv.subject||'','請求日':inv.invoiceDate||'','支払期限':inv.dueDate||'','郵便番号':String(inv.postal||''),'住所':String(inv.prefecture||'')+String(inv.address1||'')+String(inv.address2||''),'税抜小計':Number(inv.subtotal||0),'消費税額':Number(inv.tax||0),'請求金額':Number(inv.total||0),'メールアドレス':partner['メールアドレス']||inv.email||'','CCメールアドレス':partner['CCメールアドレス']||inv.cc||'','PDF状態':'PDF作成済み','PDFファイルID':fileId,'PDFファイル名':fileName,'現在状態':'PDF作成済み','作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now};if(existing)updateRow_(sh,existing.rowNumber,t.map,row);else sh.appendRow(STEP.INVOICE_HEADERS.map(h=>row[h]));const ds=sheet_(STEP.SHEETS.DETAILS),dt=table_(ds);dt.rows.filter(r=>String(r.values[dt.map['請求書番号']])===String(inv.invoiceNumber)).reverse().forEach(r=>ds.deleteRow(r.rowNumber));(inv.details||[]).forEach((d,i)=>ds.appendRow([String(inv.invoiceNumber),i+1,d.deliveryDate||'',d.name||'',d.itemCode||'',Number(d.unitPrice||0),Number(d.quantity||0),d.unit||'',Number(d.amount||0),d.taxRate||'']));}
 function findPartner_(code,name){const t=table_(sheet_(STEP.SHEETS.PARTNERS));const row=t.rows.find(r=>String(r.values[t.map['顧客コード']])===String(code))||t.rows.find(r=>String(r.values[t.map['名称']]).replace(/\s/g,'')===String(name).replace(/\s/g,''));return row?objectRow_(row.values,t.map):{};}
