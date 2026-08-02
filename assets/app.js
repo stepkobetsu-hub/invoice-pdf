@@ -10,14 +10,15 @@
   async function api(action,payload={}){
     const url=state.settings.apiUrl;if(!url)throw new Error('基本設定でApps ScriptデプロイURLを設定してください。');
     const requestId=`step-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const bridgeNonce=[...crypto.getRandomValues(new Uint32Array(4))].map(x=>x.toString(16).padStart(8,'0')).join('');
     const frame=document.createElement('iframe');frame.name=requestId;frame.hidden=true;document.body.appendChild(frame);
     const form=document.createElement('form');form.method='POST';form.action=url;form.target=requestId;form.hidden=true;
-    const fields={bridge:'1',requestId,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||''};
+    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||''};
     Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);});
     document.body.appendChild(form);
     return new Promise((resolve,reject)=>{
       const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();frame.remove();};
-      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.source===frame.contentWindow);if(!trustedOrigin||!event.data||event.data.requestId!==requestId)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
+      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.data?.bridgeNonce===bridgeNonce);if(!trustedOrigin||!event.data||event.data.requestId!==requestId||event.data.bridgeNonce!==bridgeNonce)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
       const timer=setTimeout(()=>{cleanup();reject(new Error('Apps Script APIがタイムアウトしました。'));},30000);
       window.addEventListener('message',onMessage);form.submit();
     });
