@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.9. */
 const STEP = Object.freeze({
   SHEETS: {
     PARTNERS: '取引先マスタ', SETTINGS: '基本設定', TEMPLATES: 'メール定型文', INVOICES: '請求書データ',
