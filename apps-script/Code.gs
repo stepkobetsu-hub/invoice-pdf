@@ -181,7 +181,9 @@ function sendOne_(queueValues, queueMap, settings) {
   const d=delivery.values,m=delivery.map,token=takeCachedToken_(deliveryId); if(!token) throw new Error('トークン発行失敗またはキュー期限切れです。');
   const testMode=String(queueValues[queueMap['テストモード']])==='true'||queueValues[queueMap['テストモード']]===true;
   const recipient=testMode?settings.testRecipient:d[m['送信先メールアドレス']]; if(!recipient) throw new Error(testMode?'テスト送信先未登録':'メールアドレス未登録');
-  const url=(ScriptApp.getService().getUrl()||settings.webAppUrl||'')+'?t='+encodeURIComponent(token); if(!/^https:\/\//.test(url)) throw new Error('Apps ScriptデプロイURL未設定');
+  // Use the explicitly configured public deployment URL first. getUrl() may
+  // return a deployment URL that belongs to an older executing deployment.
+  const url=(settings.webAppUrl||ScriptApp.getService().getUrl()||'')+'?t='+encodeURIComponent(token); if(!/^https:\/\//.test(url)) throw new Error('Apps ScriptデプロイURL未設定');
   const invoice=findInvoice_(d[m['請求書番号']]);
   const values={'取引先名':d[m['宛名']],'敬称':invoice.敬称||'様','顧客コード':d[m['顧客コード']],'対象年月':invoice.対象年月||'','請求書番号':d[m['請求書番号']],'請求金額':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円','支払期限':invoice.支払期限||'','有効日数':settings.validDays||45,'有効期限':formatDate_(d[m['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
   let subject=merge_(settings.subject||d[m['メール件名']],values), body=merge_(settings.body||defaultMailBody_(),values);
