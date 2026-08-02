@@ -13,6 +13,11 @@ assert.equal(config.vars.TEST_SEND_APPROVED, "false");
 assert.equal(config.workers_dev, true);
 assert.equal(config.env.production.workers_dev, false);
 assert.equal(config.r2_buckets[0].bucket_name, "step-invoice-pdfs");
+assert.equal(config.vars.PUBLIC_DOWNLOAD_ENABLED, "true");
+assert.equal(config.vars.PDF_UPLOAD_ENABLED, "false");
+assert.equal(config.vars.ADMIN_API_ENABLED, "false");
+assert.equal(config.vars.EMERGENCY_STOP, "false");
+assert.equal(config.ratelimits.length, 4);
 
 for (const table of [
   "partners", "invoices", "invoice_items", "deliveries", "download_events",
@@ -21,8 +26,8 @@ for (const table of [
   assert.match(migration, new RegExp(`CREATE TABLE ${table}\\s*\\(`));
 }
 
-assert.match(source, /env\.PRODUCTION_SEND_APPROVED === "true"/);
-assert.match(source, /env\.TEST_SEND_APPROVED === "true"/);
+assert.match(source, /env\.PRODUCTION_SEND_APPROVED !== "true"/);
+assert.match(source, /env\.TEST_SEND_APPROVED !== "true"/);
 assert.match(source, /EMAIL_SEND_DISABLED/);
 assert.doesNotMatch(source, /brevo|sendinblue|google\.com|drive\.google|script\.google/i);
 assert.doesNotMatch(migration, /@gmail\.com|7132[678]|裏横地|表太田|星中山/);

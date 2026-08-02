@@ -1,23 +1,28 @@
 import { html, json } from "./core/http.js";
 import { hashOpaqueToken, isOpaqueToken } from "./core/token.js";
 
+const UNAVAILABLE_REASON = "このURLは利用できません。";
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({
-        ok: true,
-        service: "step-invoice-api",
-        environment: env.APP_ENV || "development",
-        productionSendApproved: false,
-        testSendApproved: false,
-        emailProviderConfigured: false,
-      });
+      return json({ ok: true, service: "step-invoice-api" });
     }
 
-    if (request.method === "POST" && url.pathname === "/api/send") {
-      return sendDisabled(env);
+    if (env.EMERGENCY_STOP === "true") {
+      return url.pathname.startsWith("/api/")
+        ? json({ ok: false, error: "SERVICE_PAUSED" }, 503)
+        : html(servicePausedPage(), 503);
+    }
+
+    if (url.pathname.startsWith("/api/admin/")) {
+      return serveAdminRequest(request, env, url);
+    }
+
+    if (url.pathname === "/api/send") {
+      return sendDisabled(request, env);
     }
 
     const pdfMatch = url.pathname.match(/^\/d\/([^/]+)\/pdf$/);
@@ -34,43 +39,67 @@ export default {
   },
 };
 
-function sendDisabled(env) {
-  const productionApproved = env.PRODUCTION_SEND_APPROVED === "true";
-  const testApproved = env.TEST_SEND_APPROVED === "true";
-  if (!productionApproved || !testApproved) {
-    return json({
-      ok: false,
-      error: "EMAIL_SEND_DISABLED",
-      message: "メール送信は管理者の二重承認がないため無効です。",
-    }, 403);
+async function serveAdminRequest(request, env, url) {
+  if (env.EMERGENCY_STOP === "true" || env.ADMIN_API_ENABLED !== "true") {
+    return json({ ok: false, error: "ADMIN_API_DISABLED" }, 403);
   }
-  return json({
-    ok: false,
-    error: "EMAIL_PROVIDER_NOT_CONFIGURED",
-    message: "第1段階ではメール送信プロバイダーを構成していません。",
-  }, 503);
+  if (!isAuthorizedAdmin(request, env)) {
+    return json({ ok: false, error: "ADMIN_AUTH_REQUIRED" }, 401);
+  }
+
+  const match = url.pathname.match(/^\/api\/admin\/invoices\/([^/]+)\/pdf$/);
+  if (request.method !== "GET" || !match) {
+    return json({ ok: false, error: "ADMIN_ROUTE_NOT_FOUND" }, 404);
+  }
+
+  const row = await env.DB.prepare(`
+    SELECT r2_object_key FROM invoices WHERE invoice_id = ?1 LIMIT 1
+  `).bind(match[1]).first();
+  if (!row?.r2_object_key) return json({ ok: false, error: "PDF_NOT_FOUND" }, 404);
+
+  const object = await env.PDFS.get(row.r2_object_key);
+  if (!object) return json({ ok: false, error: "PDF_NOT_FOUND" }, 404);
+  return pdfResponse(object);
+}
+
+function isAuthorizedAdmin(request, env) {
+  if (!env.ADMIN_API_KEY) return false;
+  return request.headers.get("authorization") === `Bearer ${env.ADMIN_API_KEY}`;
+}
+
+function sendDisabled(request, env) {
+  if (env.EMERGENCY_STOP === "true" || env.ADMIN_API_ENABLED !== "true") {
+    return json({ ok: false, error: "EMAIL_SEND_DISABLED" }, 403);
+  }
+  if (!isAuthorizedAdmin(request, env)) {
+    return json({ ok: false, error: "ADMIN_AUTH_REQUIRED" }, 401);
+  }
+  if (env.PRODUCTION_SEND_APPROVED !== "true" || env.TEST_SEND_APPROVED !== "true") {
+    return json({ ok: false, error: "EMAIL_SEND_DISABLED" }, 403);
+  }
+  return json({ ok: false, error: "EMAIL_PROVIDER_NOT_CONFIGURED" }, 503);
 }
 
 async function serveDownloadPage(request, env, token) {
+  const gate = await publicDownloadGate(request, env, token, "page");
+  if (!gate.ok) return gate.response;
+
   const delivery = await validateDelivery(env, token);
-  if (!delivery.ok) return html(unavailablePage(delivery.reason), delivery.status);
+  if (!delivery.ok) return html(unavailablePage(UNAVAILABLE_REASON), delivery.status);
+
+  const exactRate = await enforceKnownDeliveryRate(request, env, token, "page");
+  if (!exactRate.ok) return html(rateLimitedPage(), 429);
 
   const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare(`
-      UPDATE deliveries
-      SET first_opened_at = COALESCE(first_opened_at, ?1),
-          last_opened_at = ?1,
-          open_count = open_count + 1,
-          status = CASE WHEN status = 'sent' THEN 'opened' ELSE status END
-      WHERE delivery_id = ?2
-    `).bind(now, delivery.row.delivery_id),
-    env.DB.prepare(`
-      INSERT INTO download_events
-        (event_id, delivery_id, event_type, occurred_at, user_agent_present, ip_stored)
-      VALUES (?1, ?2, 'open', ?3, ?4, 0)
-    `).bind(crypto.randomUUID(), delivery.row.delivery_id, now, request.headers.has("user-agent") ? 1 : 0),
-  ]);
+  await env.DB.prepare(`
+    UPDATE deliveries
+    SET first_opened_at = COALESCE(first_opened_at, ?1),
+        last_opened_at = ?1,
+        open_count = open_count + 1,
+        status = CASE WHEN status = 'sent' THEN 'opened' ELSE status END,
+        updated_at = ?1
+    WHERE delivery_id = ?2
+  `).bind(now, delivery.row.delivery_id).run();
 
   return html(downloadPage({
     token,
@@ -81,48 +110,127 @@ async function serveDownloadPage(request, env, token) {
 }
 
 async function servePdf(request, env, token) {
+  const gate = await publicDownloadGate(request, env, token, "pdf");
+  if (!gate.ok) return gate.response;
+
   const delivery = await validateDelivery(env, token);
-  if (!delivery.ok) return html(unavailablePage(delivery.reason), delivery.status);
+  if (!delivery.ok) return html(unavailablePage(UNAVAILABLE_REASON), delivery.status);
+
+  const exactRate = await enforceKnownDeliveryRate(request, env, token, "pdf");
+  if (!exactRate.ok) return html(rateLimitedPage(), 429);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const maxTotal = positiveInt(env.PDF_DOWNLOAD_MAX_TOTAL, 20);
+  const maxDaily = positiveInt(env.PDF_DOWNLOAD_MAX_DAILY, 10);
+  const dailyCount = delivery.row.download_day === today ? Number(delivery.row.download_day_count || 0) : 0;
+  if (Number(delivery.row.download_count || 0) >= maxTotal || dailyCount >= maxDaily) {
+    return html(downloadLimitPage(), 429);
+  }
 
   const object = await env.PDFS.get(delivery.row.r2_object_key);
-  if (!object) return html(unavailablePage("PDFが見つかりません。"), 404);
+  if (!object) return html(unavailablePage(UNAVAILABLE_REASON), 404);
 
   const now = new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare(`
-      UPDATE deliveries
-      SET downloaded_at = COALESCE(downloaded_at, ?1),
-          download_count = download_count + 1,
-          status = 'downloaded'
-      WHERE delivery_id = ?2
-    `).bind(now, delivery.row.delivery_id),
-    env.DB.prepare(`
-      INSERT INTO download_events
-        (event_id, delivery_id, event_type, occurred_at, user_agent_present, ip_stored)
-      VALUES (?1, ?2, 'download', ?3, ?4, 0)
-    `).bind(crypto.randomUUID(), delivery.row.delivery_id, now, request.headers.has("user-agent") ? 1 : 0),
+  await env.DB.prepare(`
+    UPDATE deliveries
+    SET downloaded_at = COALESCE(downloaded_at, ?1),
+        download_count = download_count + 1,
+        download_day = ?2,
+        download_day_count = CASE WHEN download_day = ?2 THEN download_day_count + 1 ELSE 1 END,
+        status = 'downloaded',
+        updated_at = ?1
+    WHERE delivery_id = ?3
+  `).bind(now, today, delivery.row.delivery_id).run();
+
+  return pdfResponse(object);
+}
+
+async function publicDownloadGate(request, env, token, routeKind) {
+  if (env.EMERGENCY_STOP === "true") {
+    return { ok: false, response: html(servicePausedPage(), 503) };
+  }
+  if (env.PUBLIC_DOWNLOAD_ENABLED !== "true") {
+    return { ok: false, response: html(servicePausedPage(), 503) };
+  }
+  if (!env.TOKEN_PEPPER) {
+    return { ok: false, response: html(servicePausedPage(), 503) };
+  }
+
+  const rate = await enforceRateLimit(request, env, token, routeKind);
+  if (!rate.ok) {
+    return { ok: false, response: html(rateLimitedPage(), 429) };
+  }
+  return { ok: true };
+}
+
+async function enforceRateLimit(request, env, token, routeKind) {
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const [ipKey, tokenKey] = await Promise.all([
+    hashOpaqueToken(`${env.TOKEN_PEPPER}|ip|${ip}`),
+    hashOpaqueToken(`${env.TOKEN_PEPPER}|token|${String(token).slice(0, 128)}`),
   ]);
 
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set("content-type", "application/pdf");
-  headers.set("content-disposition", "inline; filename=invoice.pdf");
-  headers.set("cache-control", "private, no-store");
-  headers.set("x-content-type-options", "nosniff");
-  return new Response(object.body, { headers });
+  const ipLimiter = routeKind === "pdf" ? env.PDF_IP_RATE_LIMITER : env.PAGE_IP_RATE_LIMITER;
+  const tokenLimiter = routeKind === "pdf" ? env.PDF_TOKEN_RATE_LIMITER : env.PAGE_TOKEN_RATE_LIMITER;
+  if (!ipLimiter?.limit || !tokenLimiter?.limit) return { ok: false };
+
+  const [ipResult, tokenResult] = await Promise.all([
+    ipLimiter.limit({ key: ipKey }),
+    tokenLimiter.limit({ key: tokenKey }),
+  ]);
+  return { ok: ipResult.success && tokenResult.success };
+}
+
+async function enforceKnownDeliveryRate(request, env, token, routeKind) {
+  const now = new Date();
+  const bucket = now.toISOString().slice(0, 16);
+  const expiresAt = new Date(now.getTime() + 120_000).toISOString();
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const tokenLimit = routeKind === "pdf" ? 5 : 10;
+  const ipLimit = routeKind === "pdf" ? 10 : 30;
+  const [tokenSubject, ipSubject] = await Promise.all([
+    hashOpaqueToken(`${env.TOKEN_PEPPER}|exact-token|${token}`),
+    hashOpaqueToken(`${env.TOKEN_PEPPER}|exact-ip|${ip}`),
+  ]);
+
+  // Count only known, valid deliveries. Unknown-token attacks do not create rows.
+  const tokenAllowed = await incrementMinuteCounter(env, routeKind, "token", tokenSubject, bucket, expiresAt, tokenLimit);
+  if (!tokenAllowed) return { ok: false };
+  const ipAllowed = await incrementMinuteCounter(env, routeKind, "ip", ipSubject, bucket, expiresAt, ipLimit);
+  return { ok: ipAllowed };
+}
+
+async function incrementMinuteCounter(env, routeKind, subjectKind, subjectHash, bucket, expiresAt, limit) {
+  const counterKey = `${routeKind}:${subjectKind}:${subjectHash}`;
+  const result = await env.DB.prepare(`
+    INSERT INTO abuse_counters (
+      counter_key, time_bucket, category, subject_hash,
+      failure_count, last_seen_at, expires_at
+    ) VALUES (?1, ?2, ?3, ?4, 1, datetime('now'), ?5)
+    ON CONFLICT(counter_key) DO UPDATE SET
+      time_bucket = excluded.time_bucket,
+      failure_count = CASE
+        WHEN abuse_counters.time_bucket = excluded.time_bucket THEN abuse_counters.failure_count + 1
+        ELSE 1
+      END,
+      last_seen_at = datetime('now'),
+      expires_at = excluded.expires_at
+    WHERE abuse_counters.time_bucket != excluded.time_bucket
+       OR abuse_counters.failure_count < ?6
+    RETURNING failure_count
+  `).bind(counterKey, bucket, `${routeKind}:${subjectKind}`, subjectHash, expiresAt, limit).first();
+  return Boolean(result && Number(result.failure_count) <= limit);
 }
 
 async function validateDelivery(env, token) {
-  if (!env.DB || !env.PDFS) {
-    return { ok: false, status: 503, reason: "テスト環境の保存領域を準備中です。" };
-  }
-  if (!isOpaqueToken(token)) {
-    return { ok: false, status: 404, reason: "このURLは利用できません。" };
+  if (!env.DB || !env.PDFS || !isOpaqueToken(token)) {
+    return { ok: false, status: 404 };
   }
 
   const tokenHash = await hashOpaqueToken(token);
   const row = await env.DB.prepare(`
     SELECT d.delivery_id, d.status, d.expires_at, d.revoked_at,
+           d.download_count, d.download_day, d.download_day_count,
            i.invoice_number, i.r2_object_key,
            p.name AS partner_name
     FROM deliveries d
@@ -132,14 +240,25 @@ async function validateDelivery(env, token) {
     LIMIT 1
   `).bind(tokenHash).first();
 
-  if (!row) return { ok: false, status: 404, reason: "このURLは利用できません。" };
-  if (row.revoked_at || row.status === "revoked") {
-    return { ok: false, status: 410, reason: "このURLは利用できません。最新の案内をご確認ください。" };
-  }
-  if (!row.expires_at || Date.parse(row.expires_at) <= Date.now()) {
-    return { ok: false, status: 410, reason: "このURLの有効期限が切れています。" };
+  if (!row || row.revoked_at || row.status === "revoked" || !row.expires_at || Date.parse(row.expires_at) <= Date.now()) {
+    return { ok: false, status: 404 };
   }
   return { ok: true, row };
+}
+
+function pdfResponse(object) {
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("content-type", "application/pdf");
+  headers.set("content-disposition", "inline; filename=invoice.pdf");
+  headers.set("cache-control", "private, no-store");
+  headers.set("x-content-type-options", "nosniff");
+  return new Response(object.body, { headers });
+}
+
+function positiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function downloadPage({ token, invoiceNumber, partnerName, expiresAt }) {
@@ -151,19 +270,34 @@ function downloadPage({ token, invoiceNumber, partnerName, expiresAt }) {
 <p class="lead">${escapeHtml(partnerName)} 様の請求書をご用意しました。</p>
 <dl><div><dt>請求書番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div><div><dt>有効期限</dt><dd>${escapeHtml(formatDate(expiresAt))}</dd></div></dl>
 <a class="button" href="/d/${encodeURIComponent(token)}/pdf">請求書PDFを表示・ダウンロード</a>
-<p class="note">PDFは非公開ストレージから安全に取得されます。Google Driveには移動しません。</p>
+<p class="note">PDFはSTEPの保護された配信経路から取得されます。</p>
 </main></body></html>`;
 }
 
 function unavailablePage(reason) {
+  return messagePage("このダウンロードURLは現在ご利用いただけません。", reason);
+}
+
+function downloadLimitPage() {
+  return messagePage("ダウンロード回数の上限に達しました。", "この請求書はダウンロード回数の上限に達しました。個別指導ステップまでお問い合わせください。");
+}
+
+function rateLimitedPage() {
+  return messagePage("短時間にアクセスが集中しています。", "しばらく待ってから、もう一度お試しください。");
+}
+
+function servicePausedPage() {
+  return messagePage("現在、請求書配信サービスを一時停止しています。", "お急ぎの場合は個別指導ステップまでお問い合わせください。");
+}
+
+function messagePage(title, message) {
   return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ダウンロードURLをご利用いただけません</title><style>${pageCss()}</style></head>
-<body><main class="card"><div class="brand">個別指導ステップ</div><h1>このダウンロードURLは現在ご利用いただけません。</h1>
-<p class="lead">${escapeHtml(reason)}</p><p>最新の案内をご確認いただくか、個別指導ステップまでお問い合わせください。</p></main></body></html>`;
+<title>${escapeHtml(title)}</title><style>${pageCss()}</style></head><body><main class="card"><div class="brand">個別指導ステップ</div>
+<h1>${escapeHtml(title)}</h1><p class="lead">${escapeHtml(message)}</p></main></body></html>`;
 }
 
 function notFoundPage() {
-  return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STEP請求書</title><style>${pageCss()}</style></head><body><main class="card"><div class="brand">個別指導ステップ</div><h1>ページが見つかりません。</h1></main></body></html>`;
+  return messagePage("ページが見つかりません。", "URLをご確認ください。");
 }
 
 function pageCss() {

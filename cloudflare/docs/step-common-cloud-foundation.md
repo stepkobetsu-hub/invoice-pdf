@@ -18,3 +18,12 @@ Invoice-specific tables remain isolated for accounting rules. Generic resources 
 ## Storage evolution
 
 `step-invoice-pdfs` remains invoice-only and private. A future shared `step-files` bucket should use namespaced object keys such as `{module}/{year}/{opaque-id}` and separate bindings per environment. Public bucket access and direct R2 URLs remain prohibited.
+
+## Cost and abuse controls
+
+- Public download, administration, upload, and email routes have independent feature gates.
+- `EMERGENCY_STOP` blocks all mutable and public delivery routes without changing application code.
+- Cloudflare Rate Limiting bindings reject abusive page/PDF traffic before D1 or R2 access. Because the binding is eventually consistent, valid deliveries also reuse fixed D1 counter rows for exact one-minute thresholds; invalid tokens never create those rows and never reach R2.
+- PDF downloads are capped per token and per UTC day; administrator retrieval uses a separately authenticated route and ignores parent limits.
+- Invalid tokens are not persisted per request and never reach R2. Aggregated counters and security alerts are available for later monitoring jobs.
+- Budget alerts are informational warnings, never described as an automatic billing cap.

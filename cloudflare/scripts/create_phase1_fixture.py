@@ -80,7 +80,7 @@ def create_fixture() -> None:
         "token": token,
         "masked_token": f"{token[:4]}...{token[-4:]}",
         "token_hash": token_hash,
-        "object_key": "phase1/cloudflare-r2-test.pdf",
+        "object_key": f"invoices/2026/08/{secrets.token_hex(24)}.pdf",
         "pdf_path": str(PDF_PATH),
         "pdf_sha256": pdf_hash,
         "pdf_size": len(pdf_bytes),
