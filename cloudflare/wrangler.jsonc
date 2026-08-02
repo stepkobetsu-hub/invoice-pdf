@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "step-invoice-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-03",
+  "workers_dev": true,
+  "vars": {
+    "APP_ENV": "development",
+    "PRODUCTION_SEND_APPROVED": "false",
+    "TEST_SEND_APPROVED": "false",
+    "PARENT_LINK_TTL_DAYS": "60"
+  },
+  "env": {
+    "production": {
+      "name": "step-invoice-api-production",
+      "workers_dev": false,
+      "vars": {
+        "APP_ENV": "production",
+        "PRODUCTION_SEND_APPROVED": "false",
+        "TEST_SEND_APPROVED": "false",
+        "PARENT_LINK_TTL_DAYS": "60"
+      }
+    }
+  }
+}

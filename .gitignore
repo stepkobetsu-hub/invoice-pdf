@@ -6,3 +6,6 @@ Thumbs.db
 *.csv
 !tests/fixtures/*.csv
 node_modules/
+cloudflare/.dev.vars
+cloudflare/.wrangler/
+cloudflare/wrangler.local.jsonc
