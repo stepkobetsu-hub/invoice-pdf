@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>STEP請求書PDF作成・配信システム</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" defer></script>
+  <script src="assets/core.js" defer></script>
+  <script src="assets/invoice-pdf.js" defer></script>
+  <script src="assets/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><img src="assets/step-logo.jpg" alt="個別指導ステップ"><div><strong>STEP請求書</strong><span>PDF作成・配信システム</span></div></div>
+    <div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">未接続</span></div>
+  </header>
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="メインメニュー">
+      <button class="nav-item active" data-view="create">1. 請求書作成</button>
+      <button class="nav-item" data-view="invoices">2. 請求書一覧・送信</button>
+      <button class="nav-item" data-view="partners">3. 取引先マスタ</button>
+      <button class="nav-item" data-view="history">4. 配信履歴</button>
+      <button class="nav-item" data-view="settings">5. 基本設定</button>
+      <button class="nav-item" data-view="mail">6. メール設定</button>
+    </nav>
+    <main class="main">
+      <div id="globalAlert" class="alert hidden" role="alert"></div>
+
+      <section id="view-create" class="view active">
+        <div class="page-heading"><div><h1>請求書作成</h1><p>CSV読込後に内容を確認し、PDFを確定してから送信一覧へ追加します。</p></div></div>
+        <ol class="steps" id="createSteps"><li class="active">CSV読込</li><li>取引先照合</li><li>内容確認</li><li>PDFプレビュー</li><li>PDF確定</li><li>送信一覧へ追加</li></ol>
+        <div class="panel upload-panel">
+          <label class="file-drop">請求書CSVを選択<input id="invoiceCsv" type="file" accept=".csv,text/csv"><span>UTF-8／CP932／Shift-JISに対応</span></label>
+          <button id="loadSample" class="button secondary">検証用サンプルを読み込む</button>
+        </div>
+        <div id="invoiceImportSummary" class="summary-grid hidden"></div>
+        <div class="table-wrap">
+          <table id="createTable"><thead><tr><th>選択</th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>対象年月</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
+        </div>
+        <div class="actions"><button id="confirmPdf" class="button primary" disabled>選択した請求書のPDFを確定</button><button id="addToSend" class="button success" disabled>送信一覧へ追加</button></div>
+      </section>
+
+      <section id="view-invoices" class="view">
+        <div class="page-heading"><div><h1>請求書一覧・送信</h1><p>送信状態とPDF取得状況を別々に管理します。</p></div><button id="refreshInvoices" class="button secondary">最新状態を取得</button></div>
+        <div class="selection-toolbar">
+          <button data-select="visible">表示中をすべて選択</button><button data-select="all">全件を選択</button><button data-select="none">選択解除</button><button data-select="unsent">未送信のみ</button><button data-select="failed">送信失敗のみ</button><button data-select="expired">期限切れのみ</button>
+          <button id="bulkSend" class="button primary">一括送信</button>
+        </div>
+        <div class="table-wrap wide"><table id="invoiceTable"><thead><tr><th>選択</th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>メール</th><th>CC</th><th>請求金額</th><th>PDF</th><th>送信状態</th><th>送信日時</th><th>DL状態</th><th>DL日時</th><th>有効期限</th><th>操作</th></tr></thead><tbody><tr class="empty"><td colspan="14">請求書がありません。</td></tr></tbody></table></div>
+      </section>
+
+      <section id="view-partners" class="view">
+        <div class="page-heading"><div><h1>取引先マスタ</h1><p>Money Forward形式20列を文字コードを判定して取り込みます。</p></div><label class="button secondary">CSV取込<input id="partnerCsv" type="file" accept=".csv" hidden></label></div>
+        <div class="table-wrap wide"><table id="partnerTable"><thead><tr><th>顧客コード</th><th>名称</th><th>敬称</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>メール</th><th>CC</th><th>メモ</th></tr></thead><tbody><tr class="empty"><td colspan="9">取引先CSVを読み込んでください。</td></tr></tbody></table></div>
+      </section>
+
+      <section id="view-history" class="view">
+        <div class="page-heading"><div><h1>配信履歴</h1><p>初回送信、再送、アクセス、PDF取得、無効化を監査できます。</p></div><button id="refreshHistory" class="button secondary">更新</button></div>
+        <div class="table-wrap wide"><table id="historyTable"><thead><tr><th>日時</th><th>操作</th><th>請求書番号</th><th>宛名</th><th>配信ID</th><th>送信状態</th><th>URL状態</th><th>結果・理由</th></tr></thead><tbody><tr class="empty"><td colspan="8">履歴がありません。</td></tr></tbody></table></div>
+      </section>
+
+      <section id="view-settings" class="view">
+        <div class="page-heading"><div><h1>基本設定</h1><p>PDFテンプレートの座標は承認済み正本として固定されています。</p></div></div>
+        <form id="settingsForm" class="form-grid panel">
+          <label>事業者名<input name="businessName" value="個別指導ステップ"></label><label>郵便番号<input name="businessPostal" value="487-0024"></label><label class="span-2">住所<input name="businessAddress" value="愛知県春日井市大留町1丁目23-2"></label><label>電話番号<input name="businessPhone" value="0568-41-8937"></label><label>10円単位丸め<select name="rounding"><option value="nearest10" selected>四捨五入</option></select></label><label>氏名表示<select name="nameDisplay"><option value="masked" selected>一部伏字</option><option value="full">表示</option></select></label><label>金額表示<select name="amountDisplay"><option value="show" selected>表示</option><option value="hide">非表示</option></select></label><label class="span-2">Apps ScriptデプロイURL<input name="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="span-2">管理APIキー<input name="adminApiKey" type="password" autocomplete="off" placeholder="setupSystemで発行された管理APIキー"></label><div class="span-2 actions"><button class="button primary" type="submit">設定を保存</button></div>
+        </form>
+      </section>
+
+      <section id="view-mail" class="view">
+        <div class="page-heading"><div><h1>メール設定</h1><p>本番送信は管理者の最終承認まで有効化できません。</p></div></div>
+        <form id="mailForm" class="form-grid panel">
+          <label>送信者表示名<input name="senderName" value="個別指導ステップ【請求書】"></label><label>送信元メール<input name="senderEmail" value="invoice@step-edu.net"></label><label>返信先<input name="replyTo" value="stepkobetsu@gmail.com"></label><label>管理者CC<input name="adminCc" value="stepkobetsu@gmail.com"></label><label>BCC<input name="bcc"></label><label>有効日数<input name="validDays" type="number" min="1" value="45"></label><label>1時間あたり送信上限<input name="hourlyLimit" type="number" min="1" value="50"></label><label>1回の処理件数<input name="batchSize" type="number" min="1" max="20" value="5"></label><label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label><label>再送時の旧URL<select name="invalidateOld"><option value="true" selected>無効化</option><option value="false">併用</option></select></label><label class="span-2">件名<input name="subject" value="【請求書】送付のご案内（個別指導ステップから）"></label><label class="span-2">本文<textarea name="body" rows="17">{{取引先名}} {{敬称}}
+
+お世話になっております。
+次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。
+
+請求書は、以下のURLよりダウンロードできます。
+有効期間は本日より{{有効日数}}日間です。
+
+有効期間を過ぎた場合は、個別指導ステップまでメールの再配信をご依頼ください。
+
+【ダウンロードURL】
+{{ダウンロードURL}}
+
+本メールは、個別指導ステップの請求書配信システムから自動送信しております。</textarea></label><div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div><div class="span-2 actions"><button class="button primary" type="submit">メール設定を保存</button><button id="sendTest" class="button secondary" type="button">テスト送信</button></div>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="previewDialog" class="preview-dialog"><div class="dialog-head"><h2>PDFプレビュー</h2><button data-close aria-label="閉じる">×</button></div><div id="invoicePreviewHost"></div><div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="downloadPreview" class="button primary">PDFを保存</button></div></dialog>
+  <dialog id="sendDialog"><div class="dialog-head"><h2>送信前の最終確認</h2><button data-close aria-label="閉じる">×</button></div><div id="sendSummary" class="summary-grid"></div><div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="reviewMessages" class="button secondary">送信内容を確認</button><button id="confirmSend" class="button primary">選択した0件を送信</button></div></dialog>
+</body>
+</html>

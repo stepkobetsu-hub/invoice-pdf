@@ -1,0 +1,8 @@
+.DS_Store
+Thumbs.db
+.clasp.json
+.env
+*.pdf
+*.csv
+!tests/fixtures/*.csv
+node_modules/

@@ -1,0 +1,38 @@
+const assert = require('node:assert/strict');
+const C = require('../assets/core.js');
+
+assert.equal(C.roundToNearest10(27549),27550);
+assert.equal(C.roundToNearest10(27551),27550);
+assert.equal(C.roundToNearest10(27555),27560);
+const postalInvoice=C.parseInvoiceRows([
+  ['取引先名称','件名','請求日','お支払期限','請求書番号','小計','消費税','合計金額','取引先郵便番号'],
+  ['テスト','2026年8月分','2026/7/10','2026/7/27','202608999','25045','2504','27549','4870024']
+])[0];
+assert.equal(postalInvoice.postal,'487-0024');
+assert.equal(postalInvoice.total,27550);
+assert.equal(postalInvoice.tax,2505);
+
+const headers=['csv_type(変更不可)','取引先名称','件名','請求日','お支払期限','請求書番号','売上計上日','メモ','タグ','小計','消費税','源泉徴収税','合計金額','取引先敬称','取引先郵便番号','取引先都道府県','取引先住所1','取引先住所2','取引先部署','取引先担当者役職','取引先担当者氏名','自社担当者氏名','備考','振込先','入金ステータス','メール送信ステータス','郵送ステータス','ダウンロードステータス','納品日','品名','品目コード','単価','数量','単位','納品書番号','詳細','金額','源泉徴収','品目消費税率'];
+const row=['40102','テスト太郎','2026年8月分','2026/7/10','2026/7/27','999999002','2026/8/1','検証','テスト','25045','2505','','27550','様','4870024','愛知県','春日井市テスト町1-2-3','','','','','TEST002','口座振替予定','','','','','','','8月分授業料','','22545','1','','','','22545','含まない','10%'];
+const invoices=C.parseInvoiceRows([headers,row]);
+assert.equal(invoices.length,1);
+assert.equal(invoices[0].invoiceNumber,'999999002');
+assert.equal(invoices[0].total,27550);
+assert.equal(invoices[0].tax,2505);
+assert.equal(invoices[0].invoiceDate,'2026/07/10');
+assert.equal(invoices[0].postal,'487-0024');
+
+const partnerHeader=C.PARTNER_HEADERS;
+const partnerRow=['TEST002','テスト太郎','テスト タロウ','様','','','','4870024','愛知県','春日井市テスト町1-2-3','','','','','','sample@example.com','cc@example.com','','',''];
+const partners=C.parsePartners([partnerHeader,partnerRow]);
+const matched=C.matchPartners(invoices,partners)[0];
+assert.equal(matched.email,'sample@example.com');
+assert.equal(matched.cc,'cc@example.com');
+assert.equal(matched.warnings.length,0);
+
+const summary=C.selectedSummary([{email:'sample@example.com',pdfStatus:'PDF作成済み',sendStatus:'未送信',warnings:[]},{email:'',pdfStatus:'未作成',sendStatus:'送信済み',warnings:['メール未登録']}]);
+assert.deepEqual(summary,{selected:2,sendable:1,missingEmail:1,invalidEmail:0,missingPdf:1,alreadySent:1,errors:1});
+
+const quoted=C.parseCsv('a,b\n"x,y","z"\n');
+assert.deepEqual(quoted,[['a','b'],['x,y','z']]);
+console.log('core tests passed');

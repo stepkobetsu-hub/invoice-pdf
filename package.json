@@ -1,0 +1,6 @@
+{
+  "name": "step-invoice-pdf",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {"test": "node tests/core.test.js", "check": "node --check assets/core.js && node --check assets/invoice-pdf.js && node --check assets/app.js"}
+}
