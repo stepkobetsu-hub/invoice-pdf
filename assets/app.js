@@ -17,7 +17,7 @@
     document.body.appendChild(form);
     return new Promise((resolve,reject)=>{
       const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();frame.remove();};
-      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){return;}if(event.origin!=='https://script.google.com'&&!host.endsWith('.googleusercontent.com'))return;if(!event.data||event.data.requestId!==requestId)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
+      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.source===frame.contentWindow);if(!trustedOrigin||!event.data||event.data.requestId!==requestId)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
       const timer=setTimeout(()=>{cleanup();reject(new Error('Apps Script APIがタイムアウトしました。'));},30000);
       window.addEventListener('message',onMessage);form.submit();
     });
