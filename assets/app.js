@@ -9,8 +9,18 @@
   function showView(name){$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${name}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));}
   async function api(action,payload={}){
     const url=state.settings.apiUrl;if(!url)throw new Error('基本設定でApps ScriptデプロイURLを設定してください。');
-    const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,payload,authToken:state.settings.adminApiKey||''})});
-    const data=await response.json();if(!data.ok)throw new Error(data.error||'APIエラー');return data.data;
+    const requestId=`step-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const frame=document.createElement('iframe');frame.name=requestId;frame.hidden=true;document.body.appendChild(frame);
+    const form=document.createElement('form');form.method='POST';form.action=url;form.target=requestId;form.hidden=true;
+    const fields={bridge:'1',requestId,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||''};
+    Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);});
+    document.body.appendChild(form);
+    return new Promise((resolve,reject)=>{
+      const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();frame.remove();};
+      const onMessage=event=>{if(!['https://script.google.com','https://script.googleusercontent.com'].includes(event.origin))return;if(!event.data||event.data.requestId!==requestId)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
+      const timer=setTimeout(()=>{cleanup();reject(new Error('Apps Script APIがタイムアウトしました。'));},30000);
+      window.addEventListener('message',onMessage);form.submit();
+    });
   }
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
   function cards(values){return Object.entries(values).map(([label,value])=>`<div class="summary-card"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');}

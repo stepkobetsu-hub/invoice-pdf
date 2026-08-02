@@ -34,7 +34,12 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const isForm = !!(e && e.parameter && e.parameter.bridge === '1');
+    const body = isForm ? {
+      action: e.parameter.action || '',
+      payload: JSON.parse(e.parameter.payload || '{}'),
+      authToken: e.parameter.authToken || ''
+    } : JSON.parse((e && e.postData && e.postData.contents) || '{}');
     verifyAdminApiKey_(String(body.authToken || ''));
     const action = String(body.action || '');
     const payload = body.payload || {};
@@ -45,9 +50,13 @@ function doPost(e) {
       recoverQueue: () => recoverStuckQueue_()
     };
     if (!routes[action]) throw new Error('未対応の操作です。');
-    return json_({ok:true,data:routes[action]()});
+    const result = {ok:true,data:routes[action]()};
+    return isForm ? bridgeResponse_(result, e.parameter.requestId || '') : json_(result);
   } catch (err) {
-    return json_({ok:false,error:safeError_(err)});
+    const result = {ok:false,error:safeError_(err)};
+    return e && e.parameter && e.parameter.bridge === '1'
+      ? bridgeResponse_(result, e.parameter.requestId || '')
+      : json_(result);
   }
 }
 
@@ -255,5 +264,6 @@ function formatDateTime_(v){if(!v)return'';return Utilities.formatDate(new Date(
 function log_(action,invoice,customer,delivery,result,error,before,after){sheet_(STEP.SHEETS.LOGS).appendRow([new Date(),activeEmail_(),action,invoice||'',customer||'',delivery||'',result||'',error||'',before?JSON.stringify(before).slice(0,1000):'',after?JSON.stringify(after).slice(0,1000):'']);}
 function safeError_(err){return String(err&&err.message?err.message:err).replace(/[A-Za-z0-9_-]{30,}/g,'[秘匿]').slice(0,500);}
 function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);}
+function bridgeResponse_(obj,requestId){const payload=JSON.stringify({requestId:String(requestId||''),result:obj}).replace(/</g,'\\u003c');return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>parent.postMessage('+payload+',"https://stepkobetsu-hub.github.io");<\\/script>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
 function installQueueTrigger_(){if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='processSendQueue'))ScriptApp.newTrigger('processSendQueue').timeBased().everyMinutes(1).create();}
 function recoverStuckQueue_(){requirePermission_('メール送信');const sh=sheet_(STEP.SHEETS.QUEUE),t=table_(sh),cutoff=Date.now()-15*60000;let n=0;t.rows.forEach(r=>{if(r.values[t.map['状態']]==='送信中'&&new Date(r.values[t.map['開始日時']]).getTime()<cutoff){updateRow_(sh,r.rowNumber,t.map,{'状態':'送信待ち','エラー':'送信中タイムアウトから復旧'});n++;}});return {recovered:n};}
