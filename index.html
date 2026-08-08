@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260802-resend-modal">
+  <link rel="stylesheet" href="assets/styles.css?v=20260809-individual">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
-  <script src="assets/core.js?v=20260802-resend-modal" defer></script>
+  <script src="assets/core.js?v=20260809-individual" defer></script>
   <script src="assets/invoice-pdf.js?v=20260802-logo" defer></script>
-  <script src="assets/app.js?v=20260802-resend-modal" defer></script>
+  <script src="assets/app.js?v=20260809-individual" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -30,11 +30,34 @@
       <div id="globalAlert" class="alert hidden" role="alert"></div>
 
       <section id="view-create" class="view active">
-        <div class="page-heading"><div><h1>請求書作成</h1><p>CSV読込後に内容を確認し、PDFを確定してから送信一覧へ追加します。</p></div></div>
-        <ol class="steps" id="createSteps"><li class="active">CSV読込</li><li>取引先照合</li><li>内容確認</li><li>PDFプレビュー</li><li>PDF確定</li><li>送信一覧へ追加</li></ol>
-        <div class="panel upload-panel">
-          <label class="file-drop">請求書CSVを選択<input id="invoiceCsv" type="file" accept=".csv,text/csv"><span>UTF-8／CP932／Shift-JISに対応</span></label>
-          <button id="loadSample" class="button secondary">検証用サンプルを読み込む</button>
+        <div class="page-heading"><div><h1>請求書作成</h1><p>CSV一括作成または個別入力で請求書を作成し、PDFを確定してから送信一覧へ追加します。</p></div></div>
+        <div class="create-methods" role="tablist" aria-label="請求書の作成方法">
+          <button class="create-method active" type="button" data-create-method="csv" role="tab" aria-selected="true">CSVで一括作成</button>
+          <button class="create-method" type="button" data-create-method="single" role="tab" aria-selected="false">1件ずつ個別作成</button>
+        </div>
+        <ol class="steps" id="createSteps"><li class="active">データ入力</li><li>取引先照合</li><li>内容確認</li><li>PDFプレビュー</li><li>PDF確定</li><li>送信一覧へ追加</li></ol>
+        <div id="createCsvPane" class="create-pane active">
+          <div class="panel upload-panel">
+            <label class="file-drop">請求書CSVを選択<input id="invoiceCsv" type="file" accept=".csv,text/csv"><span>UTF-8／CP932／Shift-JISに対応</span></label>
+            <button id="loadSample" class="button secondary">検証用サンプルを読み込む</button>
+          </div>
+        </div>
+        <div id="createSinglePane" class="create-pane">
+          <form id="singleInvoiceForm" class="panel individual-form">
+            <div class="individual-heading"><div><h2>請求書を1件作成</h2><p>取引先を選び、請求内容と明細を入力してください。</p></div><button id="loadDemoPartners" class="button secondary" type="button">ダミー取引先4件を再表示</button></div>
+            <div class="form-grid">
+              <label>取引先<span class="required">必須</span><select id="singlePartner" name="partnerCode" required><option value="">取引先を選択してください</option></select></label>
+              <label>請求書番号<span class="required">必須</span><input name="invoiceNumber" inputmode="numeric" pattern="[0-9]{6,}" placeholder="例：202608001" required></label>
+              <label>対象年月・件名<span class="required">必須</span><input name="subject" placeholder="例：2026年8月分" required></label>
+              <label>請求日<span class="required">必須</span><input name="invoiceDate" type="date" required></label>
+              <label>支払期限<span class="required">必須</span><input name="dueDate" type="date" required></label>
+              <label>備考<input name="note" placeholder="例：口座振替予定"></label>
+            </div>
+            <div class="individual-details-heading"><h3>請求明細</h3><button id="addSingleDetail" class="button secondary" type="button">明細行を追加</button></div>
+            <div class="table-wrap individual-details"><table><thead><tr><th>品目<span class="required">必須</span></th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="singleDetailBody"></tbody></table></div>
+            <div class="individual-total"><span>税抜小計 <strong id="singleSubtotal">0円</strong></span><span>消費税 <strong id="singleTax">0円</strong></span><span>請求金額 <strong id="singleTotal">0円</strong></span></div>
+            <div class="actions"><button class="button primary" type="submit">この内容を作成リストへ追加</button></div>
+          </form>
         </div>
         <div id="invoiceImportSummary" class="summary-grid hidden"></div>
         <div class="table-wrap">
