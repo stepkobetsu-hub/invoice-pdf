@@ -30,6 +30,26 @@ assert.equal(matched.email,'sample@example.com');
 assert.equal(matched.cc,'cc@example.com');
 assert.equal(matched.warnings.length,0);
 
+assert.deepEqual(C.DEMO_PARTNERS.map(p=>p['メールアドレス']),[
+  'mintcocoajasmine@gmail.com',
+  'kk8989892000@yahoo.co.jp',
+  'skase.days@gmail.com',
+  'chloeandnina1@gmail.com'
+]);
+const manual=C.buildManualInvoice({invoiceNumber:'202608101',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-31',note:'個別作成テスト'},[
+  {name:'授業料',unitPrice:25000,quantity:1,unit:'月',taxRate:10},
+  {name:'教材費',unitPrice:50,quantity:1,unit:'冊',taxRate:10}
+],C.DEMO_PARTNERS[0]);
+assert.equal(manual.csvType,'個別作成');
+assert.equal(manual.customerCode,'DEMO001');
+assert.equal(manual.subtotal,25050);
+assert.equal(manual.sourceTax,2505);
+assert.equal(manual.sourceTotal,27555);
+assert.equal(manual.total,27560);
+assert.equal(manual.tax,2510);
+assert.equal(manual.details.length,2);
+assert.equal(C.matchPartners([manual],C.DEMO_PARTNERS)[0].warnings.length,1);
+
 const summary=C.selectedSummary([{email:'sample@example.com',pdfStatus:'PDF作成済み',sendStatus:'未送信',warnings:[]},{email:'',pdfStatus:'未作成',sendStatus:'送信済み',warnings:['メール未登録']}]);
 assert.deepEqual(summary,{selected:2,sendable:1,missingEmail:1,invalidEmail:0,missingPdf:1,alreadySent:1,errors:1});
 
