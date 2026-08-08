@@ -2,6 +2,12 @@
   'use strict';
   const PARTNER_HEADERS=['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ'];
   const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const DEMO_PARTNERS=[
+    ['DEMO001','ダミー取引先1','ダミー トリヒキサキ イチ','様','','','','487-0001','愛知県','春日井市テスト町1-1','','','','','','mintcocoajasmine@gmail.com','','','','検証用ダミー取引先（実在しません）'],
+    ['DEMO002','ダミー取引先2','ダミー トリヒキサキ ニ','様','','','','487-0002','愛知県','春日井市テスト町2-2','','','','','','kk8989892000@yahoo.co.jp','','','','検証用ダミー取引先（実在しません）'],
+    ['DEMO003','ダミー取引先3','ダミー トリヒキサキ サン','様','','','','487-0003','愛知県','春日井市テスト町3-3','','','','','','skase.days@gmail.com','','','','検証用ダミー取引先（実在しません）'],
+    ['DEMO004','ダミー取引先4','ダミー トリヒキサキ ヨン','様','','','','487-0004','愛知県','春日井市テスト町4-4','','','','','','chloeandnina1@gmail.com','','','','検証用ダミー取引先（実在しません）']
+  ].map(row=>Object.fromEntries(PARTNER_HEADERS.map((header,index)=>[header,row[index]||''])));
 
   function parseCsv(text){
     const rows=[];let row=[],field='',quoted=false;
@@ -81,6 +87,38 @@
     });
   }
 
+  function buildManualInvoice(values,detailRows,partner){
+    const invoiceNumber=String(values?.invoiceNumber||'').trim();
+    if(!/^\d{6,}$/.test(invoiceNumber))throw new Error('請求書番号は6桁以上の数字で入力してください。');
+    if(!partner)throw new Error('取引先を選択してください。');
+    if(!String(values?.subject||'').trim())throw new Error('対象年月・件名を入力してください。');
+    if(!values?.invoiceDate||!values?.dueDate)throw new Error('請求日と支払期限を入力してください。');
+    const details=(Array.isArray(detailRows)?detailRows:[]).map((row,index)=>{
+      const name=String(row?.name||'').trim();
+      const unitPrice=Number(row?.unitPrice||0);
+      const quantity=Number(row?.quantity||0);
+      const taxRate=Number(row?.taxRate??10);
+      if(!name)throw new Error(`明細${index+1}の品目を入力してください。`);
+      if(!Number.isFinite(unitPrice)||unitPrice<0)throw new Error(`明細${index+1}の単価が不正です。`);
+      if(!Number.isFinite(quantity)||quantity<=0)throw new Error(`明細${index+1}の数量が不正です。`);
+      if(![0,8,10].includes(taxRate))throw new Error(`明細${index+1}の税率が不正です。`);
+      const amount=Math.round(unitPrice*quantity);
+      return {deliveryDate:'',name,itemCode:'',unitPrice,quantity,unit:String(row?.unit||''),deliveryNumber:'',detail:'',amount,withholding:'含まない',taxRate:`${taxRate}%`,taxRateValue:taxRate};
+    });
+    if(!details.length)throw new Error('請求明細を1行以上入力してください。');
+    const subtotal=details.reduce((sum,row)=>sum+row.amount,0);
+    const sourceTax=details.reduce((sum,row)=>sum+Math.round(row.amount*row.taxRateValue/100),0);
+    const sourceTotal=subtotal+sourceTax;
+    const total=roundToNearest10(sourceTotal);
+    return {
+      csvType:'個別作成',partnerName:partner['名称'],subject:String(values.subject).trim(),invoiceDate:normalizeDate(values.invoiceDate),dueDate:normalizeDate(values.dueDate),invoiceNumber,
+      memo:'',tags:'',subtotal,sourceTax,sourceTotal,tax:total-subtotal,total,honorific:partner['敬称']||'様',postal:normalizePostal(partner['郵便番号']),prefecture:partner['都道府県']||'',
+      address1:partner['住所1']||'',address2:partner['住所2']||'',department:partner['担当者部署']||'',position:partner['担当者役職']||'',contactName:partner['担当者氏名']||'',
+      customerCode:String(partner['顧客コード']||''),note:String(values.note||''),bank:'',details:details.map(({taxRateValue,...row})=>row),pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',
+      roundingAdjusted:sourceTotal!==total
+    };
+  }
+
   function validateEmail(value){return EMAIL.test(String(value||''));}
   function isSentStatus(status){return ['送信済み','再送済み'].includes(String(status||''));}
   function isInitialSendable(item){return String(item?.sendStatus||'')==='未送信'&&validateEmail(item?.email)&&item?.pdfStatus==='PDF作成済み';}
@@ -97,6 +135,6 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,parseInvoiceRows,parsePartners,matchPartners,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
