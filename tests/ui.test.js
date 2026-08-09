@@ -49,8 +49,25 @@ async function main(){
   assert.equal(document.querySelector('#singlePartner').classList.contains('field-missing'),true);
   const saveButton=document.querySelector('#singleInvoiceForm button[type="submit"]');
   assert.equal(saveButton.textContent,'保存して発行リストへ追加');
+  assert.equal(document.querySelector('#singleInvoiceForm').noValidate,true);
+  assert.equal(saveButton.id,'saveSingleInvoice');
   assert.ok(document.querySelector('#previewSingleInvoice').compareDocumentPosition(saveButton)&window.Node.DOCUMENT_POSITION_FOLLOWING);
   assert.equal(document.querySelector('#confirmPdf'),null);
+
+  const firstDetailName=document.querySelector('[name="detailName"]');
+  assert.equal(firstDetailName.getAttribute('inputmode'),'text');
+  assert.equal(firstDetailName.getAttribute('lang'),'ja');
+  document.querySelector('#addSingleDetail').click();
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  const detailRows=document.querySelectorAll('#singleDetailBody tr');
+  const addedDetail=detailRows[detailRows.length-1];
+  assert.equal(document.activeElement,addedDetail.querySelector('[name="detailName"]'));
+  assert.equal(addedDetail.querySelector('[name="detailName"]').getAttribute('inputmode'),'text');
+  const addedPrice=addedDetail.querySelector('[name="detailUnitPrice"]');
+  addedPrice.value='－１０，０００';
+  addedPrice.dispatchEvent(new window.Event('input',{bubbles:true}));
+  assert.equal(addedPrice.value,'-10000');
+  addedDetail.querySelector('.remove-detail').click();
 
   document.querySelector('#loadDemoPartners').click();
   await new Promise(resolve=>window.setTimeout(resolve,0));
