@@ -154,7 +154,7 @@
   }
 
   function validateEmail(value){return EMAIL.test(String(value||''));}
-  function isSentStatus(status){return ['送信済み','再送済み'].includes(String(status||''));}
+  function isSentStatus(status){return ['送信済','送信済み','再送済','再送済み'].includes(String(status||''));}
   function isInitialSendable(item){return String(item?.sendStatus||'')==='未送信'&&validateEmail(item?.email)&&item?.pdfStatus==='PDF作成済み';}
   function isResendable(item){return isSentStatus(item?.sendStatus)&&validateEmail(item?.email)&&item?.pdfStatus==='PDF作成済み';}
   function classifySendSelection(items){
