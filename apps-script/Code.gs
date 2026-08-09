@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.14. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.22. */
 const STEP = Object.freeze({
   AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
   AUTH_PERMISSION_LEVELS:['2','3','4'],
@@ -55,7 +55,8 @@ function doPost(e) {
       prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true}), requestAuth),
       releasePreparedSend: () => releasePreparedSend_(payload.deliveryId, requestAuth),
       disableDelivery: () => disableDelivery_(payload.invoiceNumber, requestAuth), saveSettings: () => saveSettings_(payload, requestAuth),
-      recoverQueue: () => recoverStuckQueue_(requestAuth)
+      recoverQueue: () => recoverStuckQueue_(requestAuth),
+      processPendingSends: () => processPendingSends_(requestAuth)
     };
     if (!routes[action]) throw new Error('未対応の操作です。');
     const result = {ok:true,data:routes[action]()};
@@ -192,6 +193,7 @@ function enqueueSend_(payload, requestAuth) {
   if (!testMode && PropertiesService.getScriptProperties().getProperty('PRODUCTION_SEND_APPROVED') !== 'true') throw new Error('本番送信は管理者の最終承認前のため無効です。');
   const numbers = [...new Set((payload.invoiceNumbers || []).map(String))]; if (!numbers.length) throw new Error('請求書が選択されていません。');
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
+  let response;
   try {
     const queue = sheet_(STEP.SHEETS.QUEUE), deliveries = table_(sheet_(STEP.SHEETS.DELIVERIES)), invoices = table_(sheet_(STEP.SHEETS.INVOICES));
     const queued = table_(queue).rows;
@@ -214,8 +216,11 @@ function enqueueSend_(payload, requestAuth) {
       results.push({invoiceNumber:number,deliveryId,queueId,preflightUrl:prepared?baseUrl+'?t='+encodeURIComponent(token):''});
       log_(payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','');
     });
-    return {queued:results.length,items:results,testMode};
+    response={queued:results.length,items:results,testMode};
   } finally { lock.releaseLock(); }
+  installQueueTrigger_();
+  if(payload.preflight!==true)processSendQueue();
+  return response;
 }
 
 function releasePreparedSend_(deliveryId, requestAuth) {
@@ -234,6 +239,8 @@ function releasePreparedSend_(deliveryId, requestAuth) {
   updateRow_(queueSheet,q.rowNumber,queue.map,{'状態':'送信待ち','開始日時':'','完了日時':'','エラー':''});
   updateDeliveryById_(id,{'送信状態':'送信待ち','送信エラー':'','初回アクセス日時':'','初回ダウンロード日時':'','最終アクセス日時':'','アクセス回数':0,'ダウンロード回数':0,'現在状態':'送信待ち','更新日時':now});
   log_('送信前URL確認',d[m['請求書番号']],d[m['顧客コード']],id,'成功','');
+  installQueueTrigger_();
+  processSendQueue();
   return {released:true,invoiceNumber:d[m['請求書番号']]};
 }
 
@@ -341,3 +348,4 @@ function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).
 function bridgeResponse_(obj,requestId,bridgeNonce){const payload=JSON.stringify({requestId:String(requestId||''),bridgeNonce:String(bridgeNonce||''),result:obj}).replace(/</g,'\\u003c');return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>top.postMessage('+payload+',"https://stepkobetsu-hub.github.io");</script>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
 function installQueueTrigger_(){if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='processSendQueue'))ScriptApp.newTrigger('processSendQueue').timeBased().everyMinutes(1).create();}
 function recoverStuckQueue_(requestAuth){requirePermission_('メール送信', requestAuth);const sh=sheet_(STEP.SHEETS.QUEUE),t=table_(sh),cutoff=Date.now()-15*60000;let n=0;t.rows.forEach(r=>{if(r.values[t.map['状態']]==='送信中'&&new Date(r.values[t.map['開始日時']]).getTime()<cutoff){updateRow_(sh,r.rowNumber,t.map,{'状態':'送信待ち','エラー':'送信中タイムアウトから復旧'});n++;}});return {recovered:n};}
+function processPendingSends_(requestAuth){requirePermission_('メール送信', requestAuth);const recovered=recoverStuckQueue_(requestAuth).recovered;installQueueTrigger_();processSendQueue();const queue=table_(sheet_(STEP.SHEETS.QUEUE));return {recovered,pending:queue.rows.filter(r=>['送信待ち','送信中'].includes(String(r.values[queue.map['状態']]))).length,failed:queue.rows.filter(r=>String(r.values[queue.map['状態']])==='送信失敗').length};}
