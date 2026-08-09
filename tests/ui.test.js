@@ -5,15 +5,18 @@ const {JSDOM} = require('jsdom');
 
 const root = path.resolve(__dirname, '..');
 const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), {
-  url: 'https://stepkobetsu-hub.github.io/invoice-pdf/',
+  url: 'https://stepkobetsu-hub.github.io/invoice-pdf/#partners',
   runScripts: 'outside-only'
 });
 const {window} = dom;
+window.localStorage.setItem('stepStaffAppAuth',JSON.stringify({systemPortalSessionToken:'test-staff-session'}));
+let submittedStaffToken='';
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 window.HTMLDialogElement.prototype.close=function(){this.open=false;};
 window.HTMLFormElement.prototype.submit=function(){
   const value=name=>this.querySelector(`[name="${name}"]`)?.value||'';
   const requestId=value('requestId'),bridgeNonce=value('bridgeNonce'),action=value('action');
+  submittedStaffToken=value('systemPortalSessionToken');
   if(!requestId)return;
   const data=action==='getDashboard'?{invoices:[],history:[]}:{count:1};
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
@@ -26,7 +29,12 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
 
 async function main(){
   const document=window.document;
+  assert.equal(document.querySelector('#view-partners').classList.contains('active'),true);
+  document.querySelector('[data-view="create"]').click();
+  assert.equal(window.location.hash,'#create');
   document.querySelector('[data-create-method="single"]').click();
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(submittedStaffToken,'test-staff-session');
   assert.equal(document.querySelector('#createSinglePane').classList.contains('active'),true);
   assert.match(document.querySelector('[name="invoiceNumber"]').value,/^\d{9}$/);
   assert.equal(document.querySelector('[name="invoiceNumber"]').readOnly,true);
@@ -97,6 +105,9 @@ async function main(){
   assert.match(document.querySelector('#studentImportDialog').textContent,/※半角英数で入力してください。/);
   assert.equal(document.querySelector('#studentSearchForm [name="studentCode"]').pattern,'[A-Za-z0-9]+');
   assert.match(document.querySelector('#settingsForm [name="apiUrl"]').value,/^https:\/\/script\.google\.com\/macros\/s\//);
+  const backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
+  assert.match(backend,/action:'verifySystemPortal'/);
+  assert.match(backend,/String\(result\.permissionLevel\)!=='4'/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
