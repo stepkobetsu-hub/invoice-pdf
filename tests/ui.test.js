@@ -107,7 +107,8 @@ async function main(){
   assert.match(document.querySelector('#settingsForm [name="apiUrl"]').value,/^https:\/\/script\.google\.com\/macros\/s\//);
   const backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
   assert.match(backend,/action:'verifySystemPortal'/);
-  assert.match(backend,/String\(result\.permissionLevel\)!=='4'/);
+  assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
+  assert.match(backend,/AUTH_PERMISSION_LEVELS\.includes\(String\(result\.permissionLevel\)\)/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
