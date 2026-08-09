@@ -20,6 +20,11 @@ const STEP = Object.freeze({
   SETTING_HEADERS: ['キー','値','説明']
 });
 
+// SpreadsheetApp.openById is comparatively expensive. Keep one spreadsheet and
+// one Sheet object per name for the lifetime of a single Apps Script execution.
+let STEP_SPREADSHEET_CACHE_ = null;
+const STEP_SHEET_CACHE_ = {};
+
 function doGet(e) {
   const token = String((e && e.parameter && e.parameter.t) || '');
   if (!token) return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><title>STEP請求書</title><p>STEP請求書配信サービスは稼働中です。</p>');
@@ -207,8 +212,14 @@ function deleteInvoice_(invoiceNumber, requestAuth) {
 }
 
 function replaceInvoiceDetails_(number, details) {
-  const ds=sheet_(STEP.SHEETS.DETAILS),dt=table_(ds);dt.rows.filter(r=>String(r.values[dt.map['請求書番号']])===String(number)).reverse().forEach(r=>ds.deleteRow(r.rowNumber));
-  (details||[]).forEach((d,i)=>ds.appendRow([String(number),i+1,d.deliveryDate||'',d.name||'',d.itemCode||'',Number(d.unitPrice||0),Number(d.quantity||0),d.unit||'',Number(d.amount||0),d.taxRate||'']));
+  const ds=sheet_(STEP.SHEETS.DETAILS),dt=table_(ds),invoiceNumber=String(number);
+  const retained=dt.rows
+    .filter(r=>String(r.values[dt.map['請求書番号']])!==invoiceNumber)
+    .map(r=>STEP.DETAIL_HEADERS.map(header=>r.values[dt.map[header]]));
+  const replacements=(details||[]).map((d,i)=>[invoiceNumber,i+1,d.deliveryDate||'',d.name||'',d.itemCode||'',Number(d.unitPrice||0),Number(d.quantity||0),d.unit||'',Number(d.amount||0),d.taxRate||'']);
+  const rows=retained.concat(replacements),existingRows=Math.max(0,ds.getLastRow()-1);
+  if(existingRows)ds.getRange(2,1,existingRows,STEP.DETAIL_HEADERS.length).clearContent();
+  if(rows.length)ds.getRange(2,1,rows.length,STEP.DETAIL_HEADERS.length).setValues(rows);
 }
 
 function enqueueSend_(payload, requestAuth) {
@@ -344,10 +355,10 @@ function defaultMailBody_(){return '{{取引先名}} {{敬称}}\n\nお世話に�
 
 function ensureSheet_(ss,name,headers){let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);if(sh.getLastRow()===0||String(sh.getRange(1,1).getValue())!==headers[0]){sh.clear();sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e8eaed');sh.setFrozenRows(1);sh.getRange(1,1,Math.max(2,sh.getMaxRows()),headers.length).setWrap(false);sh.autoResizeColumns(1,headers.length);}return sh;}
 function ensureInvoiceColumns_(){const sh=sheet_(STEP.SHEETS.INVOICES),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.INVOICE_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
-function sheet_(name){const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw new Error('初期設定が未完了です。setupSystemを実行してください。');const sh=SpreadsheetApp.openById(id).getSheetByName(name);if(!sh)throw new Error(`シートがありません: ${name}`);return sh;}
+function sheet_(name){if(STEP_SHEET_CACHE_[name])return STEP_SHEET_CACHE_[name];const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw new Error('初期設定が未完了です。setupSystemを実行してください。');if(!STEP_SPREADSHEET_CACHE_)STEP_SPREADSHEET_CACHE_=SpreadsheetApp.openById(id);const sh=STEP_SPREADSHEET_CACHE_.getSheetByName(name);if(!sh)throw new Error(`シートがありません: ${name}`);STEP_SHEET_CACHE_[name]=sh;return sh;}
 function table_(sh){const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();const values=lastRow?sh.getRange(1,1,lastRow,lastCol).getValues():[];const headers=values[0]||[],map={};headers.forEach((h,i)=>map[String(h)]=i);return {headers,map,rows:values.slice(1).map((v,i)=>({values:v,rowNumber:i+2}))};}
 function objectRow_(values,map){const o={};Object.keys(map).forEach(k=>o[k]=values[map[k]]);return o;}
-function updateRow_(sh,rowNumber,map,changes){Object.keys(changes).forEach(k=>{if(map[k]!==undefined)sh.getRange(rowNumber,map[k]+1).setValue(changes[k]);});}
+function updateRow_(sh,rowNumber,map,changes){const lastCol=sh.getLastColumn(),row=sh.getRange(rowNumber,1,1,lastCol).getValues()[0];Object.keys(changes).forEach(k=>{if(map[k]!==undefined)row[map[k]]=changes[k];});sh.getRange(rowNumber,1,1,lastCol).setValues([row]);}
 function updateDeliveryCells_(row,changes){updateRow_(row.sheet,row.rowNumber,row.map,changes);}
 function updateDeliveryById_(id,changes){const r=findDeliveryById_(id);if(r)updateDeliveryCells_(r,changes);}
 function findDeliveryById_(id){const sh=sheet_(STEP.SHEETS.DELIVERIES),t=table_(sh),r=t.rows.find(x=>String(x.values[t.map['配信ID']])===String(id));return r?{sheet:sh,rowNumber:r.rowNumber,map:t.map,values:r.values}:null;}
@@ -371,11 +382,15 @@ function verifyRequestAuth_(body){
   if(apiKey){verifyAdminApiKey_(apiKey);return {method:'apiKey',permissionLevel:'4',name:activeEmail_()};}
   const token=String(body.systemPortalSessionToken||'').trim();
   if(!token)throw new Error('スタッフ用アプリへログインしてから、もう一度お試しください。');
+  const cache=CacheService.getScriptCache(),cacheKey='staff-auth:'+hashToken_(token),cached=cache.get(cacheKey);
+  if(cached){try{return JSON.parse(cached);}catch(_){cache.remove(cacheKey);}}
   const response=UrlFetchApp.fetch(STEP.AUTH_API,{method:'post',contentType:'text/plain',payload:JSON.stringify({action:'verifySystemPortal',systemPortalSessionToken:token}),muteHttpExceptions:true});
   let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('スタッフ認証サーバーへ接続できませんでした。');}
   if(!result.success)throw new Error(result.error||'スタッフログインを確認できません。もう一度ログインしてください。');
   if(!STEP.AUTH_PERMISSION_LEVELS.includes(String(result.permissionLevel)))throw new Error('請求書システムを利用できるスタッフ権限を確認できません。');
-  return {method:'systemPortal',permissionLevel:String(result.permissionLevel),name:String(result.name||''),code:String(result.code||'')};
+  const verified={method:'systemPortal',permissionLevel:String(result.permissionLevel),name:String(result.name||''),code:String(result.code||'')};
+  cache.put(cacheKey,JSON.stringify(verified),120);
+  return verified;
 }
 function merge_(text,values){return String(text).replace(/{{([^{}]+)}}/g,(m,k)=>values[String(k).trim()]==null?'':String(values[String(k).trim()]));}
 function maskName_(name){const a=Array.from(String(name||''));return a.length<2?'＊':a[0]+'＊'.repeat(a.length-1);}
