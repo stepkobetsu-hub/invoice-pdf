@@ -17,7 +17,7 @@ window.HTMLFormElement.prototype.submit=function(){
   const action=value('action'),requestId=value('requestId'),bridgeNonce=value('bridgeNonce');
   const invoices=[
     {invoiceNumber:'202608102',partnerName:'最新の取引先',honorific:'様',subject:'2026年9月分',invoiceDate:'2026/08/10',dueDate:'2026/08/31',createdAt:'2026/08/10',updatedAt:'2026/08/10 12:30:00',memo:'中2',tags:'神領',paymentStatus:'未入金',subtotal:10000,tax:1000,total:11000,email:'new@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'夏期講習',unitPrice:10000,quantity:1,amount:10000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'未送信',dlStatus:'未取得',warnings:[]},
-    {invoiceNumber:'202608101',partnerName:'以前の取引先',honorific:'様',subject:'2026年8月分',invoiceDate:'2026/08/09',dueDate:'2026/08/30',createdAt:'2026/08/09',updatedAt:'2026/08/09 11:00:00',memo:'中1',tags:'大手',paymentStatus:'入金済',paymentDate:'2026/08/10',paymentAmount:9900,subtotal:9000,tax:900,total:9900,email:'old@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'授業料',unitPrice:9000,quantity:1,amount:9000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'送信済み',dlStatus:'未アクセス',warnings:[]}
+    {invoiceNumber:'202608101',partnerName:'以前の取引先',honorific:'様',subject:'2026年8月分',invoiceDate:'2026/08/09',dueDate:'2026/08/30',createdAt:'2026/08/09',updatedAt:'2026/08/09 11:00:00',memo:'中1',tags:'大手',paymentStatus:'入金済',paymentDate:'2026/08/10',paymentAmount:9900,paymentMemo:'振込手数料差引',subtotal:9000,tax:900,total:9900,email:'old@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'授業料',unitPrice:9000,quantity:1,amount:9000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'送信済み',dlStatus:'未アクセス',warnings:[]}
   ];
   const data=action==='getDashboard'?{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}:{ok:true};
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
@@ -49,10 +49,13 @@ window.eval(fs.readFileSync(path.join(root,'assets/app.js'),'utf8'));
   document.querySelector('[data-payment-value="入金済"]').click();
   assert.equal(document.querySelector('#paymentDateDialog').open,true);
   assert.equal(document.querySelector('#paymentAmountInput').value,'11000');
+  assert.equal(document.querySelector('#paymentMemoInput').value,'');
   document.querySelector('#paymentDateDialog').close();
   document.querySelectorAll('#invoiceList .invoice-list-item')[1].click();
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/入金日：2026\/08\/10/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/入金金額：9,900円/);
+  assert.match(document.querySelector('#invoiceDetailPanel').textContent,/入金メモ：振込手数料差引/);
+  assert.equal(document.querySelector('[data-invoice-action="mail"]').textContent,'メール再送信');
   document.querySelectorAll('#invoiceList .invoice-list-item')[0].click();
   assert.ok(document.querySelector('[name="defaultBank"]'));
   assert.ok(document.querySelector('[name="defaultNote"]'));
@@ -97,6 +100,8 @@ window.eval(fs.readFileSync(path.join(root,'assets/app.js'),'utf8'));
   const backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
   assert.match(backend,/入金金額/);
   assert.match(backend,/paymentAmount/);
+  assert.match(backend,/入金メモ/);
+  assert.match(backend,/paymentMemo/);
   assert.match(worker,/ご請求金額<\/dt>/);
   assert.match(worker,/請求書番号<\/dt>/);
   assert.match(worker,/お支払期限<\/dt>/);
