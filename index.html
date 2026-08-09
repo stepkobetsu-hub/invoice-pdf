@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-payment-amount">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-payment-memo">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
-  <script src="assets/core.js?v=20260809-common-auth-view-state" defer></script>
+  <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
-  <script src="assets/app.js?v=20260810-payment-amount" defer></script>
+  <script src="assets/app.js?v=20260810-payment-memo" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -210,7 +210,7 @@
   <dialog id="paymentDateDialog" class="payment-date-dialog">
     <form id="paymentDateForm">
       <div class="dialog-head"><h2>入金情報の確認</h2><button data-close type="button" aria-label="閉じる">×</button></div>
-      <div class="dialog-message"><p><strong id="paymentDateTarget"></strong></p><label class="payment-date-field">入金日<input id="paymentDateInput" name="paymentDate" type="date" required></label><label class="payment-date-field">入金金額<input id="paymentAmountInput" name="paymentAmount" type="text" inputmode="decimal" required></label><p class="field-help">請求金額を初期表示しています。金額が異なる場合は変更してください。</p></div>
+      <div class="dialog-message"><p><strong id="paymentDateTarget"></strong></p><label class="payment-date-field">入金日<input id="paymentDateInput" name="paymentDate" type="date" required></label><label class="payment-date-field">入金金額<input id="paymentAmountInput" name="paymentAmount" type="text" inputmode="decimal" required></label><p class="field-help">請求金額を初期表示しています。金額が異なる場合は変更してください。</p><label class="payment-date-field">入金メモ<textarea id="paymentMemoInput" name="paymentMemo" rows="3" placeholder="例：振込手数料差引、現金受領など"></textarea></label></div>
       <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button class="button primary" type="submit">入金済として保存</button></div>
     </form>
   </dialog>
