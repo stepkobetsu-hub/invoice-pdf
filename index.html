@@ -5,14 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-pdf-fit-180days">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-loading-difference">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
-  <script src="assets/app.js?v=20260810-payment-memo" defer></script>
+  <script src="assets/app.js?v=20260810-loading-difference" defer></script>
 </head>
 <body>
+  <div id="operationOverlay" class="operation-overlay" role="status" aria-live="polite" aria-busy="true">
+    <div class="operation-overlay-card">
+      <span class="operation-spinner" aria-hidden="true"></span>
+      <strong id="operationOverlayText">読み込み中</strong>
+    </div>
+  </div>
   <header class="topbar">
     <div class="brand"><img src="assets/step-logo.png?v=20260802-logo" alt="個別指導ステップ"><div><strong>STEP請求書</strong><span>PDF作成・配信システム</span></div></div>
     <div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">未接続</span><a id="staffLoginLink" class="staff-login-link" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログイン</a></div>
