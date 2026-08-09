@@ -88,6 +88,7 @@ async function main(){
   assert.match(window.StepInvoicePdf.pageHtml(window.StepInvoiceCore.buildManualInvoice({invoiceNumber:'202608998',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-30'},[{name:'授業料',unitPrice:7000,quantity:1,taxRate:10}],window.StepInvoiceCore.DEMO_PARTNERS[0]),{preview:true}),/preview-watermark/);
   document.querySelector('#previewDialog').close();
   form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(resolve=>window.setTimeout(resolve,20));
   assert.match(document.querySelector('#createTable tbody').textContent,/202608501/);
   assert.match(document.querySelector('#createTable tbody').textContent,/ダミー取引先1/);
 
@@ -138,7 +139,8 @@ async function main(){
   assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS\.includes\(String\(result\.permissionLevel\)\)/);
   assert.match(backend,/processPendingSends: \(\) => processPendingSends_\(requestAuth\)/);
-  assert.match(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
+  assert.match(backend,/installQueueTrigger_\(\);\s*return response/);
+  assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));

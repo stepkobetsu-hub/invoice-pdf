@@ -125,7 +125,7 @@
     const invoiceNumber=String(values?.invoiceNumber||'').trim();
     if(!/^\d{6,}$/.test(invoiceNumber))throw new Error('請求書番号は6桁以上の数字で入力してください。');
     if(!partner)throw new Error('取引先を選択してください。');
-    if(!String(values?.subject||'').trim())throw new Error('対象年月・件名を入力してください。');
+    if(!String(values?.subject||'').trim())throw new Error('件名を入力してください。');
     if(!values?.invoiceDate||!values?.dueDate)throw new Error('請求日と支払期限を入力してください。');
     const details=(Array.isArray(detailRows)?detailRows:[]).map((row,index)=>{
       const name=String(row?.name||'').trim();
@@ -133,7 +133,7 @@
       const quantity=Number(row?.quantity||0);
       const taxRate=Number(row?.taxRate??10);
       if(!name)throw new Error(`明細${index+1}の品目を入力してください。`);
-      if(!Number.isFinite(unitPrice)||unitPrice<0)throw new Error(`明細${index+1}の単価が不正です。`);
+      if(!Number.isFinite(unitPrice))throw new Error(`明細${index+1}の単価が不正です。`);
       if(!Number.isFinite(quantity)||quantity<=0)throw new Error(`明細${index+1}の数量が不正です。`);
       if(![0,8,10].includes(taxRate))throw new Error(`明細${index+1}の税率が不正です。`);
       const amount=Math.round(unitPrice*quantity);

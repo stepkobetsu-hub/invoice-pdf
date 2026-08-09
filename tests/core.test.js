@@ -60,6 +60,13 @@ assert.equal(manual.total,27560);
 assert.equal(manual.tax,2510);
 assert.equal(manual.details.length,2);
 assert.equal(C.matchPartners([manual],C.DEMO_PARTNERS)[0].warnings.length,1);
+const discounted=C.buildManualInvoice({invoiceNumber:'202608102',subject:'割引テスト',invoiceDate:'2026-08-10',dueDate:'2026-08-31'},[
+  {name:'授業料',unitPrice:25000,quantity:1,unit:'月',taxRate:10},
+  {name:'割引',unitPrice:-10000,quantity:1,unit:'式',taxRate:10}
+],C.DEMO_PARTNERS[0]);
+assert.equal(discounted.subtotal,15000);
+assert.equal(discounted.tax,1500);
+assert.equal(discounted.total,16500);
 
 const summary=C.selectedSummary([{email:'sample@example.com',pdfStatus:'PDF作成済み',sendStatus:'未送信',warnings:[]},{email:'',pdfStatus:'未作成',sendStatus:'送信済み',warnings:['メール未登録']}]);
 assert.deepEqual(summary,{selected:2,sendable:1,missingEmail:1,invalidEmail:0,missingPdf:1,alreadySent:1,errors:1});

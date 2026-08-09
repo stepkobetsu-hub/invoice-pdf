@@ -180,7 +180,7 @@ async function uploadInvoice(request, env, ctx) {
   items.forEach((item, index) => statements.push(env.DB.prepare(`
     INSERT INTO invoice_items (item_id, invoice_id, line_number, service_date, description, unit_price, quantity, unit, amount, tax_rate)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-  `).bind(`${invoiceId}:item:${index + 1}`, invoiceId, index + 1, String(item.deliveryDate || ""), String(item.name || ""), positiveMoney(item.unitPrice), positiveQuantity(item.quantity), String(item.unit || ""), positiveMoney(item.amount), positiveTaxRate(item.taxRate))));
+  `).bind(`${invoiceId}:item:${index + 1}`, invoiceId, index + 1, String(item.deliveryDate || ""), String(item.name || ""), signedMoney(item.unitPrice), positiveQuantity(item.quantity), String(item.unit || ""), signedMoney(item.amount), positiveTaxRate(item.taxRate))));
 
   try {
     await env.DB.batch(statements);
@@ -477,6 +477,11 @@ function safeFileName(value) {
 function positiveMoney(value) {
   const number = Math.round(Number(value || 0));
   return Number.isFinite(number) && number >= 0 ? number : 0;
+}
+
+function signedMoney(value) {
+  const number = Math.round(Number(value || 0));
+  return Number.isFinite(number) ? number : 0;
 }
 
 function positiveQuantity(value) {

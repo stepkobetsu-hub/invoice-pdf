@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.23. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.24. */
 const STEP = Object.freeze({
   AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
   AUTH_PERMISSION_LEVELS:['2','3','4'],
@@ -243,7 +243,6 @@ function enqueueSend_(payload, requestAuth) {
     response={queued:results.length,items:results,testMode};
   } finally { lock.releaseLock(); }
   installQueueTrigger_();
-  if(payload.preflight!==true)processSendQueue();
   return response;
 }
 
