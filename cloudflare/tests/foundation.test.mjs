@@ -19,6 +19,7 @@ assert.equal(config.vars.PUBLIC_DOWNLOAD_ENABLED, "true");
 assert.equal(config.vars.PDF_UPLOAD_ENABLED, "true");
 assert.equal(config.vars.ADMIN_API_ENABLED, "true");
 assert.equal(config.vars.EMERGENCY_STOP, "false");
+assert.equal(config.vars.PARENT_LINK_TTL_DAYS, "180");
 assert.equal(config.ratelimits.length, 4);
 
 for (const table of [
@@ -39,6 +40,7 @@ assert.match(source, /<dt>ご請求金額<\/dt>/);
 assert.match(source, /<dt>請求書番号<\/dt>/);
 assert.match(source, /<dt>お支払期限<\/dt>/);
 assert.match(source, /ダウンロード期限：/);
+assert.match(source, /font-size:clamp\(20px,4\.5vw,26px\);font-weight:400/);
 assert.doesNotMatch(source, /<dt>請求日<\/dt>/);
 
 for (const table of ["system_modules", "managed_files", "access_tokens", "audit_events"]) {
