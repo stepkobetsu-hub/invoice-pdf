@@ -142,6 +142,10 @@ function findStudentForPartner_(studentCode, requestAuth) {
   const code = String(studentCode == null ? '' : studentCode).trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
   if (!code) throw new Error('生徒コードを入力してください。');
   if (!/^[A-Za-z0-9]+$/.test(code)) throw new Error('生徒コードは半角英数で入力してください。');
+  const cache = CacheService.getScriptCache(), cacheKey = 'student-partner:' + code.toLowerCase(), cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (_) { cache.remove(cacheKey); }
+  }
   const master = SpreadsheetApp.openById(STEP.STUDENT_MASTER.SPREADSHEET_ID);
   const sheet = master.getSheetByName(STEP.STUDENT_MASTER.SHEET_NAME);
   if (!sheet) throw new Error('生徒マスタの「☆マスタ」シートが見つかりません。');
@@ -151,11 +155,13 @@ function findStudentForPartner_(studentCode, requestAuth) {
   if (!found) throw new Error('一致する生徒コードが見つかりません。');
   const row = sheet.getRange(found.getRow(),1,1,24).getDisplayValues()[0];
   if (String(row[0]).trim() !== code) throw new Error('一致する生徒コードが見つかりません。');
-  return {
+  const student = {
     studentCode:String(row[0] || '').trim(), name:String(row[4] || '').trim(), kana:String(row[5] || '').trim(),
     grade:String(row[9] || '').trim(), postal:String(row[19] || '').trim(), addressU:String(row[20] || '').trim(),
     addressV:String(row[21] || '').trim(), addressW:String(row[22] || '').trim(), email:String(row[23] || '').trim()
   };
+  cache.put(cacheKey, JSON.stringify(student), 300);
+  return student;
 }
 
 function savePdf_(invoice, pdfBase64, requestAuth) {
