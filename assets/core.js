@@ -36,6 +36,25 @@
     const digits=text.replace(/\D/g,'');
     return digits.length===7?`${digits.slice(0,3)}-${digits.slice(3)}`:text;
   }
+  function splitJapaneseAddress(address){
+    const text=String(address||'').trim();
+    const match=text.match(/^(東京都|北海道|(?:京都|大阪)府|.{2,3}県)(.*)$/);
+    return match?{prefecture:match[1],rest:match[2]}:{prefecture:'',rest:text};
+  }
+  function studentToPartner(student){
+    const code=String(student?.studentCode||'').trim(),name=String(student?.name||'').trim();
+    if(!code||!name)throw new Error('生徒コードまたは生徒氏名がありません。');
+    const first=splitJapaneseAddress(student?.addressU);
+    const partner=Object.fromEntries(PARTNER_HEADERS.map(header=>[header,'']));
+    Object.assign(partner,{
+      '顧客コード':code,'名称':name,'名称(カナ)':String(student?.kana||'').trim(),'敬称':'様',
+      '郵便番号':normalizePostal(student?.postal),'都道府県':first.prefecture,
+      '住所1':`${first.rest}${String(student?.addressV||'').trim()}`,
+      '住所2':String(student?.addressW||'').trim(),'メールアドレス':String(student?.email||'').trim(),
+      'メモ':`生徒マスタから取込${student?.grade?`（学年：${String(student.grade).trim()}）`:''}`
+    });
+    return partner;
+  }
   function formatYen(value){return `${Number(value||0).toLocaleString('ja-JP')}円`;}
   function normalizeDate(value){const parts=String(value||'').split(/[\/-]/);if(parts.length!==3)return String(value||'');return `${parts[0]}/${parts[1].padStart(2,'0')}/${parts[2].padStart(2,'0')}`;}
   function nextInvoiceNumber(dateValue,invoices){
@@ -147,6 +166,6 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
