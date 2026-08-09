@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-invoice-search">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-search-layout">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260809-common-auth-view-state" defer></script>
   <script src="assets/invoice-pdf.js?v=20260809-preview-watermark" defer></script>
-  <script src="assets/app.js?v=20260810-refresh-persistence" defer></script>
+  <script src="assets/app.js?v=20260810-search-defaults" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -83,8 +83,7 @@
             <span aria-hidden="true">～</span>
             <input id="invoiceDateTo" type="date" aria-label="検索終了日">
           </div>
-          <label class="invoice-free-search"><span class="sr-only">請求内容を検索</span><input id="invoiceFreeSearch" type="search" placeholder="取引先名、件名、メモ、明細などを検索"></label>
-          <button id="clearInvoiceSearch" class="button secondary" type="button">クリア</button>
+          <div class="invoice-free-search"><input id="invoiceFreeSearch" type="search" aria-label="請求内容を検索" placeholder="取引先名、件名、メモ、明細などを検索"><button id="clearInvoiceSearch" type="button">クリア</button></div>
         </div>
         <div class="invoice-workspace">
           <aside class="invoice-list-pane" aria-label="請求書一覧"><div class="invoice-list-head"><strong id="invoiceListCount">0件</strong><span>最新順</span></div><div id="invoiceList" class="invoice-list"><p class="invoice-list-empty">請求書がありません。</p></div></aside>
