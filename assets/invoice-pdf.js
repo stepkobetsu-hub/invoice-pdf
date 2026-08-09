@@ -14,7 +14,7 @@
       <table class="detail"><thead><tr><th>納品日</th><th>品目・納品書番号</th><th class="num">単価</th><th class="num">数量</th><th class="num">価格</th></tr></thead><tbody>${details}</tbody></table>
       <div class="abs tax-title">税率別内訳</div><table class="tax-table"><tr><th></th><th>税抜金額</th><th>消費税額</th><th>税込金額</th></tr><tr><td>10%</td><td>${Number(inv.subtotal).toLocaleString()}</td><td>${Number(inv.tax).toLocaleString()}</td><td>${Number(inv.total).toLocaleString()}</td></tr></table>
       <table class="totals"><tr><td>小計</td><td class="num">${Number(inv.subtotal).toLocaleString()}</td></tr><tr><td>消費税額合計</td><td class="num">${Number(inv.tax).toLocaleString()}</td></tr><tr><td>合計</td><td class="num">${Number(inv.total).toLocaleString()}</td></tr></table>
-      <div class="abs section-title bank-title">振込先</div><div class="section-box bank-box">${esc(inv.note||inv.bank)}</div><div class="abs section-title note-title">備考</div><div class="section-box note-box">個別指導ステップ（運営:株式会社エデュクレスト）</div><div class="abs page-number">1 / 1</div>
+      <div class="abs section-title bank-title">振込先</div><div class="section-box bank-box">${esc(inv.bank||'')}</div><div class="abs section-title note-title">備考</div><div class="section-box note-box">${esc(inv.note||'個別指導ステップ（運営：株式会社エデュクレスト）')}</div><div class="abs page-number">1 / 1</div>
     </div>`;
   }
   async function toBlob(element){
