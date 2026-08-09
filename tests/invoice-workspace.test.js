@@ -23,6 +23,7 @@ window.HTMLFormElement.prototype.submit=function(){
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
 };
 window.print=()=>{};
+window.confirm=()=>true;
 window.fetch=async()=>({ok:true,json:async()=>({results:[]})});
 window.eval(fs.readFileSync(path.join(root,'assets/core.js'),'utf8'));
 window.eval(fs.readFileSync(path.join(root,'assets/invoice-pdf.js'),'utf8'));
@@ -44,6 +45,10 @@ window.eval(fs.readFileSync(path.join(root,'assets/app.js'),'utf8'));
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/PDF／印刷/);
   assert.equal(document.querySelector('#selectedPaymentStatus summary').textContent,'未入金');
   assert.equal(document.querySelectorAll('[data-payment-value]').length,3);
+  assert.ok(document.querySelector('#paymentDateDialog'));
+  assert.ok(document.querySelector('[name="defaultBank"]'));
+  assert.ok(document.querySelector('[name="defaultNote"]'));
+  assert.ok(document.querySelector('.advanced-settings [name="apiUrl"]'));
   assert.doesNotMatch(document.querySelector('#view-invoices').textContent,/新しい請求書から順に表示しています/);
   assert.deepEqual([...document.querySelectorAll('#invoiceDateField option')].map(option=>option.textContent),['作成日','請求日','最終更新日','お支払期限日']);
   const today=new Date(),expectedFrom=`${today.getFullYear()-1}-${String(today.getMonth()+1).padStart(2,'0')}-01`,periodEnd=new Date(today.getFullYear(),today.getMonth()+2,0),expectedTo=`${periodEnd.getFullYear()}-${String(periodEnd.getMonth()+1).padStart(2,'0')}-${String(periodEnd.getDate()).padStart(2,'0')}`;
