@@ -134,8 +134,9 @@ function importPartners_(partners) {
 
 function findStudentForPartner_(studentCode) {
   requirePermission_('取引先編集');
-  const code = String(studentCode == null ? '' : studentCode).trim();
+  const code = String(studentCode == null ? '' : studentCode).trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
   if (!code) throw new Error('生徒コードを入力してください。');
+  if (!/^[A-Za-z0-9]+$/.test(code)) throw new Error('生徒コードは半角英数で入力してください。');
   const master = SpreadsheetApp.openById(STEP.STUDENT_MASTER.SPREADSHEET_ID);
   const sheet = master.getSheetByName(STEP.STUDENT_MASTER.SHEET_NAME);
   if (!sheet) throw new Error('生徒マスタの「☆マスタ」シートが見つかりません。');
