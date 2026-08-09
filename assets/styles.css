@@ -37,6 +37,8 @@
 .student-search-working{color:var(--blue);font-weight:700}
 .student-search-success{color:var(--green);font-weight:700}
 .student-search-error{color:var(--danger);font-weight:700}
+.staff-login-link{border:1px solid #9fb4d6;border-radius:7px;padding:7px 10px;color:var(--blue);background:#fff;text-decoration:none;font-weight:700;white-space:nowrap}
+.staff-login-link:hover{background:#eef5ff}
 .student-result{margin-top:18px;border:1px solid #9fb8e6;border-radius:9px;background:#f6f9ff;padding:4px}
 .student-choice{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer}
 .student-choice input{width:18px;height:18px}
