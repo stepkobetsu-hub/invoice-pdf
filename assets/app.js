@@ -2,6 +2,8 @@
   'use strict';
   const C=window.StepInvoiceCore,P=window.StepInvoicePdf;
   const DEFAULT_API_URL='https://script.google.com/macros/s/AKfycbwo1DdSQ2eUVVU35v1TqermHTgIEsT1u4U-M_67KfA50VelbHsh28W_pec56OlyBkxqaw/exec';
+  const STAFF_AUTH_KEY='stepStaffAppAuth';
+  const VIEWS=new Set(['create','invoices','partners','history','settings','mail']);
   const savedPartners=JSON.parse(localStorage.getItem('stepInvoicePartners')||'[]');
   const savedSettings=JSON.parse(localStorage.getItem('stepInvoiceSettings')||'{}');
   if(!savedSettings.apiUrl)savedSettings.apiUrl=DEFAULT_API_URL;
@@ -12,7 +14,7 @@
   const plusDays=(dateValue,days)=>{const [year,month,day]=String(dateValue).split('-').map(Number),date=new Date(year,month-1,day);date.setDate(date.getDate()+days);return localIso(date);};
   function alert(message,type='warning'){const el=$('#globalAlert');el.textContent=message;el.className=`alert ${type}`;setTimeout(()=>el.classList.add('hidden'),7000);}
   function activateStep(index){$$('#createSteps li').forEach((el,i)=>{el.classList.toggle('active',i===index);el.classList.toggle('done',i<index);});}
-  function showView(name){$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${name}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===name));}
+  function showView(name){const view=VIEWS.has(name)?name:'create';$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${view}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(location.hash!==`#${view}`)history.replaceState(null,'',`#${view}`);}
   function setCreateMethod(method){$$('[data-create-method]').forEach(button=>{const active=button.dataset.createMethod===method;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});$('#createCsvPane').classList.toggle('active',method==='csv');$('#createSinglePane').classList.toggle('active',method==='single');if(method==='single')prepareSingleInvoice();}
   function setSingleDefaults(force=false){const form=$('#singleInvoiceForm'),date=form.elements.invoiceDate;if(!date.value)date.value=localIso(new Date());if(force||!form.elements.dueDate.value)form.elements.dueDate.value=plusDays(date.value,21);if(force||!form.elements.invoiceNumber.value)form.elements.invoiceNumber.value=C.nextInvoiceNumber(date.value,state.invoices);if(force||!form.elements.subject.value){const [year,month]=date.value.split('-');form.elements.subject.value=`${year}年${Number(month)}月分`;}}
   function updateSingleFromDate(){const form=$('#singleInvoiceForm'),date=form.elements.invoiceDate.value;if(!date)return;form.elements.dueDate.value=plusDays(date,21);form.elements.invoiceNumber.value=C.nextInvoiceNumber(date,state.invoices);const [year,month]=date.split('-');form.elements.subject.value=`${year}年${Number(month)}月分`;}
@@ -21,11 +23,12 @@
   function renderPartnerOptions(){const select=$('#singlePartner'),selected=select.value;select.innerHTML='<option value="">取引先を選択してください</option>'+state.partners.map(p=>`<option value="${esc(p['顧客コード'])}">${esc(p['顧客コード'])}　${esc(p['名称'])}（${esc(p['メールアドレス']||'メール未登録')}）</option>`).join('');if(state.partners.some(p=>p['顧客コード']===selected))select.value=selected;}
   async function api(action,payload={}){
     const url=state.settings.apiUrl;if(!url)throw new Error('基本設定でApps ScriptデプロイURLを設定してください。');
+    let staffAuth=null;try{staffAuth=JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null');}catch(_){}
     const requestId=`step-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const bridgeNonce=[...crypto.getRandomValues(new Uint32Array(4))].map(x=>x.toString(16).padStart(8,'0')).join('');
     const frame=document.createElement('iframe');frame.name=requestId;frame.hidden=true;document.body.appendChild(frame);
     const form=document.createElement('form');form.method='POST';form.action=url;form.target=requestId;form.hidden=true;
-    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||''};
+    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||'',systemPortalSessionToken:staffAuth?.systemPortalSessionToken||''};
     Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);});
     document.body.appendChild(form);
     return new Promise((resolve,reject)=>{
@@ -142,5 +145,5 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');
   $('#loadSample').onclick=()=>{state.invoices=C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners);renderCreate();activateStep(2);};
-  restoreForms();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();renderCreate();renderInvoices();renderHistory();
+  restoreForms();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();renderCreate();renderInvoices();renderHistory();showView(location.hash.slice(1));
 })();
