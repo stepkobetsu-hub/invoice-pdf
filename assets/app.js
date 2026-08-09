@@ -39,7 +39,12 @@
     });
   }
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
-  const displayDlStatus=s=>['送信済み','再送済み'].includes(String(s||''))?'未アクセス':s;
+  const displayDlStatus=s=>{
+    const status=String(s||'');
+    if(['送信済み','再送済み'].includes(status))return '未アクセス';
+    if(!status||['未送信','送信待ち','送信中','送信失敗','送信前確認'].includes(status))return '送信前';
+    return status;
+  };
   function cards(values){return Object.entries(values).map(([label,value])=>`<div class="summary-card"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');}
   function reconcile(){state.invoices=C.matchPartners(state.invoices,state.partners);renderCreate();}
   async function onInvoiceCsv(file){try{const decoded=await C.decodeCsvFile(file);state.invoices=C.parseInvoiceRows(C.parseCsv(decoded.text));activateStep(1);reconcile();$('#invoiceImportSummary').innerHTML=cards({'読込件数':state.invoices.length,'文字コード':decoded.encoding,'10円丸め調整':state.invoices.filter(x=>x.roundingAdjusted).length,'照合済み':state.invoices.filter(x=>x.partner).length});$('#invoiceImportSummary').classList.remove('hidden');activateStep(2);alert(`${state.invoices.length}件を読み込みました。送信は行っていません。`,'success');}catch(e){alert(e.message,'error');}}
@@ -95,7 +100,7 @@
     if(groups.resend.length){$('#sendDialog').close();return openResendDialog(groups);}
     if(!groups.unsent.length)return;
     const button=$('#confirmSend');button.disabled=true;button.textContent='送信を受け付けています…';
-    try{await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:true,resend:false,newToken:true});groups.unsent.forEach(x=>x.sendStatus='送信待ち');renderInvoices();$('#sendDialog').close();alert('送信キューへ登録しました。進行状況は自動更新されます。','success');}catch(e){alert(e.message,'error');}finally{button.disabled=false;button.textContent=`選択した${groups.unsent.length}件を送信`;}
+    try{await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:true,resend:false,newToken:true});$('#sendDialog').close();await refreshAll(false);alert('送信処理を実行しました。送信状態を更新しました。','success');}catch(e){alert(e.message,'error');}finally{button.disabled=false;button.textContent=`選択した${groups.unsent.length}件を送信`;}
   }
   async function confirmResend(){
     if(state.resendSubmitting||!state.pendingResend)return;
@@ -104,14 +109,14 @@
     try{
       if(groups.unsent.length)await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:true,resend:false,newToken:true});
       if(groups.resend.length)await api('enqueueSend',{invoiceNumbers:groups.resend.map(x=>x.invoiceNumber),testMode:true,resend:true,newToken:true});
-      [...groups.unsent,...groups.resend].forEach(x=>x.sendStatus='送信待ち');renderInvoices();$('#resendDialog').close();alert('初回送信と再送を区別してキューへ登録しました。','success');state.pendingResend=null;
+      $('#resendDialog').close();await refreshAll(false);alert('初回送信と再送の処理を実行し、送信状態を更新しました。','success');state.pendingResend=null;
     }catch(e){alert(e.message,'error');button.disabled=false;button.textContent='再送する';}finally{state.resendSubmitting=false;}
   }
   function openDisableDialog(inv){state.pendingDisable=inv;$('#disableTarget').textContent=`請求書番号: ${inv.invoiceNumber}　顧客名: ${inv.partnerName}`;$('#disableDialog').showModal();}
   async function confirmDisable(){const inv=state.pendingDisable;if(!inv)return;const button=$('#confirmDisable');button.disabled=true;try{await api('disableDelivery',{invoiceNumber:inv.invoiceNumber});inv.sendStatus='無効化';renderInvoices();$('#disableDialog').close();state.pendingDisable=null;}catch(e){alert(e.message,'error');}finally{button.disabled=false;}}
   async function rowAction(action,i){const inv=state.invoices[i];if(action==='preview')return previewInvoice(i);if(action==='send'){state.selected=new Set([i]);return openSendDialog([inv]);}if(action==='resend'){state.selected=new Set([i]);return openResendDialog(C.classifySendSelection([inv]));}if(action==='disable')return openDisableDialog(inv);}
   function selectBy(mode){state.selected.clear();state.invoices.forEach((x,i)=>{if(mode==='all'||mode==='visible'||mode==='unsent'&&C.isInitialSendable(x)||mode==='failed'&&x.sendStatus==='送信失敗'||mode==='expired'&&x.dlStatus==='期限切れ')state.selected.add(i);});renderInvoices();}
-  async function refreshAll(){try{const data=await api('getDashboard');state.invoices=data.invoices||state.invoices;state.history=data.history||[];if(Array.isArray(data.partners)){state.partners=data.partners;persistPartners();renderPartners();renderPartnerOptions();}renderInvoices();renderHistory();$('#userLabel').textContent=data.user||'接続済み';}catch(e){alert(e.message,'error');}}
+  async function refreshAll(processPending=true){try{if(processPending)await api('processPendingSends');const data=await api('getDashboard');state.invoices=data.invoices||state.invoices;state.history=data.history||[];if(Array.isArray(data.partners)){state.partners=data.partners;persistPartners();renderPartners();renderPartnerOptions();}renderInvoices();renderHistory();$('#userLabel').textContent=data.user||'接続済み';}catch(e){alert(e.message,'error');}}
   function saveForm(form,key){const values=Object.fromEntries(new FormData(form).entries());state.settings={...state.settings,...values};localStorage.setItem('stepInvoiceSettings',JSON.stringify(state.settings));alert('設定を保存しました。','success');return values;}
   function restoreForms(){$$('#settingsForm [name],#mailForm [name]').forEach(el=>{if(state.settings[el.name]!==undefined)el.value=state.settings[el.name];});}
   $$('.nav-item').forEach(b=>b.onclick=()=>showView(b.dataset.view));
@@ -152,4 +157,5 @@
   $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');
   $('#loadSample').onclick=()=>{state.invoices=C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners);renderCreate();activateStep(2);};
   restoreForms();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();renderCreate();renderInvoices();renderHistory();showView(location.hash.slice(1));
+  if(localStorage.getItem(STAFF_AUTH_KEY))refreshAll();
 })();
