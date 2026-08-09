@@ -17,7 +17,7 @@
     "PDF_UPLOAD_ENABLED": "true",
     "ADMIN_API_ENABLED": "true",
     "EMERGENCY_STOP": "false",
-    "PARENT_LINK_TTL_DAYS": "60",
+    "PARENT_LINK_TTL_DAYS": "180",
     "PDF_DOWNLOAD_MAX_TOTAL": "20",
     "PDF_DOWNLOAD_MAX_DAILY": "10",
     "BULK_SEND_MAX": "100",
