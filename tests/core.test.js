@@ -45,6 +45,8 @@ assert.equal(studentPartner['住所1'],'小牧市大草1220');
 assert.equal(studentPartner['住所2'],'テストハイツ101');
 assert.equal(studentPartner['郵便番号'],'485-0802');
 assert.match(studentPartner['メモ'],/小５/);
+assert.equal(C.normalizeStudentCode(' １３２０ '),'1320');
+assert.equal(C.normalizeStudentCode(' Ａb１２ '),'Ab12');
 const manual=C.buildManualInvoice({invoiceNumber:'202608101',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-31',note:'個別作成テスト'},[
   {name:'授業料',unitPrice:25000,quantity:1,unit:'月',taxRate:10},
   {name:'教材費',unitPrice:50,quantity:1,unit:'冊',taxRate:10}
