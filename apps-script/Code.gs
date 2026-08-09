@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.22. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.23. */
 const STEP = Object.freeze({
   AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
   AUTH_PERMISSION_LEVELS:['2','3','4'],
@@ -23,16 +23,8 @@ const STEP = Object.freeze({
 function doGet(e) {
   const token = String((e && e.parameter && e.parameter.t) || '');
   if (!token) return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><title>STEP請求書</title><p>STEP請求書配信サービスは稼働中です。</p>');
-  try {
-    const delivery = validateToken_(token, true);
-    const tpl = HtmlService.createTemplateFromFile('Download');
-    tpl.token = token;
-    tpl.delivery = delivery.publicData;
-    return tpl.evaluate().setTitle('個別指導ステップ 請求書ダウンロード');
-  } catch (err) {
-    log_('URLアクセス','','','','失敗',safeError_(err));
-    return HtmlService.createHtmlOutput('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ダウンロードURLをご利用いただけません</title><style>body{font-family:system-ui,sans-serif;background:#f5f7fb;color:#1b2a4a;margin:0;padding:48px 20px}.card{max-width:640px;margin:auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 10px 30px #1b2a4a18}h1{font-size:22px}p{line-height:1.8}</style></head><body><main class="card"><h1>このダウンロードURLは現在ご利用いただけません。</h1><p>最新の案内メールをご確認いただくか、<br>個別指導ステップまでお問い合わせください。</p><p>電話: 0568-41-8937</p></main></body></html>').setTitle('ダウンロードURLをご利用いただけません');
-  }
+  log_('旧Google配信URLアクセス','','','','終了','Cloudflare版へ移行済み');
+  return HtmlService.createHtmlOutput('<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>新しい配信URLをご確認ください</title><style>body{font-family:system-ui,sans-serif;background:#f5f7fb;color:#1b2a4a;margin:0;padding:48px 20px}.card{max-width:640px;margin:auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 10px 30px #1b2a4a18}h1{font-size:22px}p{line-height:1.8}</style></head><body><main class="card"><h1>このGoogle経由の配信URLは終了しました。</h1><p>PDFはGoogle DriveではなくCloudflareの保護された保管場所から配信しています。最新の案内メールに記載されたURLをご確認ください。</p><p>ご不明な場合は個別指導ステップ（0568-41-8937）までお問い合わせください。</p></main></body></html>').setTitle('新しい配信URLをご確認ください');
 }
 
 function doPost(e) {
@@ -84,24 +76,14 @@ function setupSystem() {
   seedSettings_(spreadsheet);
   seedTemplate_(spreadsheet);
   seedCurrentUser_(spreadsheet);
-  if (!props.getProperty('PDF_FOLDER_ID')) { const folder = DriveApp.createFolder('STEP請求書'); props.setProperty('PDF_FOLDER_ID', folder.getId()); }
   if (!props.getProperty('ADMIN_API_KEY')) props.setProperty('ADMIN_API_KEY', createToken_()+createToken_());
   props.setProperties({PRODUCTION_SEND_APPROVED:'false',APPROVED_PDF_TEMPLATE:'stage1-approved-v1',SYSTEM_VERSION:'0.1.0'}, false);
   installQueueTrigger_();
-  return {spreadsheetUrl:spreadsheet.getUrl(),spreadsheetId:spreadsheet.getId(),driveFolderId:props.getProperty('PDF_FOLDER_ID'),webAppUrl:ScriptApp.getService().getUrl() || '',adminApiKey:props.getProperty('ADMIN_API_KEY')};
+  return {spreadsheetUrl:spreadsheet.getUrl(),spreadsheetId:spreadsheet.getId(),webAppUrl:ScriptApp.getService().getUrl() || '',adminApiKey:props.getProperty('ADMIN_API_KEY'),cloudflareConfigured:Boolean(props.getProperty('CLOUDFLARE_API_URL')&&props.getProperty('CLOUDFLARE_ADMIN_API_KEY'))};
 }
 
 function getPdfForToken(token) {
-  const checked = validateToken_(String(token || ''), false);
-  const row = checked.row, values = row.values;
-  const fileId = values[row.map['PDFファイルID']];
-  if (!fileId) throw new Error('PDFが準備されていません。');
-  const blob = DriveApp.getFileById(fileId).getBlob().setContentType(MimeType.PDF);
-  const now = new Date();
-  updateDeliveryCells_(row, {'初回ダウンロード日時': values[row.map['初回ダウンロード日時']] || now, 'ダウンロード回数': Number(values[row.map['ダウンロード回数']] || 0) + 1, '現在状態':'DL済', '更新日時':now});
-  sheet_(STEP.SHEETS.DOWNLOADS).appendRow([now,values[row.map['配信ID']],values[row.map['請求書番号']],'PDF取得','成功','保存しない','保存しない']);
-  log_('PDF取得',values[row.map['請求書番号']],values[row.map['顧客コード']],values[row.map['配信ID']],'成功','');
-  return {base64:Utilities.base64Encode(blob.getBytes()),fileName:values[row.map['PDFファイル名']],mimeType:'application/pdf'};
+  throw new Error('Google経由のPDF配信は終了しました。最新のCloudflare配信URLをご利用ください。');
 }
 
 function processSendQueue() {
@@ -175,16 +157,11 @@ function savePdf_(invoice, pdfBase64, requestAuth) {
   if (!pdfBase64) throw new Error('PDFデータがありません。');
   const expectedTotal = Math.floor((Number(invoice.sourceTotal == null ? invoice.total : invoice.sourceTotal) + 5) / 10) * 10;
   if (Number(invoice.total) !== expectedTotal || Number(invoice.tax) !== expectedTotal - Number(invoice.subtotal)) throw new Error('10円単位の丸め結果または税額が一致しません。');
-  const bytes = Utilities.base64Decode(pdfBase64);
-  if (bytes.length > 10 * 1024 * 1024) throw new Error('PDFサイズが上限を超えています。');
-  const year = String(invoice.invoiceNumber).slice(0,4), month = String(invoice.invoiceNumber).slice(4,6);
-  const folder = childFolder_(childFolder_(DriveApp.getFolderById(PropertiesService.getScriptProperties().getProperty('PDF_FOLDER_ID')),year),month);
   const fileName = safeFileName_(`${invoice.invoiceNumber}_${invoice.partnerName}${invoice.honorific || '様'}.pdf`);
-  const existing = folder.getFilesByName(fileName); while(existing.hasNext()) existing.next().setTrashed(true);
-  const file = folder.createFile(Utilities.newBlob(bytes,MimeType.PDF,fileName));
-  upsertInvoice_(invoice,file.getId(),fileName);
-  log_('PDF作成',invoice.invoiceNumber,invoice.customerCode,'','成功','');
-  return {pdfFileId:file.getId(),pdfFileName:fileName};
+  const result = cloudflareAdminFetch_('/api/admin/invoices','post',{invoice:invoice,pdfBase64:pdfBase64});
+  upsertInvoice_(invoice,result.invoiceId,fileName);
+  log_('PDF作成',invoice.invoiceNumber,invoice.customerCode,'','成功','',{}, {storage:'Cloudflare R2',invoiceId:result.invoiceId});
+  return {pdfFileId:result.invoiceId,pdfFileName:fileName,storage:'Cloudflare R2'};
 }
 
 function enqueueSend_(payload, requestAuth) {
@@ -205,15 +182,15 @@ function enqueueSend_(payload, requestAuth) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`${number}: メールアドレス形式不正です。`);
       if (queued.some(q => String(q.values[table_(queue).map['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[table_(queue).map['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
       if (payload.resend && payload.newToken !== false) invalidateByInvoice_(number);
-      const deliveryId = Utilities.getUuid(), queueId = Utilities.getUuid(), token = createToken_(), tokenHash = hashToken_(token), now = new Date();
+      const deliveryId = Utilities.getUuid(), queueId = Utilities.getUuid(), now = new Date();
       const settings=settings_(), expires=new Date(now.getTime()+Number(settings.validDays||45)*86400000);
       const subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
       const prepared = payload.preflight === true, initialStatus = prepared ? '送信前確認' : '送信待ち';
-      sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],email,inv.values[invoices.map['CCメールアドレス']],subject,'',initialStatus,'',tokenHash,now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
-      cacheTokenForQueue_(deliveryId,token);
+      const cloudDelivery=createCloudflareDelivery_({deliveryId:deliveryId,invoiceNumber:number,recipientEmail:email,ccEmail:inv.values[invoices.map['CCメールアドレス']],expiresAt:expires,createdBy:activeEmail_()||requestAuth.name||'apps-script'});
+      sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],email,inv.values[invoices.map['CCメールアドレス']],subject,'',initialStatus,'','Cloudflare管理',now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
+      cacheDownloadUrlForQueue_(deliveryId,cloudDelivery.downloadUrl);
       queue.appendRow([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','']);
-      const baseUrl=settings.webAppUrl||ScriptApp.getService().getUrl()||'';
-      results.push({invoiceNumber:number,deliveryId,queueId,preflightUrl:prepared?baseUrl+'?t='+encodeURIComponent(token):''});
+      results.push({invoiceNumber:number,deliveryId,queueId,preflightUrl:prepared?cloudDelivery.downloadUrl:''});
       log_(payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','');
     });
     response={queued:results.length,items:results,testMode};
@@ -246,12 +223,12 @@ function releasePreparedSend_(deliveryId, requestAuth) {
 
 function sendOne_(queueValues, queueMap, settings) {
   const deliveryId=queueValues[queueMap['配信ID']], delivery=findDeliveryById_(deliveryId); if(!delivery) throw new Error('配信履歴がありません。');
-  const d=delivery.values,m=delivery.map,token=takeCachedToken_(deliveryId); if(!token) throw new Error('トークン発行失敗またはキュー期限切れです。');
+  const d=delivery.values,m=delivery.map;
   const testMode=String(queueValues[queueMap['テストモード']])==='true'||queueValues[queueMap['テストモード']]===true;
   const recipient=testMode?settings.testRecipient:d[m['送信先メールアドレス']]; if(!recipient) throw new Error(testMode?'テスト送信先未登録':'メールアドレス未登録');
-  // Use the explicitly configured public deployment URL first. getUrl() may
-  // return a deployment URL that belongs to an older executing deployment.
-  const url=(settings.webAppUrl||ScriptApp.getService().getUrl()||'')+'?t='+encodeURIComponent(token); if(!/^https:\/\//.test(url)) throw new Error('Apps ScriptデプロイURL未設定');
+  let url=takeCachedDownloadUrl_(deliveryId);
+  if(!url)url=rotateCloudflareDelivery_(deliveryId,d[m['トークン有効期限']]).downloadUrl;
+  if(!/^https:\/\//.test(url)||/script\.google\.com|drive\.google\.com/i.test(url))throw new Error('Cloudflare配信URLを発行できませんでした。');
   const invoice=findInvoice_(d[m['請求書番号']]);
   const values={'取引先名':d[m['宛名']],'敬称':invoice.敬称||'様','顧客コード':d[m['顧客コード']],'対象年月':invoice.対象年月||'','請求書番号':d[m['請求書番号']],'請求金額':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円','支払期限':invoice.支払期限||'','有効日数':settings.validDays||45,'有効期限':formatDate_(d[m['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
   let subject=merge_(settings.subject||d[m['メール件名']],values), body=merge_(settings.body||defaultMailBody_(),values);
@@ -260,7 +237,8 @@ function sendOne_(queueValues, queueMap, settings) {
   const cc=[testMode?'':d[m['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).join(','); if(cc)options.cc=cc;if(settings.bcc)options.bcc=settings.bcc;
   assertHourlyLimit_(settings);
   MailApp.sendEmail(recipient,subject,body,options);
-  clearCachedToken_(deliveryId);
+  clearCachedDownloadUrl_(deliveryId);
+  try{cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/sent','post',{});}catch(syncError){log_('Cloudflare状態同期',d[m['請求書番号']],d[m['顧客コード']],deliveryId,'警告',safeError_(syncError));}
   const now=new Date(), status=Number(d[m['再送回数']]||0)>0?'再送済み':'送信済み';
   updateDeliveryCells_(delivery,{'送信日時':now,'送信状態':status,'送信エラー':'','現在状態':status,'更新日時':now});
   updateInvoiceState_(d[m['請求書番号']],status);
@@ -279,7 +257,7 @@ function assertHourlyLimit_(settings) {
 }
 
 function disableDelivery_(invoiceNumber, requestAuth) { requirePermission_('配信停止', requestAuth); const count=invalidateByInvoice_(String(invoiceNumber)); log_('URL無効化',invoiceNumber,'','','成功',''); return {disabled:count}; }
-function invalidateByInvoice_(invoiceNumber) { const sh=sheet_(STEP.SHEETS.DELIVERIES), t=table_(sh), now=new Date(); let n=0;t.rows.forEach(r=>{if(String(r.values[t.map['請求書番号']])===invoiceNumber&&!r.values[t.map['無効化日時']]){updateRow_(sh,r.rowNumber,t.map,{'無効化日時':now,'現在状態':'無効化','更新日時':now});n++;}});return n; }
+function invalidateByInvoice_(invoiceNumber) { const sh=sheet_(STEP.SHEETS.DELIVERIES), t=table_(sh), now=new Date(); let n=0;t.rows.forEach(r=>{if(String(r.values[t.map['請求書番号']])===invoiceNumber&&!r.values[t.map['無効化日時']]){const deliveryId=String(r.values[t.map['配信ID']]||'');if(deliveryId)cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/revoke','post',{});updateRow_(sh,r.rowNumber,t.map,{'無効化日時':now,'現在状態':'無効化','更新日時':now});n++;}});return n; }
 
 function validateToken_(token, recordAccess) {
   if (!token || token.length < 30) throw new Error('このダウンロードURLはご利用いただけません。');
@@ -292,7 +270,7 @@ function validateToken_(token, recordAccess) {
   return {row:{sheet:sh,rowNumber:row.rowNumber,map:m,values:v},publicData:{name:settings.nameDisplay==='full'?v[m['宛名']]:maskName_(v[m['宛名']]),subject:invoice.対象年月||'',invoiceNumber:v[m['請求書番号']],amount:settings.amountDisplay==='hide'?'非表示':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円',expiresAt:formatDate_(v[m['トークン有効期限']])}};
 }
 
-function getDashboard_(requestAuth) { requirePermission_('履歴閲覧', requestAuth); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)), activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:requestAuth.name||activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])],rawDl=d?String(d.values[deliveries.map['現在状態']]||''):'';return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?(['送信済み','再送済み'].includes(rawDl)?'未アクセス':rawDl):'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
+function getDashboard_(requestAuth) { requirePermission_('履歴閲覧', requestAuth); syncCloudflareStatuses_(); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)), activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:requestAuth.name||activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])],rawDl=d?String(d.values[deliveries.map['現在状態']]||''):'';return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?(['送信済み','再送済み'].includes(rawDl)?'未アクセス':rawDl):'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
 
 function upsertInvoice_(inv,fileId,fileName){const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),now=new Date(),existing=t.rows.find(r=>String(r.values[t.map['請求書番号']])===String(inv.invoiceNumber));const partner=findPartner_(inv.customerCode,inv.partnerName);const row={'請求書番号':String(inv.invoiceNumber),'顧客コード':String(inv.customerCode||''),'宛名':inv.partnerName||'','敬称':inv.honorific||'様','対象年月':inv.subject||'','請求日':inv.invoiceDate||'','支払期限':inv.dueDate||'','郵便番号':String(inv.postal||''),'住所':String(inv.prefecture||'')+String(inv.address1||'')+String(inv.address2||''),'税抜小計':Number(inv.subtotal||0),'消費税額':Number(inv.tax||0),'請求金額':Number(inv.total||0),'メールアドレス':partner['メールアドレス']||inv.email||'','CCメールアドレス':partner['CCメールアドレス']||inv.cc||'','PDF状態':'PDF作成済み','PDFファイルID':fileId,'PDFファイル名':fileName,'現在状態':'PDF作成済み','作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now};if(existing)updateRow_(sh,existing.rowNumber,t.map,row);else sh.appendRow(STEP.INVOICE_HEADERS.map(h=>row[h]));const ds=sheet_(STEP.SHEETS.DETAILS),dt=table_(ds);dt.rows.filter(r=>String(r.values[dt.map['請求書番号']])===String(inv.invoiceNumber)).reverse().forEach(r=>ds.deleteRow(r.rowNumber));(inv.details||[]).forEach((d,i)=>ds.appendRow([String(inv.invoiceNumber),i+1,d.deliveryDate||'',d.name||'',d.itemCode||'',Number(d.unitPrice||0),Number(d.quantity||0),d.unit||'',Number(d.amount||0),d.taxRate||'']));}
 function findPartner_(code,name){const t=table_(sheet_(STEP.SHEETS.PARTNERS));const row=t.rows.find(r=>String(r.values[t.map['顧客コード']])===String(code))||t.rows.find(r=>String(r.values[t.map['名称']]).replace(/\s/g,'')===String(name).replace(/\s/g,''));return row?objectRow_(row.values,t.map):{};}
@@ -322,9 +300,15 @@ function safeFileName_(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,
 function createToken_(){const seed=Array.from({length:8},()=>Utilities.getUuid()).join('|')+'|'+Date.now();return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,seed,Utilities.Charset.UTF_8)).replace(/=+$/,'');}
 function hashToken_(token){return Utilities.base64EncodeWebSafe(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,String(token),Utilities.Charset.UTF_8)).replace(/=+$/,'');}
 function constantTimeEqual_(a,b){if(a.length!==b.length)return false;let d=0;for(let i=0;i<a.length;i++)d|=a.charCodeAt(i)^b.charCodeAt(i);return d===0;}
-function cacheTokenForQueue_(id,token){CacheService.getScriptCache().put('delivery-token:'+id,token,21600);}
-function takeCachedToken_(id){return CacheService.getScriptCache().get('delivery-token:'+id);}
-function clearCachedToken_(id){CacheService.getScriptCache().remove('delivery-token:'+id);}
+function cacheDownloadUrlForQueue_(id,url){CacheService.getScriptCache().put('cloudflare-download-url:'+id,url,21600);}
+function takeCachedDownloadUrl_(id){return CacheService.getScriptCache().get('cloudflare-download-url:'+id);}
+function clearCachedDownloadUrl_(id){CacheService.getScriptCache().remove('cloudflare-download-url:'+id);}
+function cloudflareConfig_(){const p=PropertiesService.getScriptProperties(),url=String(p.getProperty('CLOUDFLARE_API_URL')||'').replace(/\/+$/,''),key=String(p.getProperty('CLOUDFLARE_ADMIN_API_KEY')||'');if(!/^https:\/\/[^/]+/.test(url)||!key)throw new Error('Cloudflare連携が未設定です。Script Propertiesを確認してください。');return {url:url,key:key};}
+function cloudflareAdminFetch_(path,method,payload){const c=cloudflareConfig_(),response=UrlFetchApp.fetch(c.url+path,{method:method||'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.key},payload:JSON.stringify(payload||{}),muteHttpExceptions:true});let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('Cloudflareから正しい応答を受信できませんでした。');}if(response.getResponseCode()<200||response.getResponseCode()>=300||!result.ok)throw new Error('Cloudflare連携に失敗しました: '+String(result.error||response.getResponseCode()));return result;}
+function createCloudflareDelivery_(values){return cloudflareAdminFetch_('/api/admin/deliveries','post',{deliveryId:String(values.deliveryId||''),invoiceNumber:String(values.invoiceNumber||''),recipientEmail:String(values.recipientEmail||''),ccEmail:String(values.ccEmail||''),expiresAt:new Date(values.expiresAt).toISOString(),createdBy:String(values.createdBy||'apps-script')});}
+function rotateCloudflareDelivery_(deliveryId,expiresAt){return cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/rotate','post',{expiresAt:new Date(expiresAt).toISOString()});}
+function syncCloudflareStatuses_(){try{const sh=sheet_(STEP.SHEETS.DELIVERIES),t=table_(sh),rows=t.rows.slice(-100),ids=rows.map(r=>String(r.values[t.map['配信ID']]||'')).filter(Boolean);if(!ids.length)return;const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:ids}),byId={};(result.items||[]).forEach(item=>byId[String(item.delivery_id)]=item);rows.forEach(r=>{const item=byId[String(r.values[t.map['配信ID']]||'')];if(!item)return;const changes={'更新日時':new Date()};if(item.status==='downloaded'){changes['現在状態']='DL済';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['初回ダウンロード日時']=item.downloaded_at?new Date(item.downloaded_at):r.values[t.map['初回ダウンロード日時']];changes['アクセス回数']=Number(item.open_count||0);changes['ダウンロード回数']=Number(item.download_count||0);}else if(item.status==='opened'){changes['現在状態']='URLアクセス済み';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['アクセス回数']=Number(item.open_count||0);}else if(item.status==='revoked'||item.revoked_at){changes['現在状態']='無効化';changes['無効化日時']=item.revoked_at?new Date(item.revoked_at):new Date();}else if(item.expires_at&&new Date(item.expires_at).getTime()<Date.now()){changes['現在状態']='期限切れ';}else{return;}updateRow_(sh,r.rowNumber,t.map,changes);});}catch(err){console.warn('Cloudflare状態同期を保留: '+safeError_(err));}}
+function testCloudflareIntegration(){const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:[]});return {ok:result.ok===true,apiUrl:cloudflareConfig_().url,storage:'Cloudflare R2'};}
 function verifyAdminApiKey_(token){const expected=PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY')||'';if(!expected||!token||!constantTimeEqual_(expected,token))throw new Error('管理API認証に失敗しました。');}
 function verifyRequestAuth_(body){
   const apiKey=String(body.authToken||'');

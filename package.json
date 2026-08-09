@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node tests/core.test.js && node tests/ui.test.js",
-    "check": "node --check assets/core.js && node --check assets/invoice-pdf.js && node --check assets/app.js"
+    "test": "node tests/core.test.js && node tests/ui.test.js && node cloudflare/tests/foundation.test.mjs && node cloudflare/tests/security.test.mjs",
+    "check": "node --check assets/core.js && node --check assets/invoice-pdf.js && node --check assets/app.js && node --check cloudflare/src/index.js"
   },
   "devDependencies": {
     "jsdom": "^29.1.1"

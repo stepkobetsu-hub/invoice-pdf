@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "step-invoice-api",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "APP_ENV": "production",
+    "PRODUCTION_SEND_APPROVED": "false",
+    "TEST_SEND_APPROVED": "false",
+    "PUBLIC_DOWNLOAD_ENABLED": "true",
+    "PDF_UPLOAD_ENABLED": "true",
+    "ADMIN_API_ENABLED": "true",
+    "EMERGENCY_STOP": "false",
+    "PARENT_LINK_TTL_DAYS": "60",
+    "PDF_DOWNLOAD_MAX_TOTAL": "20",
+    "PDF_DOWNLOAD_MAX_DAILY": "10",
+    "BULK_SEND_MAX": "100",
+    "DAILY_SEND_MAX": "200"
+  },
+  "ratelimits": [
+    { "name": "PAGE_IP_RATE_LIMITER", "namespace_id": "31001", "simple": { "limit": 30, "period": 60 } },
+    { "name": "PAGE_TOKEN_RATE_LIMITER", "namespace_id": "31002", "simple": { "limit": 10, "period": 60 } },
+    { "name": "PDF_IP_RATE_LIMITER", "namespace_id": "31003", "simple": { "limit": 10, "period": 60 } },
+    { "name": "PDF_TOKEN_RATE_LIMITER", "namespace_id": "31004", "simple": { "limit": 5, "period": 60 } }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PDFS",
+      "bucket_name": "step-invoice-pdfs"
+    }
+  ]
+}

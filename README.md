@@ -1,11 +1,12 @@
 # STEP請求書PDF作成・配信システム
 
-個別指導ステップ専用の請求書PDF作成・配信システムです。公開フロントエンドとGoogle Apps Scriptバックエンドを分離し、個人情報入りPDFは非公開のGoogle Driveにだけ保存します。
+個別指導ステップ専用の請求書PDF作成・配信システムです。管理画面・Google Apps Script・Cloudflareを分離し、個人情報入りPDFは非公開のCloudflare R2に保存します。保護者向けURLはCloudflare Workerが発行し、Google Driveには接続しません。
 
 ## 安全上の原則
 
 - PDF・請求書CSV・取引先CSVをGitHubへ保存しない
-- Driveファイルを公開共有しない
+- PDFをGoogle Driveへ保存しない
+- Cloudflare R2バケットを公開しない
 - 請求書番号や顧客コードをダウンロードURLへ含めない
 - トークンはハッシュ化してSpreadsheetへ保存する
 - URLアクセスとPDF取得を別々に記録する
@@ -15,17 +16,19 @@
 ## 構成
 
 - `index.html`, `assets/`: GitHub Pages用管理画面
-- `apps-script/`: Apps Script Web App、Spreadsheet、Drive、メールキュー
+- `apps-script/`: Apps Script Web App、Spreadsheet、メールキュー
+- `cloudflare/`: Worker、D1マイグレーション、非公開R2配信
 - `tests/`: CSV解析、10円丸め、照合、送信前集計の単体テスト
 
 ## 初期設定
 
 1. Apps Scriptプロジェクトへ `apps-script/Code.gs`、`Download.html`、`appsscript.json` を登録する。
 2. エディタから `setupSystem()` を1回実行して権限を承認する。
-3. 実行結果のSpreadsheet URL、DriveフォルダID、管理APIキーを安全な場所へ保存する。
-4. Webアプリとして「自分として実行」「全員がアクセス可」でデプロイする。ダウンロードページはトークンで保護され、管理APIは別の管理APIキーで保護される。
-5. `基本設定` シートの `webAppUrl` をデプロイURLへ更新する。
-6. GitHub Pages管理画面の基本設定へデプロイURLと管理APIキーを入力する。
+3. Cloudflare WorkerへD1の `DB` とR2の `PDFS` をバインドし、`TOKEN_PEPPER` と `ADMIN_API_KEY` をSecretとして設定する。
+4. Apps ScriptのScript Propertiesへ `CLOUDFLARE_API_URL` と、Workerと同じ `CLOUDFLARE_ADMIN_API_KEY` を設定する。
+5. Webアプリとして「自分として実行」「全員がアクセス可」でデプロイする。Apps Scriptは管理APIとメール送信を担当し、PDF配信はCloudflareだけが担当する。
+6. `基本設定` シートの `webAppUrl` をデプロイURLへ更新する。
+7. GitHub Pages管理画面の基本設定へデプロイURLと管理APIキーを入力する。
 
 ## PDF金額ルール
 
