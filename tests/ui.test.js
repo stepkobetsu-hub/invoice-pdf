@@ -69,6 +69,7 @@ async function main(){
   addedPrice.value='－１０，０００';
   addedPrice.dispatchEvent(new window.Event('input',{bubbles:true}));
   assert.equal(addedPrice.value,'-10000');
+  assert.match(window.localStorage.getItem('stepInvoiceSingleDraft'),/-10000/);
   addedDetail.querySelector('.remove-detail').click();
 
   document.querySelector('#loadDemoPartners').click();
