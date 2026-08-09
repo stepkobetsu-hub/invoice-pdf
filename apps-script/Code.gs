@@ -314,7 +314,8 @@ function verifyRequestAuth_(body){
   if(!token)throw new Error('スタッフ用アプリへログインしてから、もう一度お試しください。');
   const response=UrlFetchApp.fetch(STEP.AUTH_API,{method:'post',contentType:'text/plain',payload:JSON.stringify({action:'verifySystemPortal',systemPortalSessionToken:token}),muteHttpExceptions:true});
   let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('スタッフ認証サーバーへ接続できませんでした。');}
-  if(!result.success||!STEP.AUTH_PERMISSION_LEVELS.includes(String(result.permissionLevel)))throw new Error('請求書システムを利用できるスタッフログインを確認できません。');
+  if(!result.success)throw new Error(result.error||'スタッフログインを確認できません。もう一度ログインしてください。');
+  if(!STEP.AUTH_PERMISSION_LEVELS.includes(String(result.permissionLevel)))throw new Error('請求書システムを利用できるスタッフ権限を確認できません。');
   return {method:'systemPortal',permissionLevel:String(result.permissionLevel),name:String(result.name||''),code:String(result.code||'')};
 }
 function merge_(text,values){return String(text).replace(/{{([^{}]+)}}/g,(m,k)=>values[String(k).trim()]==null?'':String(values[String(k).trim()]));}
