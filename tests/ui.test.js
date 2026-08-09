@@ -47,6 +47,8 @@ async function main(){
   assert.match(document.querySelector('#globalAlert').textContent,/明細1の品目/);
   assert.match(document.querySelector('#globalAlert').textContent,/明細1の単価/);
   assert.equal(document.querySelector('#singlePartner').classList.contains('field-missing'),true);
+  assert.match(document.querySelector('#singleSaveStatus').textContent,/入力が必要な項目/);
+  assert.equal(document.querySelector('#singleSaveStatus').classList.contains('error'),true);
   const saveButton=document.querySelector('#singleInvoiceForm button[type="submit"]');
   assert.equal(saveButton.textContent,'保存して発行リストへ追加');
   assert.equal(document.querySelector('#singleInvoiceForm').noValidate,true);
