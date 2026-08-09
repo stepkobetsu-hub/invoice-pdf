@@ -76,3 +76,9 @@
 
 /* Payment date and settings organization — 2026-08-10 */
 .payment-status-block{display:flex;flex-direction:column;align-items:flex-end;gap:6px}.invoice-payment-meta{margin:6px 0 0;color:#475467;font-size:12px;font-weight:600}.payment-date-dialog{width:min(92vw,520px)}.payment-date-field{display:flex;flex-direction:column;gap:7px;margin-top:12px;font-weight:700}.payment-date-field input{height:44px;border:1px solid #b8c1ce;border-radius:6px;padding:0 10px;font:inherit}.advanced-settings{border:1px solid var(--line);border-radius:8px;background:#f8fafc}.advanced-settings>summary{cursor:pointer;padding:13px 15px;color:#344054;font-weight:700}.advanced-settings[open]>summary{border-bottom:1px solid var(--line)}.advanced-settings-body{padding:16px;background:#fff;border-radius:0 0 8px 8px}
+
+/* Payment memo and paid status color — 2026-08-10 */
+.payment-pill.paid{border:1px solid #9fc7ed;background:#e8f3ff;color:#2167a9}
+.payment-dropdown[data-status="入金済"] summary{border:1px solid #8dbbe8;background:#e8f3ff;color:#2167a9}
+.invoice-payment-note{margin:5px 0 0;color:#475467;font-size:12px;white-space:pre-wrap}
+.payment-date-field textarea{min-height:72px;border:1px solid #b8c1ce;border-radius:6px;padding:10px;font:inherit;resize:vertical}
