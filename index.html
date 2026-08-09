@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260809-preview-auto-pdf">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-invoice-workspace">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260809-common-auth-view-state" defer></script>
   <script src="assets/invoice-pdf.js?v=20260809-preview-watermark" defer></script>
-  <script src="assets/app.js?v=20260809-preview-auto-pdf" defer></script>
+  <script src="assets/app.js?v=20260810-invoice-workspace" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -19,8 +19,8 @@
   </header>
   <div class="app-shell">
     <nav class="sidebar" aria-label="メインメニュー">
-      <button class="nav-item active" data-view="create">1. 請求書作成</button>
-      <button class="nav-item" data-view="invoices">2. 請求書一覧・送信</button>
+      <button class="nav-item active" data-view="invoices">1. 請求書一覧</button>
+      <button class="nav-item" data-view="create">2. 請求書作成</button>
       <button class="nav-item" data-view="partners">3. 取引先マスタ</button>
       <button class="nav-item" data-view="history">4. 配信履歴</button>
       <button class="nav-item" data-view="settings">5. 基本設定</button>
@@ -29,7 +29,7 @@
     <main class="main">
       <div id="globalAlert" class="alert hidden" role="alert"></div>
 
-      <section id="view-create" class="view active">
+      <section id="view-create" class="view">
         <div class="page-heading"><div><h1>請求書作成</h1><p>CSV一括作成または個別入力で請求書を作成します。PDFはプレビュー、印刷、保存、送信時に自動作成されます。</p></div></div>
         <div class="create-methods" role="tablist" aria-label="請求書の作成方法">
           <button class="create-method active" type="button" data-create-method="csv" role="tab" aria-selected="true">CSVで一括作成</button>
@@ -51,7 +51,9 @@
               <label>対象年月・件名<span class="required">必須</span><input name="subject" placeholder="例：2026年8月分" required></label>
               <label>請求日<span class="required">必須</span><input name="invoiceDate" type="date" required></label>
               <label>支払期限<span class="required">必須</span><input name="dueDate" type="date" required></label>
-              <label>備考<input name="note" placeholder="例：口座振替予定"></label>
+              <label>学年（メモ）<input name="memo" placeholder="例：中2"></label>
+              <label>教室（タグ）<select name="tags"><option value="">未設定</option><option value="神領">神領</option><option value="大手">大手</option></select></label>
+              <label class="span-2">備考<input name="note" placeholder="例：口座振替予定"></label>
             </div>
             <div class="individual-details-heading"><h3>請求明細</h3></div>
             <div class="table-wrap individual-details"><table><thead><tr><th>品目<span class="required">必須</span></th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="singleDetailBody"></tbody></table></div>
@@ -67,13 +69,12 @@
         <div class="actions"><button id="addToSend" class="button success" disabled>発行リストを請求書一覧で確認</button></div>
       </section>
 
-      <section id="view-invoices" class="view">
-        <div class="page-heading"><div><h1>請求書一覧・送信</h1><p>送信状態とPDF取得状況を別々に管理します。</p></div><button id="refreshInvoices" class="button secondary">最新状態を取得</button></div>
-        <div class="selection-toolbar">
-          <button data-select="unsent">未送信のみ選択</button><button data-select="visible">表示中をすべて選択</button><button data-select="all">全件を選択</button><button data-select="none">選択を解除</button><button data-select="failed">送信失敗のみ</button><button data-select="expired">期限切れのみ</button>
-          <button id="bulkSend" class="button primary">選択した請求書を送信</button>
+      <section id="view-invoices" class="view active">
+        <div class="invoice-workspace-heading"><div><h1>請求書一覧</h1><p>新しい請求書から順に表示しています。</p></div></div>
+        <div class="invoice-workspace">
+          <aside class="invoice-list-pane" aria-label="請求書一覧"><div class="invoice-list-head"><strong id="invoiceListCount">0件</strong><span>最新順</span></div><div id="invoiceList" class="invoice-list"><p class="invoice-list-empty">請求書がありません。</p></div></aside>
+          <div class="invoice-detail-column"><div class="invoice-heading-actions"><label class="button secondary">CSV一括追加<input id="invoiceCsvFromList" type="file" accept=".csv,text/csv" hidden></label><button id="createInvoiceFromList" class="button primary" type="button">請求書を作成</button><button id="refreshInvoices" class="button secondary" type="button">最新状態を取得</button></div><section id="invoiceDetailPanel" class="invoice-detail-pane"><div class="invoice-detail-empty">左の一覧から請求書を選択してください。</div></section></div>
         </div>
-        <div class="table-wrap wide"><table id="invoiceTable"><thead><tr><th>選択</th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>メール</th><th>CC</th><th>請求金額</th><th>PDF</th><th>送信状態</th><th>送信日時</th><th>DL状態</th><th>DL日時</th><th>有効期限</th><th>操作</th></tr></thead><tbody><tr class="empty"><td colspan="14">請求書がありません。</td></tr></tbody></table></div>
       </section>
 
       <section id="view-partners" class="view">
@@ -173,6 +174,31 @@
     <div class="dialog-head"><h2>配信停止の確認</h2><button data-close aria-label="閉じる">×</button></div>
     <div class="dialog-message"><p>この操作を行うと、送信済みメール内のURLから請求書を取得できなくなります。</p><p id="disableTarget"></p></div>
     <div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="confirmDisable" class="button danger">配信停止する</button></div>
+  </dialog>
+  <dialog id="invoiceMailDialog" class="invoice-mail-dialog">
+    <div class="dialog-head"><h2>請求書メールの確認</h2><button data-close aria-label="閉じる">×</button></div>
+    <div class="invoice-mail-body">
+      <div class="test-banner">テスト送信モード — 送信先を確認してから実行してください</div>
+      <dl class="mail-review-grid"><div><dt>請求書番号</dt><dd id="mailInvoiceNumber"></dd></div><div><dt>TO</dt><dd id="mailTo"></dd></div><div><dt>CC</dt><dd id="mailCc"></dd></div><div><dt>送信者名</dt><dd id="mailSender"></dd></div><div><dt>返信先</dt><dd id="mailReplyTo"></dd></div></dl>
+      <label class="mail-review-field">件名<input id="mailSubject" readonly></label>
+      <label class="mail-review-field">本文<textarea id="mailBody" rows="15" readonly></textarea></label>
+    </div>
+    <div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="confirmInvoiceMail" class="button primary">この内容で送信</button></div>
+  </dialog>
+  <dialog id="invoicePdfDialog" class="invoice-pdf-dialog">
+    <div class="dialog-head"><h2>請求書のPDF／印刷</h2><button data-close aria-label="閉じる">×</button></div>
+    <div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p><p>PDFを端末へ保存するか、印刷画面を開きます。</p></div>
+    <div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printSelectedInvoice" class="button secondary preview-output-button">印刷</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>
+  </dialog>
+  <dialog id="editInvoiceDialog" class="edit-invoice-dialog">
+    <form id="editInvoiceForm">
+      <div class="dialog-head"><h2>請求書を編集</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="dialog-form"><div class="form-grid"><label>取引先名<input name="partnerName" required></label><label>請求書番号<input name="invoiceNumber" readonly></label><label>対象年月・件名<input name="subject" required></label><label>請求日<input name="invoiceDate" type="date" required></label><label>支払期限<input name="dueDate" type="date" required></label><label>学年（メモ）<input name="memo"></label><label>教室（タグ）<select name="tags"><option value="">未設定</option><option value="神領">神領</option><option value="大手">大手</option></select></label><label>入金状態<select name="paymentStatus"><option value="未設定">未設定</option><option value="未入金">未入金</option><option value="入金済">入金済</option></select></label><label class="span-2">備考<input name="note"></label></div><h3>請求明細</h3><div class="table-wrap individual-details"><table><thead><tr><th>品目</th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="editInvoiceDetailBody"></tbody></table></div><div class="individual-detail-actions"><button id="addEditInvoiceDetail" class="button secondary" type="button">明細行を追加</button></div><div class="individual-total"><span>税抜小計 <strong id="editInvoiceSubtotal">0円</strong></span><span>消費税 <strong id="editInvoiceTax">0円</strong></span><span>請求金額 <strong id="editInvoiceTotal">0円</strong></span></div></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button class="button primary" type="submit">変更を保存</button></div>
+    </form>
+  </dialog>
+  <dialog id="deleteInvoiceDialog" class="delete-partner-dialog">
+    <form id="deleteInvoiceForm"><div class="dialog-head"><h2>請求書削除の確認</h2><button data-close type="button" aria-label="閉じる">×</button></div><div class="dialog-message delete-confirmation"><p><strong id="deleteInvoiceTarget"></strong> を削除します。</p><p class="warning-text">請求書と配信URLは利用できなくなり、元に戻せません。</p><label>確認のため請求書番号を入力<input id="deleteInvoiceNumberInput" autocomplete="off"></label><label class="delete-confirm-check"><input id="deleteInvoiceCheck" type="checkbox"> 本当に削除することを確認しました</label></div><div class="dialog-actions"><button data-close class="button secondary" type="button">削除しない</button><button id="confirmDeleteInvoice" class="button danger" type="submit" disabled>本当に削除する</button></div></form>
   </dialog>
 </body>
 </html>

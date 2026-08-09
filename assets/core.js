@@ -146,7 +146,7 @@
     const total=roundToNearest10(sourceTotal);
     return {
       csvType:'個別作成',partnerName:partner['名称'],subject:String(values.subject).trim(),invoiceDate:normalizeDate(values.invoiceDate),dueDate:normalizeDate(values.dueDate),invoiceNumber,
-      memo:'',tags:'',subtotal,sourceTax,sourceTotal,tax:total-subtotal,total,honorific:partner['敬称']||'様',postal:normalizePostal(partner['郵便番号']),prefecture:partner['都道府県']||'',
+      memo:String(values.memo||''),tags:String(values.tags||''),paymentStatus:String(values.paymentStatus||'未入金'),subtotal,sourceTax,sourceTotal,tax:total-subtotal,total,honorific:partner['敬称']||'様',postal:normalizePostal(partner['郵便番号']),prefecture:partner['都道府県']||'',
       address1:partner['住所1']||'',address2:partner['住所2']||'',department:partner['担当者部署']||'',position:partner['担当者役職']||'',contactName:partner['担当者氏名']||'',
       customerCode:String(partner['顧客コード']||''),note:String(values.note||''),bank:'',details:details.map(({taxRateValue,...row})=>row),pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',
       roundingAdjusted:sourceTotal!==total
