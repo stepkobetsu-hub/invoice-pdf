@@ -31,6 +31,7 @@
 .student-search-row{display:flex;align-items:flex-end;gap:12px}
 .student-search-row label{display:flex;flex:1;flex-direction:column;gap:6px;font-size:12px;font-weight:700}
 .student-search-row input{font:inherit;border:1px solid #b8c1ce;border-radius:6px;padding:9px;background:#fff}
+.student-code-note{color:#b3261e;font-size:12px;font-weight:600}
 .student-result{margin-top:18px;border:1px solid #9fb8e6;border-radius:9px;background:#f6f9ff;padding:4px}
 .student-choice{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer}
 .student-choice input{width:18px;height:18px}
