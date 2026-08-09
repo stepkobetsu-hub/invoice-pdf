@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260809-partner-delete">
+  <link rel="stylesheet" href="assets/styles.css?v=20260809-partner-delete-list">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260809-common-auth-view-state" defer></script>
   <script src="assets/invoice-pdf.js?v=20260809-entry-fixes" defer></script>
-  <script src="assets/app.js?v=20260809-partner-delete" defer></script>
+  <script src="assets/app.js?v=20260809-partner-delete-list" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -133,13 +133,15 @@
         <label class="span-2">CCメールアドレス<input name="cc" type="email"></label>
         <label class="span-2">メモ<textarea name="memo" rows="3"></textarea></label>
       </div>
-      <div class="dialog-actions"><button id="deletePartnerButton" class="button danger dialog-delete hidden" type="button">この取引先を削除</button><button data-close class="button secondary" type="button">キャンセル</button><button id="savePartnerButton" class="button primary" type="submit">取引先マスタへ登録</button></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button id="savePartnerButton" class="button primary" type="submit">取引先マスタへ登録</button></div>
     </form>
   </dialog>
-  <dialog id="deletePartnerDialog">
-    <div class="dialog-head"><h2>取引先削除の確認</h2><button data-close type="button" aria-label="閉じる">×</button></div>
-    <div class="dialog-message"><p>この取引先を取引先マスタから削除します。</p><p id="deletePartnerTarget"></p><p class="warning-text">この操作は取り消せません。</p></div>
-    <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button id="confirmDeletePartner" class="button danger" type="button">削除する</button></div>
+  <dialog id="deletePartnerDialog" class="delete-partner-dialog">
+    <form id="deletePartnerForm">
+      <div class="dialog-head"><h2>取引先削除の確認</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="dialog-message delete-confirmation"><p><strong id="deletePartnerTarget"></strong> を取引先マスタから削除します。</p><p class="warning-text">削除すると元に戻せません。本当に削除する場合だけ、次の2項目を確認してください。</p><label>確認のため顧客コードを入力<input id="deletePartnerCodeInput" name="confirmCode" autocomplete="off"></label><label class="delete-confirm-check"><input id="deletePartnerCheck" type="checkbox"> この取引先を削除することを確認しました</label></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">削除しない</button><button id="confirmDeletePartner" class="button danger" type="submit" disabled>本当に削除する</button></div>
+    </form>
   </dialog>
   <dialog id="studentImportDialog" class="student-import-dialog">
     <form id="studentSearchForm">

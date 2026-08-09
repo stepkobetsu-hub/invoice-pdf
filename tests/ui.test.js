@@ -89,10 +89,15 @@ async function main(){
   partnerForm.elements.name.value='個別入力テスト（編集済）';
   partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト（編集済）/);
-  document.querySelector('[data-edit-partner="NEW001"]').click();
-  assert.equal(document.querySelector('#deletePartnerButton').classList.contains('hidden'),false);
-  document.querySelector('#deletePartnerButton').click();
+  assert.equal(document.querySelector('#partnerDialog #deletePartnerButton'),null);
+  document.querySelector('[data-delete-partner="NEW001"]').click();
   assert.equal(document.querySelector('#deletePartnerDialog').open,true);
+  assert.equal(document.querySelector('#confirmDeletePartner').disabled,true);
+  document.querySelector('#deletePartnerCodeInput').value='NEW001';
+  document.querySelector('#deletePartnerCodeInput').dispatchEvent(new window.Event('input',{bubbles:true}));
+  document.querySelector('#deletePartnerCheck').checked=true;
+  document.querySelector('#deletePartnerCheck').dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(document.querySelector('#confirmDeletePartner').disabled,false);
   document.querySelector('#confirmDeletePartner').click();
   await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.doesNotMatch(document.querySelector('#partnerTable').textContent,/個別入力テスト（編集済）/);
