@@ -171,7 +171,9 @@ async function main(){
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
-  assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));
+  assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}'));
+  assert.match(styles,/\.invoice-page \.bank-box\{[\s\S]*?min-height:92px;[\s\S]*?max-height:92px;/);
+  assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
   console.log('ui tests passed');
 }
 
