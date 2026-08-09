@@ -207,7 +207,7 @@ async function createDelivery(request, env, url) {
   const token = createOpaqueToken();
   const tokenHash = await hashOpaqueToken(token);
   const now = new Date().toISOString();
-  const expiresAt = validFutureDate(input.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 60) * 86400000).toISOString();
+  const expiresAt = validFutureDate(input.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 180) * 86400000).toISOString();
   await env.DB.prepare(`
     INSERT INTO deliveries (delivery_id, invoice_id, recipient_email, cc_email, token_hash, issued_at, expires_at, status, created_by, created_at, updated_at)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?6, ?6)
@@ -225,7 +225,7 @@ async function rotateDelivery(request, env, url, deliveryId) {
   const token = createOpaqueToken();
   const tokenHash = await hashOpaqueToken(token);
   const now = new Date().toISOString();
-  const expiresAt = validFutureDate(payload.value.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 60) * 86400000).toISOString();
+  const expiresAt = validFutureDate(payload.value.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 180) * 86400000).toISOString();
   await env.DB.prepare(`UPDATE deliveries SET token_hash=?1, issued_at=?2, expires_at=?3, revoked_at=NULL,
     status='pending', first_opened_at=NULL, last_opened_at=NULL, downloaded_at=NULL, open_count=0,
     download_count=0, download_day=NULL, download_day_count=0, updated_at=?2 WHERE delivery_id=?4`)
@@ -541,7 +541,7 @@ function notFoundPage() {
 }
 
 function pageCss() {
-  return `:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:32px 16px;background:#f4f7fb;color:#172b4d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.card{max-width:680px;margin:5vh auto;background:#fff;border-radius:18px;padding:clamp(24px,6vw,48px);box-shadow:0 16px 50px #17345a1a}.brand{font-weight:800;color:#173e6b;letter-spacing:.04em}h1{font-size:clamp(24px,5vw,34px);margin:22px 0 16px}.lead{font-size:18px;line-height:1.8}dl{margin:28px 0;border:1px solid #dbe4ef;border-radius:12px;overflow:hidden}dl div{display:grid;grid-template-columns:9em 1fr;padding:14px 16px;border-bottom:1px solid #e7edf4}dl div:last-child{border-bottom:0}dt{font-weight:700}dd{margin:0}.invoice-total{background:#f4f8fd}.invoice-total dd{font-size:clamp(22px,5vw,30px);font-weight:800;color:#173e6b}.button{display:block;text-align:center;padding:16px 20px;border-radius:11px;background:#174a7e;color:#fff;text-decoration:none;font-weight:800}.button:focus{outline:3px solid #ffcc33;outline-offset:3px}.download-expiry{margin:9px 0 0;text-align:center;color:#66788d;font-size:12px}.note{margin-top:20px;color:#52677f;font-size:14px;line-height:1.7}@media(max-width:520px){dl div{grid-template-columns:1fr;gap:4px}}`;
+  return `:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:32px 16px;background:#f4f7fb;color:#172b4d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.card{max-width:680px;margin:5vh auto;background:#fff;border-radius:18px;padding:clamp(24px,6vw,48px);box-shadow:0 16px 50px #17345a1a}.brand{font-weight:800;color:#173e6b;letter-spacing:.04em}h1{font-size:clamp(24px,5vw,34px);margin:22px 0 16px}.lead{font-size:18px;line-height:1.8}dl{margin:28px 0;border:1px solid #dbe4ef;border-radius:12px;overflow:hidden}dl div{display:grid;grid-template-columns:9em 1fr;padding:14px 16px;border-bottom:1px solid #e7edf4}dl div:last-child{border-bottom:0}dt{font-size:clamp(18px,4vw,22px);font-weight:700}dd{margin:0;font-size:clamp(20px,4.5vw,26px);font-weight:400}.invoice-total{background:#f4f8fd}.invoice-total dd{font-size:clamp(20px,4.5vw,26px);font-weight:400;color:#172b4d}.button{display:block;text-align:center;padding:16px 20px;border-radius:11px;background:#174a7e;color:#fff;text-decoration:none;font-weight:800}.button:focus{outline:3px solid #ffcc33;outline-offset:3px}.download-expiry{margin:9px 0 0;text-align:center;color:#66788d;font-size:12px}.note{margin-top:20px;color:#52677f;font-size:14px;line-height:1.7}@media(max-width:520px){dl div{grid-template-columns:1fr;gap:4px}}`;
 }
 
 function formatMoney(value) {
