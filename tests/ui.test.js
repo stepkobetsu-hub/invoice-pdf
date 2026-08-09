@@ -154,6 +154,7 @@ async function main(){
   assert.match(document.querySelector('#studentImportDialog').textContent,/※半角英数で入力してください。/);
   assert.equal(document.querySelector('#studentSearchForm [name="studentCode"]').pattern,'[A-Za-z0-9]+');
   assert.match(document.querySelector('#settingsForm [name="apiUrl"]').value,/^https:\/\/script\.google\.com\/macros\/s\//);
+  assert.equal(document.querySelector('#staffLoginLink').href,'https://stepkobetsu-hub.github.io/seiseki-kanri/');
   const backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
   assert.match(backend,/action:'verifySystemPortal'/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
