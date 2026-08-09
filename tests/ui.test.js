@@ -161,6 +161,10 @@ async function main(){
   assert.match(backend,/processPendingSends: \(\) => processPendingSends_\(requestAuth\)/);
   assert.match(backend,/installQueueTrigger_\(\);\s*return response/);
   assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
+  assert.match(backend,/STEP_SPREADSHEET_CACHE_/);
+  assert.match(backend,/const rows=retained\.concat\(replacements\)/);
+  assert.doesNotMatch(backend,/replaceInvoiceDetails_[\s\S]*?\.forEach\(r=>ds\.deleteRow/);
+  assert.match(backend,/staff-auth:'\+hashToken_\(token\)/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
