@@ -107,3 +107,11 @@
 .payment-dropdown[data-status="入金済"] summary{border:1px solid #8dbbe8;background:#e8f3ff;color:#2167a9}
 .invoice-payment-note{margin:5px 0 0;color:#475467;font-size:12px;white-space:pre-wrap}
 .payment-date-field textarea{min-height:72px;border:1px solid #b8c1ce;border-radius:6px;padding:10px;font:inherit;resize:vertical}
+
+/* Blocking progress for initial load and invoice saves — 2026-08-10 */
+.operation-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(244,246,249,.82);backdrop-filter:blur(2px)}
+.operation-overlay.hidden{display:none}
+.operation-overlay-card{display:flex;min-width:230px;align-items:center;justify-content:center;gap:18px;padding:28px 36px;border:1px solid #c9d5e5;border-radius:14px;background:#fff;box-shadow:0 18px 50px rgba(23,32,51,.22)}
+.operation-overlay-card strong{color:var(--navy);font-size:28px;line-height:1.2;letter-spacing:.04em}
+.operation-spinner{width:30px;height:30px;border:4px solid #dbe7f6;border-top-color:var(--blue);border-radius:50%;animation:operation-spin .8s linear infinite}
+@keyframes operation-spin{to{transform:rotate(360deg)}}
