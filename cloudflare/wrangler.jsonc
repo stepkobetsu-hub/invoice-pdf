@@ -29,6 +29,13 @@
     { "name": "PDF_IP_RATE_LIMITER", "namespace_id": "31003", "simple": { "limit": 10, "period": 60 } },
     { "name": "PDF_TOKEN_RATE_LIMITER", "namespace_id": "31004", "simple": { "limit": 5, "period": 60 } }
   ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "step-invoice-db",
+      "database_id": "e92d6d76-04d2-40de-9ddf-8804850402c8"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "PDFS",
