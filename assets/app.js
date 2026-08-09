@@ -4,13 +4,15 @@
   const DEFAULT_API_URL='https://script.google.com/macros/s/AKfycbwo1DdSQ2eUVVU35v1TqermHTgIEsT1u4U-M_67KfA50VelbHsh28W_pec56OlyBkxqaw/exec';
   const STAFF_AUTH_KEY='stepStaffAppAuth';
   const VIEWS=new Set(['create','invoices','partners','history','settings','mail']);
+  const localIso=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+  const invoiceDefaultPeriod=(today=new Date())=>({from:localIso(new Date(today.getFullYear()-1,today.getMonth(),1)),to:localIso(new Date(today.getFullYear(),today.getMonth()+2,0))});
+  const defaultInvoicePeriod=invoiceDefaultPeriod();
   const savedPartners=JSON.parse(localStorage.getItem('stepInvoicePartners')||'[]');
   const savedSettings=JSON.parse(localStorage.getItem('stepInvoiceSettings')||'{}');
   if(!savedSettings.apiUrl)savedSettings.apiUrl=DEFAULT_API_URL;
-  const state={partners:[...new Map([...C.DEMO_PARTNERS,...savedPartners].map(p=>[p['顧客コード'],p])).values()],invoices:[],history:[],preview:null,selected:new Set(),selectedInvoiceNumber:'',invoiceDetailTab:'preview',invoiceFilters:{dateField:'createdAt',from:'',to:'',query:''},pendingResend:null,pendingDisable:null,pendingDeletePartnerCode:null,pendingDeleteInvoiceNumber:null,resendSubmitting:false,editingPartnerCode:null,studentCandidate:null,postalRequest:0,settings:savedSettings};
+  const state={partners:[...new Map([...C.DEMO_PARTNERS,...savedPartners].map(p=>[p['顧客コード'],p])).values()],invoices:[],history:[],preview:null,selected:new Set(),selectedInvoiceNumber:'',invoiceDetailTab:'preview',invoiceFilters:{dateField:'createdAt',from:defaultInvoicePeriod.from,to:defaultInvoicePeriod.to,query:''},pendingResend:null,pendingDisable:null,pendingDeletePartnerCode:null,pendingDeleteInvoiceNumber:null,resendSubmitting:false,editingPartnerCode:null,studentCandidate:null,postalRequest:0,settings:savedSettings};
   const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const localIso=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   const plusDays=(dateValue,days)=>{const [year,month,day]=String(dateValue).split('-').map(Number),date=new Date(year,month-1,day);date.setDate(date.getDate()+days);return localIso(date);};
   function alert(message,type='warning'){const el=$('#globalAlert');el.textContent=message;el.className=`alert ${type}`;setTimeout(()=>el.classList.add('hidden'),7000);}
   function activateStep(index){$$('#createSteps li').forEach((el,i)=>{el.classList.toggle('active',i===index);el.classList.toggle('done',i<index);});}
@@ -87,7 +89,8 @@
   function invoiceSearchText(invoice){return normalizeSearch([invoice.invoiceNumber,invoice.customerCode,invoice.partnerName,invoice.honorific,invoice.subject,invoice.memo,invoice.tags,invoice.note,invoice.email,invoice.cc,invoice.postal,invoice.prefecture,invoice.address1,invoice.address2,invoice.paymentStatus,invoice.sendStatus,invoice.invoiceDate,invoice.dueDate,invoice.createdAt,invoice.updatedAt,...(invoice.details||[]).flatMap(detail=>[detail.name,detail.itemCode,detail.unit,detail.unitPrice,detail.quantity,detail.amount,detail.taxRate])].join(' '));}
   function filteredInvoices(){const {dateField,from,to,query}=state.invoiceFilters,needle=normalizeSearch(query);return sortedInvoices().filter(invoice=>{const date=inputDate(invoice[dateField]);if((from||to)&&!date)return false;if(from&&date<from)return false;if(to&&date>to)return false;return !needle||invoiceSearchText(invoice).includes(needle);});}
   function updateInvoiceFilters(){state.invoiceFilters={dateField:$('#invoiceDateField').value,from:$('#invoiceDateFrom').value,to:$('#invoiceDateTo').value,query:$('#invoiceFreeSearch').value};renderInvoices();}
-  function clearInvoiceFilters(){state.invoiceFilters={dateField:'createdAt',from:'',to:'',query:''};$('#invoiceDateField').value='createdAt';$('#invoiceDateFrom').value='';$('#invoiceDateTo').value='';$('#invoiceFreeSearch').value='';renderInvoices();}
+  function clearInvoiceFilters(){state.invoiceFilters.query='';$('#invoiceFreeSearch').value='';renderInvoices();}
+  function restoreInvoiceFilters(){const filters=state.invoiceFilters;$('#invoiceDateField').value=filters.dateField;$('#invoiceDateFrom').value=filters.from;$('#invoiceDateTo').value=filters.to;$('#invoiceFreeSearch').value=filters.query;}
   function renderInvoices(){
     const ordered=filteredInvoices(),filtered=ordered.length!==state.invoices.length||state.invoiceFilters.from||state.invoiceFilters.to||state.invoiceFilters.query;$('#invoiceListCount').textContent=filtered?`該当 ${ordered.length}件／全${state.invoices.length}件`:`${ordered.length}件`;
     if(ordered.length&&!ordered.some(invoice=>String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)))state.selectedInvoiceNumber=String(ordered[0].invoiceNumber);
@@ -217,6 +220,6 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');
   $('#loadSample').onclick=()=>{state.invoices=C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners);renderCreate();activateStep(2);};
-  restoreForms();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();renderCreate();renderInvoices();renderHistory();showView(location.hash.slice(1)||'invoices');
+  restoreForms();restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();renderCreate();renderInvoices();renderHistory();showView(location.hash.slice(1)||'invoices');
   if(state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY)))refreshAll(false);
 })();
