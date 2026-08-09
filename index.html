@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260809-partner-import">
+  <link rel="stylesheet" href="assets/styles.css?v=20260809-student-search-fix">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
-  <script src="assets/core.js?v=20260809-partner-import" defer></script>
+  <script src="assets/core.js?v=20260809-student-search-fix" defer></script>
   <script src="assets/invoice-pdf.js?v=20260809-entry-fixes" defer></script>
-  <script src="assets/app.js?v=20260809-partner-import" defer></script>
+  <script src="assets/app.js?v=20260809-student-search-fix" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -141,7 +141,7 @@
       <div class="dialog-head"><h2>生徒マスタから取引先を取込</h2><button data-close type="button" aria-label="閉じる">×</button></div>
       <div class="student-import-body">
         <p>「☆マスタ」の生徒番号（A列）を入力してください。完全一致した生徒の氏名と学年を確認してから登録できます。</p>
-        <div class="student-search-row"><label>生徒コード<span class="required">必須</span><input name="studentCode" autocomplete="off" required></label><button id="searchStudent" class="button primary" type="submit">生徒を検索</button></div>
+        <div class="student-search-row"><label>生徒コード<span class="required">必須</span><input name="studentCode" autocomplete="off" autocapitalize="off" spellcheck="false" pattern="[A-Za-z0-9]+" required><small class="student-code-note">※半角英数で入力してください。</small></label><button id="searchStudent" class="button primary" type="submit">生徒を検索</button></div>
         <div id="studentSearchStatus" class="field-help" role="status"></div>
         <div id="studentSearchResult" class="student-result hidden">
           <label class="student-choice"><input name="studentChoice" type="radio" value="selected"><span><strong id="studentResultName"></strong><small>生徒コード：<span id="studentResultCode"></span>　学年：<span id="studentResultGrade"></span></small></span></label>
