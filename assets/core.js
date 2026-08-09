@@ -55,6 +55,9 @@
     });
     return partner;
   }
+  function normalizeStudentCode(value){
+    return String(value??'').trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g,char=>String.fromCharCode(char.charCodeAt(0)-0xFEE0));
+  }
   function formatYen(value){return `${Number(value||0).toLocaleString('ja-JP')}円`;}
   function normalizeDate(value){const parts=String(value||'').split(/[\/-]/);if(parts.length!==3)return String(value||'');return `${parts[0]}/${parts[1].padStart(2,'0')}/${parts[2].padStart(2,'0')}`;}
   function nextInvoiceNumber(dateValue,invoices){
@@ -166,6 +169,6 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,normalizeStudentCode,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
