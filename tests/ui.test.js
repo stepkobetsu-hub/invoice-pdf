@@ -11,6 +11,13 @@ const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), {
 const {window} = dom;
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+window.HTMLFormElement.prototype.submit=function(){
+  const value=name=>this.querySelector(`[name="${name}"]`)?.value||'';
+  const requestId=value('requestId'),bridgeNonce=value('bridgeNonce'),action=value('action');
+  if(!requestId)return;
+  const data=action==='getDashboard'?{invoices:[],history:[]}:{count:1};
+  window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
+};
 window.print=()=>{};
 window.fetch=async()=>({ok:true,json:async()=>({status:200,results:[{address1:'愛知県',address2:'春日井市',address3:'大留町'}]})});
 window.eval(fs.readFileSync(path.join(root, 'assets/core.js'), 'utf8'));
@@ -87,6 +94,9 @@ async function main(){
   document.querySelector('#openStudentImport').click();
   assert.equal(document.querySelector('#studentImportDialog').open,true);
   assert.match(document.querySelector('#studentImportDialog').textContent,/生徒コード/);
+  assert.match(document.querySelector('#studentImportDialog').textContent,/※半角英数で入力してください。/);
+  assert.equal(document.querySelector('#studentSearchForm [name="studentCode"]').pattern,'[A-Za-z0-9]+');
+  assert.match(document.querySelector('#settingsForm [name="apiUrl"]').value,/^https:\/\/script\.google\.com\/macros\/s\//);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
