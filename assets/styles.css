@@ -29,6 +29,7 @@
 .student-import-body{padding:20px}
 .student-import-body>p{margin:0 0 18px;color:var(--muted);font-size:13px;line-height:1.7}
 .student-search-row{display:flex;align-items:flex-end;gap:12px}
+.dialog-actions .dialog-delete{margin-right:auto}
 .student-search-row label{display:flex;flex:1;flex-direction:column;gap:6px;font-size:12px;font-weight:700}
 .student-search-row input{font:inherit;border:1px solid #b8c1ce;border-radius:6px;padding:9px;background:#fff}
 .student-code-note{color:#b3261e;font-size:12px;font-weight:600}
