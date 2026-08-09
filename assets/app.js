@@ -3,6 +3,7 @@
   const C=window.StepInvoiceCore,P=window.StepInvoicePdf;
   const DEFAULT_API_URL='https://script.google.com/macros/s/AKfycbwo1DdSQ2eUVVU35v1TqermHTgIEsT1u4U-M_67KfA50VelbHsh28W_pec56OlyBkxqaw/exec';
   const STAFF_AUTH_KEY='stepStaffAppAuth';
+  const STAFF_LOGIN_URL='https://stepkobetsu-hub.github.io/seiseki-kanri/';
   const SINGLE_DRAFT_KEY='stepInvoiceSingleDraft';
   const VIEWS=new Set(['create','invoices','partners','history','settings','mail']);
   const localIso=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -36,7 +37,7 @@
     document.body.appendChild(form);
     return new Promise((resolve,reject)=>{
       const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();frame.remove();};
-      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.data?.bridgeNonce===bridgeNonce);if(!trustedOrigin||!event.data||event.data.requestId!==requestId||event.data.bridgeNonce!==bridgeNonce)return;cleanup();const data=event.data.result;if(!data?.ok)return reject(new Error(data?.error||'APIエラー'));resolve(data.data);};
+      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.data?.bridgeNonce===bridgeNonce);if(!trustedOrigin||!event.data||event.data.requestId!==requestId||event.data.bridgeNonce!==bridgeNonce)return;cleanup();const data=event.data.result;if(!data?.ok){const message=String(data?.error||'APIエラー');if(/ログイン|認証|セッション/.test(message))localStorage.removeItem(STAFF_AUTH_KEY);return reject(new Error(message));}resolve(data.data);};
       const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?20000:45000;
       const timer=setTimeout(()=>{cleanup();reject(new Error(`Apps Script APIが${Math.round(timeoutMs/1000)}秒以内に応答しませんでした。入力内容はこの端末に退避しています。`));},timeoutMs);
       window.addEventListener('message',onMessage);form.submit();
@@ -229,6 +230,7 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');
   $('#loadSample').onclick=()=>{state.invoices=C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners);renderCreate();activateStep(2);};
+  $('#staffLoginLink').href=STAFF_LOGIN_URL;
   restoreForms();restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(location.hash.slice(1)||'invoices');
   if(state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY)))refreshAll(false);
 })();
