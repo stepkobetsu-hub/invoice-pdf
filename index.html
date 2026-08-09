@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-student-search-fix">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-payment-settings">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260809-common-auth-view-state" defer></script>
-  <script src="assets/invoice-pdf.js?v=20260809-preview-watermark" defer></script>
-  <script src="assets/app.js?v=20260810-auth-recovery" defer></script>
+  <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
+  <script src="assets/app.js?v=20260810-payment-settings" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -53,7 +53,8 @@
               <label>支払期限<span class="required">必須</span><input name="dueDate" type="date" required></label>
               <label>学年（メモ）<input name="memo" placeholder="例：中2"></label>
               <label>教室（タグ）<select name="tags"><option value="">未設定</option><option value="神領">神領</option><option value="大手">大手</option></select></label>
-              <label class="span-2">備考<input name="note" placeholder="例：口座振替予定"></label>
+              <label class="span-2">振込先<input name="bank" placeholder="基本設定の内容を使用する場合は空欄"></label>
+              <label class="span-2">備考<input name="note" placeholder="基本設定の内容を使用する場合は空欄"></label>
             </div>
             <div class="individual-details-heading"><h3>請求明細</h3></div>
             <div class="table-wrap individual-details"><table><thead><tr><th>品目<span class="required">必須</span></th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="singleDetailBody"></tbody></table></div>
@@ -105,7 +106,7 @@
       <section id="view-settings" class="view">
         <div class="page-heading"><div><h1>基本設定</h1><p>PDFテンプレートの座標は承認済み正本として固定されています。</p></div></div>
         <form id="settingsForm" class="form-grid panel">
-          <label>事業者名<input name="businessName" value="個別指導ステップ"></label><label>郵便番号<input name="businessPostal" value="487-0024"></label><label class="span-2">住所<input name="businessAddress" value="愛知県春日井市大留町1丁目23-2"></label><label>電話番号<input name="businessPhone" value="0568-41-8937"></label><label>10円単位丸め<select name="rounding"><option value="nearest10" selected>四捨五入</option></select></label><label>氏名表示<select name="nameDisplay"><option value="masked" selected>一部伏字</option><option value="full">表示</option></select></label><label>金額表示<select name="amountDisplay"><option value="show" selected>表示</option><option value="hide">非表示</option></select></label><label class="span-2">Apps ScriptデプロイURL<input name="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="span-2">管理APIキー<input name="adminApiKey" type="password" autocomplete="off" placeholder="setupSystemで発行された管理APIキー"></label><div class="span-2 actions"><button class="button primary" type="submit">設定を保存</button></div>
+          <label>事業者名<input name="businessName" value="個別指導ステップ"></label><label>郵便番号<input name="businessPostal" value="487-0024"></label><label class="span-2">住所<input name="businessAddress" value="愛知県春日井市大留町1丁目23-2"></label><label>電話番号<input name="businessPhone" value="0568-41-8937"></label><label>10円単位丸め<select name="rounding"><option value="nearest10" selected>四捨五入</option></select></label><label>氏名表示<select name="nameDisplay"><option value="masked" selected>一部伏字</option><option value="full">表示</option></select></label><label>金額表示<select name="amountDisplay"><option value="show" selected>表示</option><option value="hide">非表示</option></select></label><label class="span-2">振込先（請求書へ標準表示）<textarea name="defaultBank" rows="3" placeholder="例：〇〇銀行　〇〇支店　普通 1234567"></textarea></label><label class="span-2">備考（請求書へ標準表示）<textarea name="defaultNote" rows="3">個別指導ステップ（運営：株式会社エデュクレスト）</textarea></label><details class="advanced-settings span-2"><summary>詳細設定</summary><div class="advanced-settings-body form-grid"><label class="span-2">Apps ScriptデプロイURL<input name="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"></label><label class="span-2">管理APIキー<input name="adminApiKey" type="password" autocomplete="off" placeholder="setupSystemで発行された管理APIキー"></label></div></details><div class="span-2 actions"><button class="button primary" type="submit">設定を保存</button></div>
         </form>
       </section>
 
@@ -206,10 +207,17 @@
     <div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p><p>PDFを端末へ保存するか、印刷画面を開きます。</p></div>
     <div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printSelectedInvoice" class="button secondary preview-output-button">印刷</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>
   </dialog>
+  <dialog id="paymentDateDialog" class="payment-date-dialog">
+    <form id="paymentDateForm">
+      <div class="dialog-head"><h2>入金日を登録</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="dialog-message"><p><strong id="paymentDateTarget"></strong></p><label class="payment-date-field">入金日<input id="paymentDateInput" name="paymentDate" type="date" required></label><p class="field-help">入金が確認できた日をカレンダーから選択してください。</p></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button class="button primary" type="submit">入金済として保存</button></div>
+    </form>
+  </dialog>
   <dialog id="editInvoiceDialog" class="edit-invoice-dialog">
     <form id="editInvoiceForm">
       <div class="dialog-head"><h2>請求書を編集</h2><button data-close type="button" aria-label="閉じる">×</button></div>
-      <div class="dialog-form"><div class="form-grid"><label>取引先名<input name="partnerName" required></label><label>請求書番号<input name="invoiceNumber" readonly></label><label>件名<input name="subject" required></label><label>請求日<input name="invoiceDate" type="date" required></label><label>支払期限<input name="dueDate" type="date" required></label><label>学年（メモ）<input name="memo"></label><label>教室（タグ）<select name="tags"><option value="">未設定</option><option value="神領">神領</option><option value="大手">大手</option></select></label><label>入金状態<select name="paymentStatus"><option value="未設定">未設定</option><option value="未入金">未入金</option><option value="入金済">入金済</option></select></label><label class="span-2">備考<input name="note"></label></div><h3>請求明細</h3><div class="table-wrap individual-details"><table><thead><tr><th>品目</th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="editInvoiceDetailBody"></tbody></table></div><div class="individual-detail-actions"><button id="addEditInvoiceDetail" class="button secondary" type="button">明細行を追加</button></div><div class="individual-total"><span>税抜小計 <strong id="editInvoiceSubtotal">0円</strong></span><span>消費税 <strong id="editInvoiceTax">0円</strong></span><span>請求金額 <strong id="editInvoiceTotal">0円</strong></span></div></div>
+      <div class="dialog-form"><div class="form-grid"><label>取引先名<input name="partnerName" required></label><label>請求書番号<input name="invoiceNumber" readonly></label><label>件名<input name="subject" required></label><label>請求日<input name="invoiceDate" type="date" required></label><label>支払期限<input name="dueDate" type="date" required></label><label>学年（メモ）<input name="memo"></label><label>教室（タグ）<select name="tags"><option value="">未設定</option><option value="神領">神領</option><option value="大手">大手</option></select></label><label>入金状態<select name="paymentStatus"><option value="未設定">未設定</option><option value="未入金">未入金</option><option value="入金済">入金済</option></select></label><label>入金日<input name="paymentDate" type="date"></label><label class="span-2">振込先<input name="bank" placeholder="基本設定の内容を使用する場合は空欄"></label><label class="span-2">備考<input name="note" placeholder="基本設定の内容を使用する場合は空欄"></label></div><h3>請求明細</h3><div class="table-wrap individual-details"><table><thead><tr><th>品目</th><th>単価</th><th>数量</th><th>単位</th><th>税率</th><th>金額</th><th></th></tr></thead><tbody id="editInvoiceDetailBody"></tbody></table></div><div class="individual-detail-actions"><button id="addEditInvoiceDetail" class="button secondary" type="button">明細行を追加</button></div><div class="individual-total"><span>税抜小計 <strong id="editInvoiceSubtotal">0円</strong></span><span>消費税 <strong id="editInvoiceTax">0円</strong></span><span>請求金額 <strong id="editInvoiceTotal">0円</strong></span></div></div>
       <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button class="button primary" type="submit">変更を保存</button></div>
     </form>
   </dialog>
