@@ -1,5 +1,6 @@
 /** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.14. */
 const STEP = Object.freeze({
+  AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
   STUDENT_MASTER: {SPREADSHEET_ID:'1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk',SHEET_NAME:'☆マスタ'},
   SHEETS: {
     PARTNERS: '取引先マスタ', SETTINGS: '基本設定', TEMPLATES: 'メール定型文', INVOICES: '請求書データ',
@@ -39,19 +40,20 @@ function doPost(e) {
     const body = isForm ? {
       action: e.parameter.action || '',
       payload: JSON.parse(e.parameter.payload || '{}'),
-      authToken: e.parameter.authToken || ''
+      authToken: e.parameter.authToken || '',
+      systemPortalSessionToken: e.parameter.systemPortalSessionToken || ''
     } : JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    verifyAdminApiKey_(String(body.authToken || ''));
+    const requestAuth = verifyRequestAuth_(body);
     const action = String(body.action || '');
     const payload = body.payload || {};
     const routes = {
-      getDashboard: () => getDashboard_(), importPartners: () => importPartners_(payload.partners || []),
-      findStudentForPartner: () => findStudentForPartner_(payload.studentCode),
-      savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || ''), enqueueSend: () => enqueueSend_(payload),
-      prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true})),
-      releasePreparedSend: () => releasePreparedSend_(payload.deliveryId),
-      disableDelivery: () => disableDelivery_(payload.invoiceNumber), saveSettings: () => saveSettings_(payload),
-      recoverQueue: () => recoverStuckQueue_()
+      getDashboard: () => getDashboard_(requestAuth), importPartners: () => importPartners_(payload.partners || [], requestAuth),
+      findStudentForPartner: () => findStudentForPartner_(payload.studentCode, requestAuth),
+      savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), enqueueSend: () => enqueueSend_(payload, requestAuth),
+      prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true}), requestAuth),
+      releasePreparedSend: () => releasePreparedSend_(payload.deliveryId, requestAuth),
+      disableDelivery: () => disableDelivery_(payload.invoiceNumber, requestAuth), saveSettings: () => saveSettings_(payload, requestAuth),
+      recoverQueue: () => recoverStuckQueue_(requestAuth)
     };
     if (!routes[action]) throw new Error('未対応の操作です。');
     const result = {ok:true,data:routes[action]()};
@@ -121,8 +123,8 @@ function processSendQueue() {
   } finally { lock.releaseLock(); }
 }
 
-function importPartners_(partners) {
-  requirePermission_('取引先編集');
+function importPartners_(partners, requestAuth) {
+  requirePermission_('取引先編集', requestAuth);
   if (!Array.isArray(partners) || !partners.length) throw new Error('取引先データがありません。');
   const sheet = sheet_(STEP.SHEETS.PARTNERS);
   const rows = partners.map(p => STEP.PARTNER_HEADERS.map(h => String(p[h] == null ? '' : p[h])));
@@ -132,8 +134,8 @@ function importPartners_(partners) {
   return {count:rows.length};
 }
 
-function findStudentForPartner_(studentCode) {
-  requirePermission_('取引先編集');
+function findStudentForPartner_(studentCode, requestAuth) {
+  requirePermission_('取引先編集', requestAuth);
   const code = String(studentCode == null ? '' : studentCode).trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
   if (!code) throw new Error('生徒コードを入力してください。');
   if (!/^[A-Za-z0-9]+$/.test(code)) throw new Error('生徒コードは半角英数で入力してください。');
@@ -153,8 +155,8 @@ function findStudentForPartner_(studentCode) {
   };
 }
 
-function savePdf_(invoice, pdfBase64) {
-  requirePermission_('PDF作成');
+function savePdf_(invoice, pdfBase64, requestAuth) {
+  requirePermission_('PDF作成', requestAuth);
   if (!/^\d{6,}$/.test(String(invoice.invoiceNumber || ''))) throw new Error('請求書番号が不正です。');
   if (!pdfBase64) throw new Error('PDFデータがありません。');
   const expectedTotal = Math.floor((Number(invoice.sourceTotal == null ? invoice.total : invoice.sourceTotal) + 5) / 10) * 10;
@@ -171,8 +173,8 @@ function savePdf_(invoice, pdfBase64) {
   return {pdfFileId:file.getId(),pdfFileName:fileName};
 }
 
-function enqueueSend_(payload) {
-  requirePermission_(payload.resend ? '再送' : 'メール送信');
+function enqueueSend_(payload, requestAuth) {
+  requirePermission_(payload.resend ? '再送' : 'メール送信', requestAuth);
   const testMode = payload.testMode !== false;
   if (!testMode && PropertiesService.getScriptProperties().getProperty('PRODUCTION_SEND_APPROVED') !== 'true') throw new Error('本番送信は管理者の最終承認前のため無効です。');
   const numbers = [...new Set((payload.invoiceNumbers || []).map(String))]; if (!numbers.length) throw new Error('請求書が選択されていません。');
@@ -203,8 +205,8 @@ function enqueueSend_(payload) {
   } finally { lock.releaseLock(); }
 }
 
-function releasePreparedSend_(deliveryId) {
-  requirePermission_('メール送信');
+function releasePreparedSend_(deliveryId, requestAuth) {
+  requirePermission_('メール送信', requestAuth);
   const id=String(deliveryId||''); if(!id) throw new Error('配信IDがありません。');
   const queueSheet=sheet_(STEP.SHEETS.QUEUE), queue=table_(queueSheet);
   const q=queue.rows.find(r=>String(r.values[queue.map['配信ID']])===id); if(!q) throw new Error('送信前確認キューがありません。');
@@ -256,7 +258,7 @@ function assertHourlyLimit_(settings) {
   if (sent >= limit) throw new Error(`1時間あたりの送信上限（${limit}件）に達しました。時間をおいて再実行してください。`);
 }
 
-function disableDelivery_(invoiceNumber) { requirePermission_('配信停止'); const count=invalidateByInvoice_(String(invoiceNumber)); log_('URL無効化',invoiceNumber,'','','成功',''); return {disabled:count}; }
+function disableDelivery_(invoiceNumber, requestAuth) { requirePermission_('配信停止', requestAuth); const count=invalidateByInvoice_(String(invoiceNumber)); log_('URL無効化',invoiceNumber,'','','成功',''); return {disabled:count}; }
 function invalidateByInvoice_(invoiceNumber) { const sh=sheet_(STEP.SHEETS.DELIVERIES), t=table_(sh), now=new Date(); let n=0;t.rows.forEach(r=>{if(String(r.values[t.map['請求書番号']])===invoiceNumber&&!r.values[t.map['無効化日時']]){updateRow_(sh,r.rowNumber,t.map,{'無効化日時':now,'現在状態':'無効化','更新日時':now});n++;}});return n; }
 
 function validateToken_(token, recordAccess) {
@@ -270,19 +272,19 @@ function validateToken_(token, recordAccess) {
   return {row:{sheet:sh,rowNumber:row.rowNumber,map:m,values:v},publicData:{name:settings.nameDisplay==='full'?v[m['宛名']]:maskName_(v[m['宛名']]),subject:invoice.対象年月||'',invoiceNumber:v[m['請求書番号']],amount:settings.amountDisplay==='hide'?'非表示':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円',expiresAt:formatDate_(v[m['トークン有効期限']])}};
 }
 
-function getDashboard_() { requirePermission_('履歴閲覧'); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)), activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])],rawDl=d?String(d.values[deliveries.map['現在状態']]||''):'';return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?(['送信済み','再送済み'].includes(rawDl)?'未アクセス':rawDl):'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
+function getDashboard_(requestAuth) { requirePermission_('履歴閲覧', requestAuth); const invoices=table_(sheet_(STEP.SHEETS.INVOICES)), deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)), activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))); const latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);return {user:requestAuth.name||activeEmail_(),invoices:invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),d=latest[String(o['請求書番号'])],rawDl=d?String(d.values[deliveries.map['現在状態']]||''):'';return {invoiceNumber:o['請求書番号'],customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?(['送信済み','再送済み'].includes(rawDl)?'未アクセス':rawDl):'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',warnings:[]};}),history:deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).slice(-200).reverse().map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}))}; }
 
 function upsertInvoice_(inv,fileId,fileName){const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),now=new Date(),existing=t.rows.find(r=>String(r.values[t.map['請求書番号']])===String(inv.invoiceNumber));const partner=findPartner_(inv.customerCode,inv.partnerName);const row={'請求書番号':String(inv.invoiceNumber),'顧客コード':String(inv.customerCode||''),'宛名':inv.partnerName||'','敬称':inv.honorific||'様','対象年月':inv.subject||'','請求日':inv.invoiceDate||'','支払期限':inv.dueDate||'','郵便番号':String(inv.postal||''),'住所':String(inv.prefecture||'')+String(inv.address1||'')+String(inv.address2||''),'税抜小計':Number(inv.subtotal||0),'消費税額':Number(inv.tax||0),'請求金額':Number(inv.total||0),'メールアドレス':partner['メールアドレス']||inv.email||'','CCメールアドレス':partner['CCメールアドレス']||inv.cc||'','PDF状態':'PDF作成済み','PDFファイルID':fileId,'PDFファイル名':fileName,'現在状態':'PDF作成済み','作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now};if(existing)updateRow_(sh,existing.rowNumber,t.map,row);else sh.appendRow(STEP.INVOICE_HEADERS.map(h=>row[h]));const ds=sheet_(STEP.SHEETS.DETAILS),dt=table_(ds);dt.rows.filter(r=>String(r.values[dt.map['請求書番号']])===String(inv.invoiceNumber)).reverse().forEach(r=>ds.deleteRow(r.rowNumber));(inv.details||[]).forEach((d,i)=>ds.appendRow([String(inv.invoiceNumber),i+1,d.deliveryDate||'',d.name||'',d.itemCode||'',Number(d.unitPrice||0),Number(d.quantity||0),d.unit||'',Number(d.amount||0),d.taxRate||'']));}
 function findPartner_(code,name){const t=table_(sheet_(STEP.SHEETS.PARTNERS));const row=t.rows.find(r=>String(r.values[t.map['顧客コード']])===String(code))||t.rows.find(r=>String(r.values[t.map['名称']]).replace(/\s/g,'')===String(name).replace(/\s/g,''));return row?objectRow_(row.values,t.map):{};}
 function findInvoice_(number){const t=table_(sheet_(STEP.SHEETS.INVOICES)),r=t.rows.find(x=>String(x.values[t.map['請求書番号']])===String(number));return r?objectRow_(r.values,t.map):{};}
 function updateInvoiceState_(number,status){const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),r=t.rows.find(x=>String(x.values[t.map['請求書番号']])===String(number));if(r)updateRow_(sh,r.rowNumber,t.map,{'現在状態':status,'更新日時':new Date()});}
 
-function requirePermission_(permission){const email=activeEmail_();if(!email)throw new Error('STEPスタッフ認証を確認できません。Googleアカウントでログインしてください。');const t=table_(sheet_(STEP.SHEETS.USERS)),r=t.rows.find(x=>String(x.values[t.map['メールアドレス']]).toLowerCase()===email.toLowerCase());if(!r||String(r.values[t.map['有効']]).toLowerCase()!=='true'||!(String(r.values[t.map['管理者']]).toLowerCase()==='true'||String(r.values[t.map[permission]]).toLowerCase()==='true'))throw new Error(`権限がありません: ${permission}`);}
+function requirePermission_(permission, requestAuth){if(requestAuth&&requestAuth.method==='systemPortal'&&String(requestAuth.permissionLevel)==='4')return;const email=activeEmail_();if(!email)throw new Error('STEPスタッフ認証を確認できません。Googleアカウントでログインしてください。');const t=table_(sheet_(STEP.SHEETS.USERS)),r=t.rows.find(x=>String(x.values[t.map['メールアドレス']]).toLowerCase()===email.toLowerCase());if(!r||String(r.values[t.map['有効']]).toLowerCase()!=='true'||!(String(r.values[t.map['管理者']]).toLowerCase()==='true'||String(r.values[t.map[permission]]).toLowerCase()==='true'))throw new Error(`権限がありません: ${permission}`);}
 function activeEmail_(){return Session.getActiveUser().getEmail()||Session.getEffectiveUser().getEmail()||'';}
 function seedCurrentUser_(ss){const sh=ss.getSheetByName(STEP.SHEETS.USERS);if(sh.getLastRow()===1){const e=activeEmail_();if(e)sh.appendRow([e,'初期管理者',true,true,true,true,true,true,true,true,true]);}}
 
 function settings_(){const t=table_(sheet_(STEP.SHEETS.SETTINGS)),o={};t.rows.forEach(r=>o[String(r.values[t.map['キー']])]=String(r.values[t.map['値']]));return o;}
-function saveSettings_(values){requirePermission_('基本設定変更');const sh=sheet_(STEP.SHEETS.SETTINGS),t=table_(sh);Object.keys(values||{}).forEach(k=>{const r=t.rows.find(x=>String(x.values[t.map['キー']])===k);if(r)updateRow_(sh,r.rowNumber,t.map,{'値':String(values[k])});else sh.appendRow([k,String(values[k]),'']);});log_('設定変更','','','','成功','');return {saved:Object.keys(values||{}).length};}
+function saveSettings_(values, requestAuth){requirePermission_('基本設定変更', requestAuth);const sh=sheet_(STEP.SHEETS.SETTINGS),t=table_(sh);Object.keys(values||{}).forEach(k=>{const r=t.rows.find(x=>String(x.values[t.map['キー']])===k);if(r)updateRow_(sh,r.rowNumber,t.map,{'値':String(values[k])});else sh.appendRow([k,String(values[k]),'']);});log_('設定変更','','','','成功','');return {saved:Object.keys(values||{}).length};}
 function seedSettings_(ss){const sh=ss.getSheetByName(STEP.SHEETS.SETTINGS);if(sh.getLastRow()>1)return;[['businessName','個別指導ステップ','事業者名'],['businessPostal','487-0024','郵便番号'],['businessAddress','愛知県春日井市大留町1丁目23-2','住所'],['businessPhone','0568-41-8937','電話番号'],['rounding','nearest10','合計を10円単位へ四捨五入'],['nameDisplay','masked','DLページの氏名表示'],['amountDisplay','show','DLページの金額表示'],['senderName','個別指導ステップ【請求書】','送信者表示名'],['senderEmail','invoice@step-edu.net','認証済み送信元'],['replyTo','stepkobetsu@gmail.com','返信先'],['adminCc','stepkobetsu@gmail.com','管理者CC'],['enableAdminCc','true','管理者CCを毎回入れる'],['bcc','','BCC'],['validDays','45','URL有効日数'],['hourlyLimit','50','1時間あたり送信上限'],['batchSize','5','1回の処理件数'],['invalidateOld','true','再送時の旧URL無効化'],['testRecipient','stepkobetsu@gmail.com','テスト送信先'],['subject','【請求書】送付のご案内（個別指導ステップから）','メール件名'],['body',defaultMailBody_(),'メール本文'],['webAppUrl','','Apps ScriptデプロイURL']].forEach(x=>sh.appendRow(x));}
 function seedTemplate_(ss){const sh=ss.getSheetByName(STEP.SHEETS.TEMPLATES);if(sh.getLastRow()===1)sh.appendRow(['default','標準','【請求書】送付のご案内（個別指導ステップから）',defaultMailBody_(),true]);}
 function defaultMailBody_(){return '{{取引先名}} {{敬称}}\n\nお世話になっております。\n次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。\n\n請求書は、以下のURLよりダウンロードできます。\n有効期間は本日より{{有効日数}}日間です。\n\n有効期間を過ぎた場合は、個別指導ステップまでメールの再配信をご依頼ください。\n\n【ダウンロードURL】\n{{ダウンロードURL}}\n\n本メールは、個別指導ステップの請求書配信システムから自動送信しております。\n\nお心当たりのない場合は、メール内のURLを開かず、個別指導ステップまでご連絡ください。\n\n個別指導ステップ\n〒487-0024\n愛知県春日井市大留町1丁目23-2\nTEL: 0568-41-8937';}
@@ -304,6 +306,16 @@ function cacheTokenForQueue_(id,token){CacheService.getScriptCache().put('delive
 function takeCachedToken_(id){return CacheService.getScriptCache().get('delivery-token:'+id);}
 function clearCachedToken_(id){CacheService.getScriptCache().remove('delivery-token:'+id);}
 function verifyAdminApiKey_(token){const expected=PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY')||'';if(!expected||!token||!constantTimeEqual_(expected,token))throw new Error('管理API認証に失敗しました。');}
+function verifyRequestAuth_(body){
+  const apiKey=String(body.authToken||'');
+  if(apiKey){verifyAdminApiKey_(apiKey);return {method:'apiKey',permissionLevel:'4',name:activeEmail_()};}
+  const token=String(body.systemPortalSessionToken||'').trim();
+  if(!token)throw new Error('スタッフ用アプリへログインしてから、もう一度お試しください。');
+  const response=UrlFetchApp.fetch(STEP.AUTH_API,{method:'post',contentType:'text/plain',payload:JSON.stringify({action:'verifySystemPortal',systemPortalSessionToken:token}),muteHttpExceptions:true});
+  let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('スタッフ認証サーバーへ接続できませんでした。');}
+  if(!result.success||String(result.permissionLevel)!=='4')throw new Error('請求書システムを利用できる管理者ログインを確認できません。');
+  return {method:'systemPortal',permissionLevel:String(result.permissionLevel),name:String(result.name||''),code:String(result.code||'')};
+}
 function merge_(text,values){return String(text).replace(/{{([^{}]+)}}/g,(m,k)=>values[String(k).trim()]==null?'':String(values[String(k).trim()]));}
 function maskName_(name){const a=Array.from(String(name||''));return a.length<2?'＊':a[0]+'＊'.repeat(a.length-1);}
 function maskId_(id){const s=String(id||'');return s?s.slice(0,8)+'…':'';}
@@ -314,4 +326,4 @@ function safeError_(err){return String(err&&err.message?err.message:err).replace
 function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);}
 function bridgeResponse_(obj,requestId,bridgeNonce){const payload=JSON.stringify({requestId:String(requestId||''),bridgeNonce:String(bridgeNonce||''),result:obj}).replace(/</g,'\\u003c');return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>top.postMessage('+payload+',"https://stepkobetsu-hub.github.io");</script>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
 function installQueueTrigger_(){if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='processSendQueue'))ScriptApp.newTrigger('processSendQueue').timeBased().everyMinutes(1).create();}
-function recoverStuckQueue_(){requirePermission_('メール送信');const sh=sheet_(STEP.SHEETS.QUEUE),t=table_(sh),cutoff=Date.now()-15*60000;let n=0;t.rows.forEach(r=>{if(r.values[t.map['状態']]==='送信中'&&new Date(r.values[t.map['開始日時']]).getTime()<cutoff){updateRow_(sh,r.rowNumber,t.map,{'状態':'送信待ち','エラー':'送信中タイムアウトから復旧'});n++;}});return {recovered:n};}
+function recoverStuckQueue_(requestAuth){requirePermission_('メール送信', requestAuth);const sh=sheet_(STEP.SHEETS.QUEUE),t=table_(sh),cutoff=Date.now()-15*60000;let n=0;t.rows.forEach(r=>{if(r.values[t.map['状態']]==='送信中'&&new Date(r.values[t.map['開始日時']]).getTime()<cutoff){updateRow_(sh,r.rowNumber,t.map,{'状態':'送信待ち','エラー':'送信中タイムアウトから復旧'});n++;}});return {recovered:n};}
