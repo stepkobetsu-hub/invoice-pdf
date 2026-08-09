@@ -1,6 +1,7 @@
 /** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.14. */
 const STEP = Object.freeze({
   AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
+  AUTH_PERMISSION_LEVELS:['2','3','4'],
   STUDENT_MASTER: {SPREADSHEET_ID:'1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk',SHEET_NAME:'☆マスタ'},
   SHEETS: {
     PARTNERS: '取引先マスタ', SETTINGS: '基本設定', TEMPLATES: 'メール定型文', INVOICES: '請求書データ',
@@ -279,7 +280,7 @@ function findPartner_(code,name){const t=table_(sheet_(STEP.SHEETS.PARTNERS));co
 function findInvoice_(number){const t=table_(sheet_(STEP.SHEETS.INVOICES)),r=t.rows.find(x=>String(x.values[t.map['請求書番号']])===String(number));return r?objectRow_(r.values,t.map):{};}
 function updateInvoiceState_(number,status){const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),r=t.rows.find(x=>String(x.values[t.map['請求書番号']])===String(number));if(r)updateRow_(sh,r.rowNumber,t.map,{'現在状態':status,'更新日時':new Date()});}
 
-function requirePermission_(permission, requestAuth){if(requestAuth&&requestAuth.method==='systemPortal'&&String(requestAuth.permissionLevel)==='4')return;const email=activeEmail_();if(!email)throw new Error('STEPスタッフ認証を確認できません。Googleアカウントでログインしてください。');const t=table_(sheet_(STEP.SHEETS.USERS)),r=t.rows.find(x=>String(x.values[t.map['メールアドレス']]).toLowerCase()===email.toLowerCase());if(!r||String(r.values[t.map['有効']]).toLowerCase()!=='true'||!(String(r.values[t.map['管理者']]).toLowerCase()==='true'||String(r.values[t.map[permission]]).toLowerCase()==='true'))throw new Error(`権限がありません: ${permission}`);}
+function requirePermission_(permission, requestAuth){if(requestAuth&&requestAuth.method==='systemPortal'&&STEP.AUTH_PERMISSION_LEVELS.includes(String(requestAuth.permissionLevel)))return;const email=activeEmail_();if(!email)throw new Error('STEPスタッフ認証を確認できません。Googleアカウントでログインしてください。');const t=table_(sheet_(STEP.SHEETS.USERS)),r=t.rows.find(x=>String(x.values[t.map['メールアドレス']]).toLowerCase()===email.toLowerCase());if(!r||String(r.values[t.map['有効']]).toLowerCase()!=='true'||!(String(r.values[t.map['管理者']]).toLowerCase()==='true'||String(r.values[t.map[permission]]).toLowerCase()==='true'))throw new Error(`権限がありません: ${permission}`);}
 function activeEmail_(){return Session.getActiveUser().getEmail()||Session.getEffectiveUser().getEmail()||'';}
 function seedCurrentUser_(ss){const sh=ss.getSheetByName(STEP.SHEETS.USERS);if(sh.getLastRow()===1){const e=activeEmail_();if(e)sh.appendRow([e,'初期管理者',true,true,true,true,true,true,true,true,true]);}}
 
@@ -313,7 +314,7 @@ function verifyRequestAuth_(body){
   if(!token)throw new Error('スタッフ用アプリへログインしてから、もう一度お試しください。');
   const response=UrlFetchApp.fetch(STEP.AUTH_API,{method:'post',contentType:'text/plain',payload:JSON.stringify({action:'verifySystemPortal',systemPortalSessionToken:token}),muteHttpExceptions:true});
   let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('スタッフ認証サーバーへ接続できませんでした。');}
-  if(!result.success||String(result.permissionLevel)!=='4')throw new Error('請求書システムを利用できる管理者ログインを確認できません。');
+  if(!result.success||!STEP.AUTH_PERMISSION_LEVELS.includes(String(result.permissionLevel)))throw new Error('請求書システムを利用できるスタッフログインを確認できません。');
   return {method:'systemPortal',permissionLevel:String(result.permissionLevel),name:String(result.name||''),code:String(result.code||'')};
 }
 function merge_(text,values){return String(text).replace(/{{([^{}]+)}}/g,(m,k)=>values[String(k).trim()]==null?'':String(values[String(k).trim()]));}
