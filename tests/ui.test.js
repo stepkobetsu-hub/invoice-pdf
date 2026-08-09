@@ -89,6 +89,13 @@ async function main(){
   partnerForm.elements.name.value='個別入力テスト（編集済）';
   partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト（編集済）/);
+  document.querySelector('[data-edit-partner="NEW001"]').click();
+  assert.equal(document.querySelector('#deletePartnerButton').classList.contains('hidden'),false);
+  document.querySelector('#deletePartnerButton').click();
+  assert.equal(document.querySelector('#deletePartnerDialog').open,true);
+  document.querySelector('#confirmDeletePartner').click();
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.doesNotMatch(document.querySelector('#partnerTable').textContent,/個別入力テスト（編集済）/);
 
   document.querySelector('#openPartnerForm').click();
   partnerForm.elements.postal.value='4870024';
