@@ -278,9 +278,9 @@ async function serveDownloadPage(request, env, token) {
 
   return html(downloadPage({
     token,
+    total: delivery.row.total,
     invoiceNumber: delivery.row.invoice_number,
     partnerName: delivery.row.partner_name,
-    issueDate: delivery.row.issue_date,
     dueDate: delivery.row.due_date,
     expiresAt: delivery.row.expires_at,
   }));
@@ -408,7 +408,7 @@ async function validateDelivery(env, token) {
   const row = await env.DB.prepare(`
     SELECT d.delivery_id, d.status, d.expires_at, d.revoked_at,
            d.download_count, d.download_day, d.download_day_count,
-           i.invoice_number, i.issue_date, i.due_date, i.r2_object_key,
+           i.invoice_number, i.issue_date, i.due_date, i.total, i.r2_object_key,
            p.name AS partner_name
     FROM deliveries d
     JOIN invoices i ON i.invoice_id = d.invoice_id
@@ -500,15 +500,16 @@ function validFutureDate(value) {
   return Number.isFinite(time) && time > Date.now() ? new Date(time).toISOString() : "";
 }
 
-function downloadPage({ token, invoiceNumber, partnerName, issueDate, dueDate, expiresAt }) {
+function downloadPage({ token, total, invoiceNumber, partnerName, dueDate, expiresAt }) {
   return `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>STEP請求書ダウンロード</title><style>${pageCss()}</style></head>
 <body><main class="card"><div class="brand">個別指導ステップ</div>
 <h1>請求書ダウンロード</h1>
 <p class="lead">${escapeHtml(partnerName)} 様の請求書をご用意しました。</p>
-<dl><div><dt>請求書番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div><div><dt>請求日</dt><dd>${escapeHtml(formatDate(issueDate))}</dd></div><div><dt>お支払期限</dt><dd>${escapeHtml(formatDate(dueDate))}</dd></div><div class="view-expiry"><dt>閲覧期限</dt><dd>${escapeHtml(formatDate(expiresAt))}</dd></div></dl>
+<dl><div class="invoice-total"><dt>ご請求金額</dt><dd>${escapeHtml(formatMoney(total))}</dd></div><div><dt>請求書番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div><div><dt>お支払期限</dt><dd>${escapeHtml(formatDate(dueDate))}</dd></div></dl>
 <a class="button" href="/d/${encodeURIComponent(token)}/pdf">請求書PDFを表示・ダウンロード</a>
+<p class="download-expiry">ダウンロード期限：${escapeHtml(formatDate(expiresAt))}</p>
 <p class="note">PDFはSTEPの保護された配信経路から取得されます。</p>
 </main></body></html>`;
 }
@@ -540,7 +541,12 @@ function notFoundPage() {
 }
 
 function pageCss() {
-  return `:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:32px 16px;background:#f4f7fb;color:#172b4d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.card{max-width:680px;margin:5vh auto;background:#fff;border-radius:18px;padding:clamp(24px,6vw,48px);box-shadow:0 16px 50px #17345a1a}.brand{font-weight:800;color:#173e6b;letter-spacing:.04em}h1{font-size:clamp(24px,5vw,34px);margin:22px 0 16px}.lead{font-size:18px;line-height:1.8}dl{margin:28px 0;border:1px solid #dbe4ef;border-radius:12px;overflow:hidden}dl div{display:grid;grid-template-columns:9em 1fr;padding:14px 16px;border-bottom:1px solid #e7edf4}dl div:last-child{border-bottom:0}dt{font-weight:700}dd{margin:0}.view-expiry{font-size:13px;color:#52677f;background:#f8fafc}.button{display:block;text-align:center;padding:16px 20px;border-radius:11px;background:#174a7e;color:#fff;text-decoration:none;font-weight:800}.button:focus{outline:3px solid #ffcc33;outline-offset:3px}.note{margin-top:20px;color:#52677f;font-size:14px;line-height:1.7}@media(max-width:520px){dl div{grid-template-columns:1fr;gap:4px}}`;
+  return `:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;min-height:100vh;padding:32px 16px;background:#f4f7fb;color:#172b4d;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif}.card{max-width:680px;margin:5vh auto;background:#fff;border-radius:18px;padding:clamp(24px,6vw,48px);box-shadow:0 16px 50px #17345a1a}.brand{font-weight:800;color:#173e6b;letter-spacing:.04em}h1{font-size:clamp(24px,5vw,34px);margin:22px 0 16px}.lead{font-size:18px;line-height:1.8}dl{margin:28px 0;border:1px solid #dbe4ef;border-radius:12px;overflow:hidden}dl div{display:grid;grid-template-columns:9em 1fr;padding:14px 16px;border-bottom:1px solid #e7edf4}dl div:last-child{border-bottom:0}dt{font-weight:700}dd{margin:0}.invoice-total{background:#f4f8fd}.invoice-total dd{font-size:clamp(22px,5vw,30px);font-weight:800;color:#173e6b}.button{display:block;text-align:center;padding:16px 20px;border-radius:11px;background:#174a7e;color:#fff;text-decoration:none;font-weight:800}.button:focus{outline:3px solid #ffcc33;outline-offset:3px}.download-expiry{margin:9px 0 0;text-align:center;color:#66788d;font-size:12px}.note{margin-top:20px;color:#52677f;font-size:14px;line-height:1.7}@media(max-width:520px){dl div{grid-template-columns:1fr;gap:4px}}`;
+}
+
+function formatMoney(value) {
+  const amount = Math.round(Number(value || 0));
+  return `${Number.isFinite(amount) ? amount.toLocaleString("ja-JP") : "0"}円`;
 }
 
 function formatDate(value) {
