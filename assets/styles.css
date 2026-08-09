@@ -6,13 +6,38 @@
 /* Invoice entry and print fixes — 2026-08-09 */
 .invoice-page{--detail-count:1}
 .invoice-page .issuer{left:520px;width:250px;font-size:14px;line-height:18px;white-space:normal}
-.invoice-page .tax-title{top:calc(569px + var(--detail-count) * 34px)}
-.invoice-page .tax-table{top:calc(585px + var(--detail-count) * 34px)}
-.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}
-.invoice-page .bank-title{top:calc(655px + var(--detail-count) * 34px)}
-.invoice-page .bank-box{top:calc(675px + var(--detail-count) * 34px)}
-.invoice-page .note-title{top:calc(737px + var(--detail-count) * 34px)}
-.invoice-page .note-box{top:calc(757px + var(--detail-count) * 34px)}
+.invoice-page .detail td{padding:5px}
+.invoice-page .tax-title{top:calc(569px + var(--detail-count) * 28px)}
+.invoice-page .tax-table{top:calc(585px + var(--detail-count) * 28px)}
+.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}
+.invoice-page .bank-title{top:calc(655px + var(--detail-count) * 28px)}
+.invoice-page .bank-box{top:calc(675px + var(--detail-count) * 28px)}
+.invoice-page .note-title{top:calc(779px + var(--detail-count) * 28px)}
+.invoice-page .note-box{top:calc(799px + var(--detail-count) * 28px)}
+
+/* 振込先・備考は複数行でもPDFの枠内に収める。 */
+.invoice-page .section-box{
+  box-sizing:border-box;
+  height:auto;
+  padding:8px 11px;
+  font-size:14px;
+  line-height:18px;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  overflow:hidden;
+}
+.invoice-page .bank-box{
+  min-height:92px;
+  max-height:92px;
+}
+.invoice-page .note-title{top:calc(779px + var(--detail-count) * 28px)}
+.invoice-page .note-box{
+  top:calc(799px + var(--detail-count) * 28px);
+  min-height:80px;
+  max-height:80px;
+}
+.invoice-page .page-number{top:1106px}
 .field-label-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mini-link{border:0;background:transparent;color:var(--blue);font-size:11px;font-weight:700;padding:0;cursor:pointer;text-decoration:underline}
 .individual-detail-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
