@@ -1,4 +1,4 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.26. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.27. */
 const STEP = Object.freeze({
   AUTH_API:'https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec',
   AUTH_PERMISSION_LEVELS:['2','3','4'],
@@ -9,7 +9,7 @@ const STEP = Object.freeze({
     USERS: 'ユーザー権限', QUEUE: '送信キュー'
   },
   PARTNER_HEADERS: ['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ'],
-  INVOICE_HEADERS: ['請求書番号','顧客コード','宛名','敬称','対象年月','請求日','支払期限','郵便番号','住所','税抜小計','消費税額','請求金額','メールアドレス','CCメールアドレス','PDF状態','PDFファイルID','PDFファイル名','現在状態','作成日時','更新日時','メモ','タグ','入金状態','入金日','入金金額','振込先','備考'],
+  INVOICE_HEADERS: ['請求書番号','顧客コード','宛名','敬称','対象年月','請求日','支払期限','郵便番号','住所','税抜小計','消費税額','請求金額','メールアドレス','CCメールアドレス','PDF状態','PDFファイルID','PDFファイル名','現在状態','作成日時','更新日時','メモ','タグ','入金状態','入金日','入金金額','入金メモ','振込先','備考'],
   DETAIL_HEADERS: ['請求書番号','行番号','納品日','品目・納品書番号','品目コード','単価','数量','単位','価格','税率'],
   DELIVERY_HEADERS: ['配信ID','請求書番号','顧客コード','宛名','送信先メールアドレス','CCメールアドレス','メール件名','送信日時','送信状態','送信エラー','ダウンロードトークンハッシュ','トークン有効開始日時','トークン有効期限','初回アクセス日時','初回ダウンロード日時','最終アクセス日時','アクセス回数','ダウンロード回数','現在状態','PDFファイルID','PDFファイル名','再送回数','最終再送日時','無効化日時','作成者','作成日時','更新日時'],
   DOWNLOAD_HEADERS: ['日時','配信ID','請求書番号','種別','結果','ユーザーエージェント保存有無','IP保存有無'],
@@ -49,7 +49,7 @@ function doPost(e) {
       deletePartner: () => deletePartner_(payload.customerCode, requestAuth),
       findStudentForPartner: () => findStudentForPartner_(payload.studentCode, requestAuth),
       savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), saveInvoiceData: () => saveInvoiceData_(payload.invoice || {}, requestAuth),
-      updatePaymentStatus: () => updatePaymentStatus_(payload.invoiceNumber, payload.paymentStatus, payload.paymentDate, payload.paymentAmount, requestAuth), deleteInvoice: () => deleteInvoice_(payload.invoiceNumber, requestAuth),
+      updatePaymentStatus: () => updatePaymentStatus_(payload.invoiceNumber, payload.paymentStatus, payload.paymentDate, payload.paymentAmount, payload.paymentMemo, requestAuth), deleteInvoice: () => deleteInvoice_(payload.invoiceNumber, requestAuth),
       enqueueSend: () => enqueueSend_(payload, requestAuth),
       prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true}), requestAuth),
       releasePreparedSend: () => releasePreparedSend_(payload.deliveryId, requestAuth),
@@ -190,15 +190,16 @@ function saveInvoiceData_(invoice, requestAuth) {
   const paymentDate=payment==='入金済'?String(invoice.paymentDate||(existing&&t.map['入金日']!==undefined?existing.values[t.map['入金日']]:'')||''):'';
   const storedPaymentAmount=existing&&t.map['入金金額']!==undefined?existing.values[t.map['入金金額']]:'';
   const paymentAmount=payment==='入金済'?Number(invoice.paymentAmount!==undefined&&invoice.paymentAmount!==''?invoice.paymentAmount:(storedPaymentAmount!==''?storedPaymentAmount:invoice.total||0)):'';
+  const paymentMemo=payment==='入金済'?String(invoice.paymentMemo!==undefined?invoice.paymentMemo:(existing&&t.map['入金メモ']!==undefined?existing.values[t.map['入金メモ']]:'')||''):'';
   if(payment==='入金済'&&(!isFinite(paymentAmount)||paymentAmount<0))throw new Error('入金金額を0以上の数字で入力してください。');
-  const row={'請求書番号':number,'顧客コード':String(invoice.customerCode||''),'宛名':String(invoice.partnerName||''),'敬称':String(invoice.honorific||'様'),'対象年月':String(invoice.subject||''),'請求日':invoice.invoiceDate||'','支払期限':invoice.dueDate||'','郵便番号':String(invoice.postal||partner['郵便番号']||''),'住所':String(invoice.prefecture||partner['都道府県']||'')+String(invoice.address1||partner['住所1']||'')+String(invoice.address2||partner['住所2']||''),'税抜小計':Number(invoice.subtotal||0),'消費税額':Number(invoice.tax||0),'請求金額':Number(invoice.total||0),'メールアドレス':partner['メールアドレス']||invoice.email||'','CCメールアドレス':partner['CCメールアドレス']||invoice.cc||'','PDF状態':String(invoice.pdfStatus||'未作成'),'PDFファイルID':String(invoice.pdfFileId||''),'PDFファイル名':String(invoice.pdfFileName||''),'現在状態':String(invoice.sendStatus||'未送信'),'作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now,'メモ':String(invoice.memo||''),'タグ':String(invoice.tags||''),'入金状態':payment,'入金日':paymentDate,'入金金額':paymentAmount,'振込先':String(invoice.bank||''),'備考':String(invoice.note||'')};
+  const row={'請求書番号':number,'顧客コード':String(invoice.customerCode||''),'宛名':String(invoice.partnerName||''),'敬称':String(invoice.honorific||'様'),'対象年月':String(invoice.subject||''),'請求日':invoice.invoiceDate||'','支払期限':invoice.dueDate||'','郵便番号':String(invoice.postal||partner['郵便番号']||''),'住所':String(invoice.prefecture||partner['都道府県']||'')+String(invoice.address1||partner['住所1']||'')+String(invoice.address2||partner['住所2']||''),'税抜小計':Number(invoice.subtotal||0),'消費税額':Number(invoice.tax||0),'請求金額':Number(invoice.total||0),'メールアドレス':partner['メールアドレス']||invoice.email||'','CCメールアドレス':partner['CCメールアドレス']||invoice.cc||'','PDF状態':String(invoice.pdfStatus||'未作成'),'PDFファイルID':String(invoice.pdfFileId||''),'PDFファイル名':String(invoice.pdfFileName||''),'現在状態':String(invoice.sendStatus||'未送信'),'作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now,'メモ':String(invoice.memo||''),'タグ':String(invoice.tags||''),'入金状態':payment,'入金日':paymentDate,'入金金額':paymentAmount,'入金メモ':paymentMemo,'振込先':String(invoice.bank||''),'備考':String(invoice.note||'')};
   if(existing)updateRow_(sh,existing.rowNumber,t.map,row);else sh.appendRow(STEP.INVOICE_HEADERS.map(h=>row[h]));
   replaceInvoiceDetails_(number,invoice.details);
-  log_(existing?'請求書編集':'請求書作成',number,row['顧客コード'],'','成功','',{}, {paymentStatus:payment,paymentDate:paymentDate,paymentAmount:paymentAmount,total:row['請求金額']});
+  log_(existing?'請求書編集':'請求書作成',number,row['顧客コード'],'','成功','',{}, {paymentStatus:payment,paymentDate:paymentDate,paymentAmount:paymentAmount,paymentMemo:paymentMemo,total:row['請求金額']});
   return {invoiceNumber:number,created:!existing,paymentStatus:payment};
 }
 
-function updatePaymentStatus_(invoiceNumber, paymentStatus, paymentDate, paymentAmount, requestAuth) {
+function updatePaymentStatus_(invoiceNumber, paymentStatus, paymentDate, paymentAmount, paymentMemo, requestAuth) {
   requirePermission_('PDF作成', requestAuth);
   ensureInvoiceColumns_();
   const number=String(invoiceNumber||''),status=String(paymentStatus||''),paidAt=status==='入金済'?String(paymentDate||''):'';
@@ -207,11 +208,12 @@ function updatePaymentStatus_(invoiceNumber, paymentStatus, paymentDate, payment
   const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),row=t.rows.find(r=>String(r.values[t.map['請求書番号']])===number);
   if(!row)throw new Error('請求書が見つかりません。');
   const paidAmount=status==='入金済'?Number(paymentAmount!==undefined&&paymentAmount!==''?paymentAmount:row.values[t.map['請求金額']]||0):'';
+  const paidMemo=status==='入金済'?String(paymentMemo||''):'';
   if(status==='入金済'&&(!isFinite(paidAmount)||paidAmount<0))throw new Error('入金金額を0以上の数字で入力してください。');
-  const before=String(row.values[t.map['入金状態']]||'未入金'),beforeDate=t.map['入金日']===undefined?'':formatDate_(row.values[t.map['入金日']]),beforeAmount=t.map['入金金額']===undefined?'':Number(row.values[t.map['入金金額']]||0);
-  updateRow_(sh,row.rowNumber,t.map,{'入金状態':status,'入金日':paidAt,'入金金額':paidAmount,'更新日時':new Date()});
-  log_('入金状態変更',number,String(row.values[t.map['顧客コード']]||''),'','成功','',{status:before,paymentDate:beforeDate,paymentAmount:beforeAmount},{status:status,paymentDate:paidAt,paymentAmount:paidAmount});
-  return {invoiceNumber:number,paymentStatus:status,paymentDate:paidAt,paymentAmount:paidAmount};
+  const before=String(row.values[t.map['入金状態']]||'未入金'),beforeDate=t.map['入金日']===undefined?'':formatDate_(row.values[t.map['入金日']]),beforeAmount=t.map['入金金額']===undefined?'':Number(row.values[t.map['入金金額']]||0),beforeMemo=t.map['入金メモ']===undefined?'':String(row.values[t.map['入金メモ']]||'');
+  updateRow_(sh,row.rowNumber,t.map,{'入金状態':status,'入金日':paidAt,'入金金額':paidAmount,'入金メモ':paidMemo,'更新日時':new Date()});
+  log_('入金状態変更',number,String(row.values[t.map['顧客コード']]||''),'','成功','',{status:before,paymentDate:beforeDate,paymentAmount:beforeAmount,paymentMemo:beforeMemo},{status:status,paymentDate:paidAt,paymentAmount:paidAmount,paymentMemo:paidMemo});
+  return {invoiceNumber:number,paymentStatus:status,paymentDate:paidAt,paymentAmount:paidAmount,paymentMemo:paidMemo};
 }
 
 function deleteInvoice_(invoiceNumber, requestAuth) {
@@ -346,6 +348,7 @@ function getDashboard_(requestAuth) {
   const partnerByCode={},partnerByName={};partners.rows.forEach(r=>{const p=objectRow_(r.values,partners.map);partnerByCode[String(p['顧客コード'])]=p;partnerByName[String(p['名称']).replace(/\s/g,'')]=p;});
   const activeNumbers=new Set(invoices.rows.map(r=>String(r.values[invoices.map['請求書番号']]))),latest={};deliveries.rows.forEach(r=>latest[String(r.values[deliveries.map['請求書番号']])]=r);
   const invoiceItems=invoices.rows.map(r=>{const o=objectRow_(r.values,invoices.map),number=String(o['請求書番号']),d=latest[number],rawDl=d?String(d.values[deliveries.map['現在状態']]||''):'',partner=partnerByCode[String(o['顧客コード'])]||partnerByName[String(o['宛名']).replace(/\s/g,'')]||{},address=String(o['住所']||''),prefecture=String(partner['都道府県']||''),addressWithoutPrefecture=prefecture&&address.indexOf(prefecture)===0?address.slice(prefecture.length):address,paymentStatus=String(o['入金状態']||'未入金'),paymentAmount=paymentStatus==='入金済'?Number(o['入金金額']!==''&&o['入金金額']!==undefined?o['入金金額']:o['請求金額']||0):'';return {invoiceNumber:number,customerCode:o['顧客コード'],partnerName:o['宛名'],honorific:o['敬称'],subject:o['対象年月'],invoiceDate:formatDate_(o['請求日']),dueDate:formatDate_(o['支払期限']),postal:o['郵便番号'],prefecture:prefecture,address1:String(partner['住所1']||addressWithoutPrefecture),address2:String(partner['住所2']||''),memo:String(o['メモ']||''),tags:String(o['タグ']||''),paymentStatus:paymentStatus,paymentDate:formatDate_(o['入金日']),paymentAmount:paymentAmount,bank:String(o['振込先']||''),note:String(o['備考']||''),subtotal:o['税抜小計'],tax:o['消費税額'],total:o['請求金額'],email:o['メールアドレス'],cc:o['CCメールアドレス'],pdfStatus:o['PDF状態'],pdfFileId:o['PDFファイルID'],pdfFileName:o['PDFファイル名'],createdAt:formatDate_(o['作成日時']),updatedAt:formatDateTime_(o['更新日時']),sendStatus:d?d.values[deliveries.map['送信状態']]:'未送信',sentAt:d?formatDateTime_(d.values[deliveries.map['送信日時']]):'',dlStatus:d?(['送信済み','再送済み'].includes(rawDl)?'未アクセス':rawDl):'未取得',downloadedAt:d?formatDateTime_(d.values[deliveries.map['初回ダウンロード日時']]):'',expiresAt:d?formatDateTime_(d.values[deliveries.map['トークン有効期限']]):'',details:details.rows.filter(item=>String(item.values[details.map['請求書番号']])===number).map(item=>({deliveryDate:formatDate_(item.values[details.map['納品日']]),name:item.values[details.map['品目・納品書番号']],itemCode:item.values[details.map['品目コード']],unitPrice:Number(item.values[details.map['単価']]||0),quantity:Number(item.values[details.map['数量']]||0),unit:item.values[details.map['単位']],amount:Number(item.values[details.map['価格']]||0),taxRate:item.values[details.map['税率']]})),warnings:[]};});
+  invoiceItems.forEach((item,index)=>{item.paymentMemo=invoices.map['入金メモ']===undefined?'':String(invoices.rows[index].values[invoices.map['入金メモ']]||'');});
   const deliveryHistory=deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}));
   const operationHistory=logs.rows.filter(r=>activeNumbers.has(String(r.values[logs.map['請求書番号']]))).map(r=>({timestamp:formatDateTime_(r.values[logs.map['日時']]),action:String(r.values[logs.map['操作種別']]||'更新'),invoiceNumber:r.values[logs.map['請求書番号']],name:'',deliveryId:maskId_(r.values[logs.map['配信ID']]),sendStatus:'',urlStatus:'',result:r.values[logs.map['結果']]||r.values[logs.map['エラー']]||'正常'}));
   return {user:requestAuth.name||activeEmail_(),settings:settings_(),invoices:invoiceItems.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||String(b.invoiceNumber).localeCompare(String(a.invoiceNumber))),history:deliveryHistory.concat(operationHistory).sort((a,b)=>String(b.timestamp).localeCompare(String(a.timestamp))).slice(0,300)};
