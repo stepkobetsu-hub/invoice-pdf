@@ -38,6 +38,18 @@
   }
   function formatYen(value){return `${Number(value||0).toLocaleString('ja-JP')}円`;}
   function normalizeDate(value){const parts=String(value||'').split(/[\/-]/);if(parts.length!==3)return String(value||'');return `${parts[0]}/${parts[1].padStart(2,'0')}/${parts[2].padStart(2,'0')}`;}
+  function nextInvoiceNumber(dateValue,invoices){
+    const match=String(dateValue||'').match(/^(\d{4})[\/-](\d{1,2})/);
+    if(!match)throw new Error('請求日が不正です。');
+    const prefix=`${match[1]}${match[2].padStart(2,'0')}`;
+    const max=(Array.isArray(invoices)?invoices:[]).reduce((current,invoice)=>{
+      const number=String(invoice?.invoiceNumber||'');
+      if(!number.startsWith(prefix))return current;
+      const suffix=number.slice(prefix.length);
+      return /^\d+$/.test(suffix)?Math.max(current,Number(suffix)):current;
+    },0);
+    return `${prefix}${String(max+1).padStart(3,'0')}`;
+  }
 
   function parseInvoiceRows(rows){
     if(rows.length<2)throw new Error('請求書CSVにデータ行がありません。');
@@ -135,6 +147,6 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
