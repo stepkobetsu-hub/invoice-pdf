@@ -165,8 +165,10 @@ async function main(){
   assert.match(backend,/const rows=retained\.concat\(replacements\)/);
   assert.doesNotMatch(backend,/replaceInvoiceDetails_[\s\S]*?\.forEach\(r=>ds\.deleteRow/);
   assert.match(backend,/staff-auth:'\+hashToken_\(token\)/);
+  assert.match(backend,/student-partner:' \+ code\.toLowerCase\(\)/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
+  assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
   assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));
   console.log('ui tests passed');
