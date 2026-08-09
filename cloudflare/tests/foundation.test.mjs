@@ -35,6 +35,11 @@ assert.match(source, /env\.PDFS\.put/);
 assert.match(source, /\/api\/admin\/deliveries/);
 assert.doesNotMatch(source, /brevo|sendinblue|google\.com|drive\.google|script\.google/i);
 assert.doesNotMatch(migration, /@gmail\.com|7132[678]|裏横地|表太田|星中山/);
+assert.match(source, /<dt>ご請求金額<\/dt>/);
+assert.match(source, /<dt>請求書番号<\/dt>/);
+assert.match(source, /<dt>お支払期限<\/dt>/);
+assert.match(source, /ダウンロード期限：/);
+assert.doesNotMatch(source, /<dt>請求日<\/dt>/);
 
 for (const table of ["system_modules", "managed_files", "access_tokens", "audit_events"]) {
   assert.match(commonMigration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\s*\\(`));
