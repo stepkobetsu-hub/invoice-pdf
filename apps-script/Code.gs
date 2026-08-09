@@ -49,6 +49,7 @@ function doPost(e) {
     const payload = body.payload || {};
     const routes = {
       getDashboard: () => getDashboard_(requestAuth), importPartners: () => importPartners_(payload.partners || [], requestAuth),
+      deletePartner: () => deletePartner_(payload.customerCode, requestAuth),
       findStudentForPartner: () => findStudentForPartner_(payload.studentCode, requestAuth),
       savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), enqueueSend: () => enqueueSend_(payload, requestAuth),
       prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true}), requestAuth),
@@ -133,6 +134,17 @@ function importPartners_(partners, requestAuth) {
   sheet.getRange(2,1,rows.length,STEP.PARTNER_HEADERS.length).setNumberFormat('@').setValues(rows);
   log_('取引先変更','','','','成功','');
   return {count:rows.length};
+}
+
+function deletePartner_(customerCode, requestAuth) {
+  requirePermission_('取引先編集', requestAuth);
+  const code=String(customerCode||'').trim();
+  if(!code)throw new Error('削除する顧客コードがありません。');
+  const sh=sheet_(STEP.SHEETS.PARTNERS),t=table_(sh);
+  const targets=t.rows.filter(r=>String(r.values[t.map['顧客コード']]).trim()===code).reverse();
+  targets.forEach(r=>sh.deleteRow(r.rowNumber));
+  log_('取引先削除','',code,'',targets.length?'成功':'対象なし','');
+  return {deleted:targets.length};
 }
 
 function findStudentForPartner_(studentCode, requestAuth) {
