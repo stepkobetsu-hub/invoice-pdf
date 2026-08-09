@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260809-entry-fixes">
+  <link rel="stylesheet" href="assets/styles.css?v=20260809-partner-import">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
-  <script src="assets/core.js?v=20260809-entry-fixes" defer></script>
+  <script src="assets/core.js?v=20260809-partner-import" defer></script>
   <script src="assets/invoice-pdf.js?v=20260809-entry-fixes" defer></script>
-  <script src="assets/app.js?v=20260809-entry-fixes" defer></script>
+  <script src="assets/app.js?v=20260809-partner-import" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -77,8 +77,8 @@
       </section>
 
       <section id="view-partners" class="view">
-        <div class="page-heading"><div><h1>取引先マスタ</h1><p>CSV取込または個別入力で登録できます。</p></div><div class="heading-actions"><label class="button secondary">CSV取込<input id="partnerCsv" type="file" accept=".csv" hidden></label><button id="openPartnerForm" class="button primary" type="button">個別入力</button></div></div>
-        <div class="table-wrap wide"><table id="partnerTable"><thead><tr><th>顧客コード</th><th>名称</th><th>敬称</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>メール</th><th>CC</th><th>メモ</th></tr></thead><tbody><tr class="empty"><td colspan="9">取引先CSVを読み込んでください。</td></tr></tbody></table></div>
+        <div class="page-heading"><div><h1>取引先マスタ</h1><p>CSV取込・個別入力・生徒マスタからの取込で登録できます。</p></div><div class="heading-actions"><label class="button secondary">CSV取込<input id="partnerCsv" type="file" accept=".csv" hidden></label><button id="openPartnerForm" class="button primary" type="button">個別入力</button><button id="openStudentImport" class="button secondary" type="button">生徒マスタから取込</button></div></div>
+        <div class="table-wrap wide"><table id="partnerTable"><thead><tr><th>顧客コード</th><th>名称</th><th>敬称</th><th>郵便番号</th><th>住所</th><th>電話番号</th><th>メール</th><th>CC</th><th>メモ</th><th>操作</th></tr></thead><tbody><tr class="empty"><td colspan="10">取引先CSVを読み込むか、個別入力してください。</td></tr></tbody></table></div>
       </section>
 
       <section id="view-history" class="view">
@@ -118,13 +118,13 @@
   <dialog id="previewDialog" class="preview-dialog"><div class="dialog-head"><h2>PDFプレビュー</h2><button data-close aria-label="閉じる">×</button></div><div id="invoicePreviewHost"></div><div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printPreview" class="button secondary" type="button">印刷</button><button id="downloadPreview" class="button primary" type="button">PDFを保存</button></div></dialog>
   <dialog id="partnerDialog" class="partner-dialog">
     <form id="partnerForm">
-      <div class="dialog-head"><h2>取引先を個別入力</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="dialog-head"><h2 id="partnerDialogTitle">取引先を個別入力</h2><button data-close type="button" aria-label="閉じる">×</button></div>
       <div class="form-grid dialog-form">
         <label>顧客コード<span class="required">必須</span><input name="customerCode" placeholder="例：C001" required></label>
         <label>名称<span class="required">必須</span><input name="name" required></label>
         <label>名称（カナ）<input name="kana"></label>
         <label>敬称<select name="honorific"><option value="様" selected>様</option><option value="御中">御中</option></select></label>
-        <label>郵便番号<input name="postal" inputmode="numeric" placeholder="487-0024"></label>
+        <label>郵便番号<input name="postal" inputmode="numeric" autocomplete="postal-code" placeholder="487-0024"><small id="postalLookupStatus" class="field-help">7桁入力すると住所を自動入力します。</small></label>
         <label>都道府県<input name="prefecture" value="愛知県"></label>
         <label>住所1<input name="address1"></label>
         <label>住所2<input name="address2"></label>
@@ -133,7 +133,21 @@
         <label class="span-2">CCメールアドレス<input name="cc" type="email"></label>
         <label class="span-2">メモ<textarea name="memo" rows="3"></textarea></label>
       </div>
-      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button class="button primary" type="submit">取引先マスタへ登録</button></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button id="savePartnerButton" class="button primary" type="submit">取引先マスタへ登録</button></div>
+    </form>
+  </dialog>
+  <dialog id="studentImportDialog" class="student-import-dialog">
+    <form id="studentSearchForm">
+      <div class="dialog-head"><h2>生徒マスタから取引先を取込</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="student-import-body">
+        <p>「☆マスタ」の生徒番号（A列）を入力してください。完全一致した生徒の氏名と学年を確認してから登録できます。</p>
+        <div class="student-search-row"><label>生徒コード<span class="required">必須</span><input name="studentCode" autocomplete="off" required></label><button id="searchStudent" class="button primary" type="submit">生徒を検索</button></div>
+        <div id="studentSearchStatus" class="field-help" role="status"></div>
+        <div id="studentSearchResult" class="student-result hidden">
+          <label class="student-choice"><input name="studentChoice" type="radio" value="selected"><span><strong id="studentResultName"></strong><small>生徒コード：<span id="studentResultCode"></span>　学年：<span id="studentResultGrade"></span></small></span></label>
+        </div>
+      </div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button id="importStudentPartner" class="button primary" type="button" disabled>選択した生徒を取引先へ登録</button></div>
     </form>
   </dialog>
   <dialog id="sendDialog"><div class="dialog-head"><h2>送信前の最終確認</h2><button data-close aria-label="閉じる">×</button></div><div id="sendSummary" class="summary-grid"></div><div class="dialog-actions"><button data-close class="button secondary">キャンセル</button><button id="reviewMessages" class="button secondary">送信内容を確認</button><button id="confirmSend" class="button primary">選択した0件を送信</button></div></dialog>

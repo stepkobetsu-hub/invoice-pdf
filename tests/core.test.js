@@ -38,6 +38,13 @@ assert.deepEqual(C.DEMO_PARTNERS.map(p=>p['メールアドレス']),[
   'skase.days@gmail.com',
   'chloeandnina1@gmail.com'
 ]);
+const studentPartner=C.studentToPartner({studentCode:'999',name:'テスト生徒',kana:'テストセイト',grade:'小５',postal:'4850802',addressU:'愛知県小牧市大草',addressV:'1220',addressW:'テストハイツ101',email:'student@example.com'});
+assert.equal(studentPartner['顧客コード'],'999');
+assert.equal(studentPartner['都道府県'],'愛知県');
+assert.equal(studentPartner['住所1'],'小牧市大草1220');
+assert.equal(studentPartner['住所2'],'テストハイツ101');
+assert.equal(studentPartner['郵便番号'],'485-0802');
+assert.match(studentPartner['メモ'],/小５/);
 const manual=C.buildManualInvoice({invoiceNumber:'202608101',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-31',note:'個別作成テスト'},[
   {name:'授業料',unitPrice:25000,quantity:1,unit:'月',taxRate:10},
   {name:'教材費',unitPrice:50,quantity:1,unit:'冊',taxRate:10}

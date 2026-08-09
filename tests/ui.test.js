@@ -12,6 +12,7 @@ const {window} = dom;
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 window.HTMLDialogElement.prototype.close=function(){this.open=false;};
 window.print=()=>{};
+window.fetch=async()=>({ok:true,json:async()=>({status:200,results:[{address1:'愛知県',address2:'春日井市',address3:'大留町'}]})});
 window.eval(fs.readFileSync(path.join(root, 'assets/core.js'), 'utf8'));
 window.eval(fs.readFileSync(path.join(root, 'assets/invoice-pdf.js'), 'utf8'));
 window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
@@ -67,6 +68,26 @@ async function main(){
   partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト/);
   assert.match(document.querySelector('#singlePartner').textContent,/NEW001/);
+  document.querySelector('[data-edit-partner="NEW001"]').click();
+  assert.equal(document.querySelector('#partnerDialogTitle').textContent,'取引先を編集');
+  assert.equal(partnerForm.elements.customerCode.readOnly,true);
+  partnerForm.elements.name.value='個別入力テスト（編集済）';
+  partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+  assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト（編集済）/);
+
+  document.querySelector('#openPartnerForm').click();
+  partnerForm.elements.postal.value='4870024';
+  partnerForm.elements.postal.dispatchEvent(new window.Event('change',{bubbles:true}));
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(partnerForm.elements.postal.value,'487-0024');
+  assert.equal(partnerForm.elements.prefecture.value,'愛知県');
+  assert.equal(partnerForm.elements.address1.value,'春日井市大留町');
+  document.querySelector('#partnerDialog').close();
+
+  document.querySelector('#openStudentImport').click();
+  assert.equal(document.querySelector('#studentImportDialog').open,true);
+  assert.match(document.querySelector('#studentImportDialog').textContent,/生徒コード/);
+  document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
   assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));

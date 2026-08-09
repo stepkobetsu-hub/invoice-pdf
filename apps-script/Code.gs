@@ -1,5 +1,6 @@
-/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.13. */
+/** STEP請求書PDF作成・配信システム backend. Public deployment v0.1.14. */
 const STEP = Object.freeze({
+  STUDENT_MASTER: {SPREADSHEET_ID:'1CIJkTlYUcUkbb8jBdFc6L8D5ubTGsxwNxFv01ten-Zk',SHEET_NAME:'☆マスタ'},
   SHEETS: {
     PARTNERS: '取引先マスタ', SETTINGS: '基本設定', TEMPLATES: 'メール定型文', INVOICES: '請求書データ',
     DETAILS: '請求書明細', DELIVERIES: '請求書配信履歴', DOWNLOADS: 'ダウンロード履歴', LOGS: '操作ログ',
@@ -45,6 +46,7 @@ function doPost(e) {
     const payload = body.payload || {};
     const routes = {
       getDashboard: () => getDashboard_(), importPartners: () => importPartners_(payload.partners || []),
+      findStudentForPartner: () => findStudentForPartner_(payload.studentCode),
       savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || ''), enqueueSend: () => enqueueSend_(payload),
       prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true})),
       releasePreparedSend: () => releasePreparedSend_(payload.deliveryId),
@@ -128,6 +130,26 @@ function importPartners_(partners) {
   sheet.getRange(2,1,rows.length,STEP.PARTNER_HEADERS.length).setNumberFormat('@').setValues(rows);
   log_('取引先変更','','','','成功','');
   return {count:rows.length};
+}
+
+function findStudentForPartner_(studentCode) {
+  requirePermission_('取引先編集');
+  const code = String(studentCode == null ? '' : studentCode).trim();
+  if (!code) throw new Error('生徒コードを入力してください。');
+  const master = SpreadsheetApp.openById(STEP.STUDENT_MASTER.SPREADSHEET_ID);
+  const sheet = master.getSheetByName(STEP.STUDENT_MASTER.SHEET_NAME);
+  if (!sheet) throw new Error('生徒マスタの「☆マスタ」シートが見つかりません。');
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) throw new Error('生徒マスタにデータがありません。');
+  const found = sheet.getRange(2,1,lastRow-1,1).createTextFinder(code).matchEntireCell(true).findNext();
+  if (!found) throw new Error('一致する生徒コードが見つかりません。');
+  const row = sheet.getRange(found.getRow(),1,1,24).getDisplayValues()[0];
+  if (String(row[0]).trim() !== code) throw new Error('一致する生徒コードが見つかりません。');
+  return {
+    studentCode:String(row[0] || '').trim(), name:String(row[4] || '').trim(), kana:String(row[5] || '').trim(),
+    grade:String(row[9] || '').trim(), postal:String(row[19] || '').trim(), addressU:String(row[20] || '').trim(),
+    addressV:String(row[21] || '').trim(), addressW:String(row[22] || '').trim(), email:String(row[23] || '').trim()
+  };
 }
 
 function savePdf_(invoice, pdfBase64) {
