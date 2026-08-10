@@ -8,6 +8,7 @@
   const DEFAULT_CLOUDFLARE_API_URL='https://step-invoice-api.stepkobetsu.workers.dev';
   const STAFF_AUTH_KEY='stepStaffAppAuth';
   const STAFF_LOGIN_URL='https://stepkobetsu-hub.github.io/seiseki-kanri/';
+  const STAFF_AUTH_API_URL='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';
   const SINGLE_DRAFT_KEY='stepInvoiceSingleDraft';
   const VIEWS=new Set(['create','invoices','bank','receipts','partners','history','settings','mail']);
   const localIso=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
@@ -94,8 +95,21 @@
     });
   }
   function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
+  async function ensureStaffSessionToken(){
+    const current=staffSessionToken();if(current)return current;
+    const code=String(localStorage.getItem('stepStaffAppCode')||'').trim();
+    const password=localStorage.getItem('stepStaffAppPassword')||'';
+    if(!code)return '';
+    try{
+      const response=await fetch(STAFF_AUTH_API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'staffLogin',code,password})});
+      const result=await response.json();
+      if(!result?.success||!result?.systemPortalSessionToken)return '';
+      localStorage.setItem(STAFF_AUTH_KEY,JSON.stringify({code,name:result.name||'',permissionLevel:result.permissionLevel||'',systemPortalSessionToken:result.systemPortalSessionToken||'',systemPortalExpiresAt:result.systemPortalExpiresAt||'',savedAt:new Date().toISOString()}));
+      return String(result.systemPortalSessionToken||'');
+    }catch(_){return '';}
+  }
   async function cloudApi(path,{method='GET',body}={}){
-    const token=staffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');
+    const token=await ensureStaffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');
     const timeoutMs=path==='/api/app/invoices/pdf'?60000:15000,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const response=await fetch(`${DEFAULT_CLOUDFLARE_API_URL}${path}`,{method,headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:controller.signal});
