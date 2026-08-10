@@ -50,7 +50,7 @@ function doPost(e) {
       getDashboard: () => getDashboard_(requestAuth, payload.syncStatuses === true), getSupportData: () => getSupportData_(requestAuth), importPartners: () => importPartners_(payload.partners || [], requestAuth),
       deletePartner: () => deletePartner_(payload.customerCode, requestAuth),
       findStudentForPartner: () => findStudentForPartner_(payload.studentCode, requestAuth),
-      savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), saveInvoiceData: () => saveInvoiceData_(payload.invoice || {}, requestAuth),
+      savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), saveInvoiceData: () => saveInvoiceData_(payload.invoice || {}, requestAuth), markPdfsSaved: () => markPdfsSaved_(payload.items || [], requestAuth),
       updatePaymentStatus: () => updatePaymentStatus_(payload.invoiceNumber, payload.paymentStatus, payload.paymentDate, payload.paymentAmount, payload.paymentMemo, requestAuth), deleteInvoice: () => deleteInvoice_(payload.invoiceNumber, requestAuth),
       saveReceiptData: () => saveReceiptData_(payload.receipt || {}, requestAuth), saveReceiptPdf: () => saveReceiptPdf_(payload.receipt || {}, payload.pdfBase64 || '', requestAuth), deleteReceipt: () => deleteReceipt_(payload.receiptNumber, requestAuth), enqueueReceiptSend: () => enqueueReceiptSend_(payload, requestAuth),
       enqueueSend: () => enqueueSend_(payload, requestAuth),
@@ -207,6 +207,24 @@ function saveInvoiceData_(invoice, requestAuth) {
   replaceInvoiceDetails_(number,invoice.details);
   log_(existing?'請求書編集':'請求書作成',number,row['顧客コード'],'','成功','',{}, {paymentStatus:payment,paymentDate:paymentDate,paymentAmount:paymentAmount,paymentMemo:paymentMemo,total:row['請求金額']});
   return {invoiceNumber:number,created:!existing,paymentStatus:payment};
+}
+
+function markPdfsSaved_(items, requestAuth) {
+  requirePermission_('PDF作成', requestAuth);
+  ensureInvoiceColumns_();
+  if (!Array.isArray(items) || !items.length) throw new Error('PDF保存結果がありません。');
+  if (items.length > 100) throw new Error('PDF保存結果は一度に100件までです。');
+  const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),byNumber=new Map(t.rows.map(row=>[String(row.values[t.map['請求書番号']]),row])),now=new Date();
+  let updated=0;
+  items.forEach(item=>{
+    const number=String(item&&item.invoiceNumber||'').trim(),fileId=String(item&&item.pdfFileId||'').trim(),fileName=String(item&&item.pdfFileName||'').trim();
+    if(!/^\d{6,}$/.test(number)||!fileId||!fileName)throw new Error(`${number||'請求書番号不明'}: PDF保存結果が不正です。`);
+    const row=byNumber.get(number);if(!row)throw new Error(`${number}: 請求書が見つかりません。`);
+    updateRow_(sh,row.rowNumber,t.map,{'PDF状態':'PDF作成済み','PDFファイルID':fileId,'PDFファイル名':fileName,'更新日時':now});
+    updated+=1;
+  });
+  log_('PDF一括状態反映','',String(updated),'','成功','',{}, {updated:updated});
+  return {updated:updated};
 }
 
 function updatePaymentStatus_(invoiceNumber, paymentStatus, paymentDate, paymentAmount, paymentMemo, requestAuth) {
