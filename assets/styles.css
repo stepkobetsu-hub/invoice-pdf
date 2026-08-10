@@ -143,10 +143,12 @@
 .invoice-page.invoice-final-page .totals{top:var(--summary-top)}
 .invoice-page.invoice-final-page .tax-title{top:calc(var(--summary-top) + 34px)}
 .invoice-page.invoice-final-page .tax-table{top:calc(var(--summary-top) + 50px)}
+.invoice-page.invoice-following-page .detail{top:60px}
 .invoice-page.invoice-final-page .bank-title{top:calc(var(--summary-top) + 130px)}
-.invoice-page.invoice-final-page .bank-box{top:calc(var(--summary-top) + 150px)}
-.invoice-page.invoice-final-page .note-title{top:calc(var(--summary-top) + 235px)}
-.invoice-page.invoice-final-page .note-box{top:calc(var(--summary-top) + 255px)}
+.invoice-page.invoice-final-page .bank-box{top:calc(var(--summary-top) + 154px)}
+.invoice-page.invoice-final-page .note-title{top:calc(var(--summary-top) + 244px)}
+.invoice-page.invoice-final-page .note-box{top:calc(var(--summary-top) + 268px)}
+.invoice-page.invoice-final-page .section-box{height:80px;box-sizing:border-box;overflow:hidden;white-space:pre-wrap;line-height:1.45}
 .pdf-render-host{height:auto!important;overflow:visible!important}
 @media print{
   body.printing-invoice .invoice-page{break-after:page;page-break-after:always}
