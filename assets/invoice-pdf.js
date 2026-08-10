@@ -5,11 +5,15 @@
   const rowHtml=d=>`<tr><td></td><td>${esc(d.name)}</td><td class="num">${number(d.unitPrice)}</td><td class="num">${number(d.quantity)}</td><td class="num">${number(d.amount)}</td></tr>`;
   function paginate(details){
     const items=details.length?details:[{name:'',unitPrice:0,quantity:0,amount:0}];
-    const finalCapacity=5,continuationCapacity=14;
-    if(items.length<=finalCapacity)return [items];
-    const pages=[],beforeFinal=items.length-finalCapacity;
-    for(let start=0;start<beforeFinal;start+=continuationCapacity)pages.push(items.slice(start,Math.min(start+continuationCapacity,beforeFinal)));
-    pages.push(items.slice(beforeFinal));
+    const singlePageCapacity=5,firstPageCapacity=10,finalContinuationCapacity=16,fullContinuationCapacity=27;
+    if(items.length<=singlePageCapacity)return [items];
+    const pages=[items.slice(0,Math.min(firstPageCapacity,items.length-1))];
+    let remaining=items.slice(pages[0].length);
+    while(remaining.length>finalContinuationCapacity){
+      pages.push(remaining.slice(0,fullContinuationCapacity));
+      remaining=remaining.slice(fullContinuationCapacity);
+    }
+    pages.push(remaining);
     return pages;
   }
   function headerHtml(inv){
@@ -29,9 +33,10 @@
       const finalPage=index===totalPages-1;
       const details=detailItems.map(rowHtml).join('');
       const watermark=options.preview===true?'<div class="preview-watermark" aria-hidden="true">プレビュー</div>':'';
-      const summaryTop=530+(detailItems.length*34);
-      return `<div class="invoice-page ${finalPage?'invoice-final-page':'invoice-continuation-page'}" ${index===0?'id="invoicePage"':''} style="--detail-count:${Math.max(1,detailItems.length)};--summary-top:${summaryTop}px">
-        ${watermark}${headerHtml(inv)}
+      const firstPage=index===0,summaryTop=(firstPage?520:110)+(detailItems.length*34);
+      const pageClasses=['invoice-page',firstPage?'invoice-first-page':'invoice-following-page',finalPage?'invoice-final-page':'invoice-continuation-page'].join(' ');
+      return `<div class="${pageClasses}" ${firstPage?'id="invoicePage"':''} style="--detail-count:${Math.max(1,detailItems.length)};--summary-top:${summaryTop}px">
+        ${watermark}${firstPage?headerHtml(inv):''}
         <table class="detail"><thead><tr><th>納品日</th><th>品目・納品書番号</th><th class="num">単価</th><th class="num">数量</th><th class="num">価格</th></tr></thead><tbody>${details}</tbody></table>
         ${finalPage?summaryHtml(inv):''}
         <footer class="invoice-footer" aria-label="ページ番号">${index+1} / ${totalPages}</footer>
