@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260811-bulk-fast" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260811-csv-select-batch-pdf-sync" defer></script>
+  <script src="assets/app.js?v=20260811-csv-select-delete" defer></script>
   <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
@@ -91,7 +91,7 @@
         <div class="table-wrap">
           <table id="createTable"><thead><tr><th><label><input id="createSelectAll" type="checkbox" aria-label="すべて選択"> すべて</label></th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>件名</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
         </div>
-        <div class="actions"><span id="createSelectedCount">0／0件を選択</span><button id="addToSend" class="button success" disabled>保存して請求書を作成</button></div>
+        <div class="actions create-list-actions"><span id="createSelectedCount">0／0件を選択</span><button id="removeSelectedCreateRows" class="button create-delete-button" type="button" disabled>選択した行を削除</button><button id="addToSend" class="button success" disabled>保存して請求書を作成</button></div>
       </section>
 
       <section id="view-invoices" class="view active">

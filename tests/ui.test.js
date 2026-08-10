@@ -22,6 +22,7 @@ window.HTMLFormElement.prototype.submit=function(){
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
 };
 window.print=()=>{};
+window.confirm=()=>true;
 window.fetch=async(url,options={})=>{
   if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
     if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{invoices:[],history:[],user:'テスト担当者'}})};
@@ -149,6 +150,14 @@ async function main(){
   await new Promise(resolve=>window.setTimeout(resolve,20));
   assert.match(document.querySelector('#createTable tbody').textContent,/202608501/);
   assert.match(document.querySelector('#createTable tbody').textContent,/ダミー取引先1/);
+  const createdRowCheck=document.querySelector('[data-create-select="0"]');
+  createdRowCheck.checked=true;
+  createdRowCheck.dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(document.querySelector('#removeSelectedCreateRows').disabled,false);
+  assert.equal(document.querySelector('#removeSelectedCreateRows').textContent,'選択した1件を削除');
+  document.querySelector('#removeSelectedCreateRows').click();
+  assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/202608501/);
+  assert.match(document.querySelector('#invoiceImportSummary').textContent,/削除件数/);
 
   document.querySelector('#openPartnerForm').click();
   const partnerForm=document.querySelector('#partnerForm');
