@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-invoice-bulk-actions">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-invoice-bulk-payment">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-pdf-layout-fix" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260810-invoice-bulk-actions" defer></script>
+  <script src="assets/app.js?v=20260810-invoice-bulk-payment" defer></script>
   <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
@@ -112,7 +112,7 @@
         </div>
         <div class="invoice-workspace">
           <aside class="invoice-list-pane" aria-label="請求書一覧">
-            <div class="invoice-bulk-toolbar"><label class="sr-only" for="invoiceBulkAction">選択した請求書の一括操作</label><select id="invoiceBulkAction" disabled><option value="">選択した0件を一括操作する</option><option value="delete">一括削除</option><option value="mail">一括メール送信</option></select></div>
+            <div class="invoice-bulk-toolbar"><label class="sr-only" for="invoiceBulkAction">選択した請求書の一括操作</label><select id="invoiceBulkAction" disabled><option value="">選択した0件を一括操作する</option><option value="delete">一括削除</option><option value="mail">一括メール送信</option><option value="paid">一括入金済にする</option></select></div>
             <div class="invoice-list-head"><label class="invoice-select-all"><input id="invoiceSelectAll" type="checkbox"><span id="invoiceVisibleRange">0件を表示</span></label><span id="invoiceListCount">0件</span></div>
             <div id="invoiceList" class="invoice-list"><p class="invoice-list-empty">請求書がありません。</p></div>
           </aside>
@@ -283,6 +283,13 @@
     <div class="dialog-head"><h2>請求書の一括削除</h2><button data-close type="button" aria-label="閉じる">×</button></div>
     <div class="dialog-message"><p><strong id="bulkDeleteCount">0件</strong>の請求書を削除します。</p><p class="warning-text">削除すると請求書と配信URLは利用できなくなり、元に戻せません。</p><label class="delete-confirm-check"><input id="bulkDeleteCheck" type="checkbox"> 選択した請求書を削除することを確認しました</label></div>
     <div class="dialog-actions"><button data-close class="button secondary" type="button">削除しない</button><button id="confirmBulkDelete" class="button danger" type="button" disabled>一括削除する</button></div>
+  </dialog>
+  <dialog id="bulkPaymentDialog" class="bulk-action-dialog">
+    <form id="bulkPaymentForm">
+      <div class="dialog-head"><h2>一括入金済にする</h2><button data-close type="button" aria-label="閉じる">×</button></div>
+      <div class="dialog-message"><p>選択した<strong id="bulkPaymentCount">0件</strong>を入金済みにします。</p><label class="bulk-payment-date">入金日<input id="bulkPaymentDate" name="paymentDate" type="date" required></label><p>入金額は、それぞれの請求書の請求金額で登録します。</p><p id="bulkPaymentStatus" class="mail-submit-status hidden" role="status" aria-live="polite"></p></div>
+      <div class="dialog-actions"><button data-close class="button secondary" type="button">キャンセル</button><button id="confirmBulkPayment" class="button primary" type="submit">入金済みにする</button></div>
+    </form>
   </dialog>
   <dialog id="bulkMailWarningDialog" class="bulk-action-dialog">
     <div class="dialog-head"><h2>一括メール送信</h2><button data-close type="button" aria-label="閉じる">×</button></div>
