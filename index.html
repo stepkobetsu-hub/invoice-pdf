@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-pdf-layout-fix" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260811-bulk-send-progress" defer></script>
+  <script src="assets/app.js?v=20260811-bulk-send-parallel" defer></script>
   <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
@@ -299,7 +299,7 @@
       <div><span>選択中の請求書 合計</span><strong id="bulkMailTotalCount">0件</strong></div>
       <p class="warning-text">送信済みの請求書を含めて進むと再送になります。次の画面で送付先を必ず確認してください。</p>
     </div>
-    <div class="dialog-actions"><button data-close class="button secondary" type="button">送信しない</button><button id="reviewBulkMail" class="button primary" type="button">さらに送信する</button></div>
+    <div class="dialog-actions"><button data-close class="button secondary" type="button">送信しない</button><button id="reviewBulkMail" class="button primary" type="button">送信する</button></div>
   </dialog>
   <dialog id="bulkMailReviewDialog" class="bulk-mail-review-dialog">
     <div class="dialog-head"><h2>一括メール送信・送付先の最終確認</h2><button data-close type="button" aria-label="閉じる">×</button></div>
