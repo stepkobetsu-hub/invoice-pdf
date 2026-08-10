@@ -155,7 +155,9 @@ async function main(){
   createdRowCheck.dispatchEvent(new window.Event('change',{bubbles:true}));
   assert.equal(document.querySelector('#removeSelectedCreateRows').disabled,false);
   assert.equal(document.querySelector('#removeSelectedCreateRows').textContent,'選択した1件を削除');
-  document.querySelector('#removeSelectedCreateRows').click();
+  assert.equal(document.querySelector('#removeSelectedCreateRowsTop').disabled,false);
+  assert.equal(document.querySelector('#removeSelectedCreateRowsTop').textContent,'選択した1件を削除');
+  document.querySelector('#removeSelectedCreateRowsTop').click();
   assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/202608501/);
   assert.match(document.querySelector('#invoiceImportSummary').textContent,/削除件数/);
 
