@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-multipage-footer">
+  <link rel="stylesheet" href="assets/styles.css?v=20260810-demo-save-send">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-multipage-footer" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260810-multipage-footer" defer></script>
+  <script src="assets/app.js?v=20260810-demo-save-send" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
 </head>
 <body>
@@ -76,7 +76,7 @@
                 <div class="individual-detail-actions"><button id="addSingleDetail" class="button secondary" type="button">明細行を追加</button></div>
                 <div class="individual-total"><span>税抜小計 <strong id="singleSubtotal">0円</strong></span><span>消費税 <strong id="singleTax">0円</strong></span><span>請求金額 <strong id="singleTotal">0円</strong></span></div>
                 <p id="singleSaveStatus" class="mail-submit-status hidden" role="status" aria-live="polite"></p>
-                <div class="actions single-save-actions"><button id="previewSingleInvoice" class="button secondary" type="button">大きくプレビュー</button><button id="saveSingleInvoice" class="button primary" type="submit">保存して発行リストへ追加</button></div>
+                <div class="actions single-save-actions"><button id="previewSingleInvoice" class="button secondary" type="button">大きくプレビュー</button><button id="saveSingleInvoice" class="button primary" type="submit">保存して発行リストへ追加</button><button id="saveAndSendSingleInvoice" class="button success single-save-send hidden" type="button">保存して送信する</button></div>
               </div>
               <aside class="single-invoice-live-preview" aria-label="請求書プレビュー">
                 <div class="document-editor-preview-label">プレビュー</div>
