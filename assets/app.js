@@ -392,5 +392,6 @@
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
   const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();
-  Promise.resolve(initialLoad).finally(hideOperationOverlay);
+  const startupOverlayTimer=setTimeout(()=>{operationOverlayCount=1;hideOperationOverlay();},15000);
+  Promise.resolve(initialLoad).finally(()=>{clearTimeout(startupOverlayTimer);operationOverlayCount=1;hideOperationOverlay();});
 })();
