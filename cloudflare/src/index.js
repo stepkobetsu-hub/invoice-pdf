@@ -100,6 +100,15 @@ async function serveAppRequest(request, env, url) {
     }
   }
 
+  if (request.method === "POST" && url.pathname === "/api/app/invoices/pdf") {
+    const response = await uploadInvoice(request, env);
+    let result;
+    try { result = await response.json(); }
+    catch (_error) { return appJson(request, env, { ok: false, error: "PDF_UPLOAD_FAILED" }, response.status || 500); }
+    if (!response.ok || !result?.ok) return appJson(request, env, { ok: false, error: result?.error || "PDF_UPLOAD_FAILED" }, response.status);
+    return appJson(request, env, { ok: true, data: result });
+  }
+
   const paymentMatch = url.pathname.match(/^\/api\/app\/invoices\/([^/]+)\/payment$/);
   if (request.method === "POST" && paymentMatch) {
     const payload = await readJson(request);
