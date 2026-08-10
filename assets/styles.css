@@ -131,4 +131,4 @@
 
 
 /* D1 duplicate save feedback and print-safe page number — 2026-08-10 */
-.invoice-page .page-number{bottom:42px}
+.invoice-page .page-number{top:auto!important;bottom:82px!important}
