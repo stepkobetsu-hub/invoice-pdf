@@ -1,0 +1,26 @@
+name: Hide invoice login UI
+on:
+  push:
+    paths: ['.github/workflows/hide-login-ui.yml']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html'); s=p.read_text()
+          old='<div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">未接続</span><a id="staffLoginLink" class="staff-login-link" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログイン</a></div>'
+          new='<div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">自動接続</span><a id="staffLoginLink" class="staff-login-link hidden" href="https://stepkobetsu-hub.github.io/seiseki-kanri/" aria-hidden="true" tabindex="-1">スタッフログイン</a></div>'
+          if old not in s: raise SystemExit('top action target not found')
+          p.write_text(s.replace(old,new,1))
+      - shell: bash
+        run: |
+          git config user.name stepkobetsu-hub
+          git config user.email stepkobetsu-hub@users.noreply.github.com
+          git add index.html
+          git commit -m '請求書画面からログイン操作を非表示化'
+          git push
