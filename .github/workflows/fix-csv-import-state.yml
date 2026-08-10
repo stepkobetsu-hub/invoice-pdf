@@ -1,0 +1,85 @@
+name: Fix CSV import state separation
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-csv-import-state.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Separate imported CSV rows from saved invoices
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('assets/app.js')
+          s = p.read_text(encoding='utf-8')
+
+          replacements = [
+            ("const state={partners:[...new Map([...C.DEMO_PARTNERS,...savedPartners].map(p=>[p['顧客コード'],p])).values()],invoices:[],receipts:[]",
+             "const state={partners:[...new Map([...C.DEMO_PARTNERS,...savedPartners].map(p=>[p['顧客コード'],p])).values()],invoices:[],importedInvoices:[],receipts:[]"),
+            ("function reconcile(){state.invoices=C.matchPartners(state.invoices,state.partners);renderCreate();}",
+             "function reconcile(){state.importedInvoices=C.matchPartners(state.importedInvoices,state.partners);renderCreate();}"),
+            ("async function onInvoiceCsv(file){try{const decoded=await C.decodeCsvFile(file);state.invoices=C.parseInvoiceRows(C.parseCsv(decoded.text));state.createSelected=new Set(state.invoices.map((_,index)=>index));activateStep(1);reconcile();$('#invoiceImportSummary').innerHTML=cards({'読込件数':state.invoices.length,'文字コード':decoded.encoding,'10円丸め調整':state.invoices.filter(x=>x.roundingAdjusted).length,'照合済み':state.invoices.filter(x=>x.partner).length});$('#invoiceImportSummary').classList.remove('hidden');activateStep(2);alert(`${state.invoices.length}件を読み込みました。すべて選択されています。送信は行っていません。`,'success');}catch(e){alert(e.message,'error');}}",
+             "async function onInvoiceCsv(file){try{const decoded=await C.decodeCsvFile(file);state.importedInvoices=C.parseInvoiceRows(C.parseCsv(decoded.text));state.createSelected=new Set(state.importedInvoices.map((_,index)=>index));activateStep(1);reconcile();$('#invoiceImportSummary').innerHTML=cards({'読込件数':state.importedInvoices.length,'文字コード':decoded.encoding,'10円丸め調整':state.importedInvoices.filter(x=>x.roundingAdjusted).length,'照合済み':state.importedInvoices.filter(x=>x.partner).length});$('#invoiceImportSummary').classList.remove('hidden');activateStep(2);alert(`${state.importedInvoices.length}件を読み込みました。すべて選択されています。送信は行っていません。`,'success');}catch(e){alert(e.message,'error');}}"),
+            ("async function saveImportedInvoicesToList(){const buttons=$$('[data-save-imported-invoices]'),items=[...state.createSelected].sort((a,b)=>a-b).map(index=>state.invoices[index]).filter(Boolean);",
+             "async function saveImportedInvoicesToList(){const buttons=$$('[data-save-imported-invoices]'),items=[...state.createSelected].sort((a,b)=>a-b).map(index=>state.importedInvoices[index]).filter(Boolean);"),
+            ("buttons.forEach(button=>button.textContent='保存しました');state.createSelected.clear();await refreshAll(false);",
+             "buttons.forEach(button=>button.textContent='保存しました');state.createSelected.clear();state.importedInvoices=[];renderCreate();await refreshAll(false);"),
+            ("function updateCreateSelectionUi(){const total=state.invoices.length,selected=state.createSelected.size",
+             "function updateCreateSelectionUi(){const total=state.importedInvoices.length,selected=state.createSelected.size"),
+            ("function removeSelectedCreateRows(){const selected=[...state.createSelected].filter(index=>state.invoices[index]);",
+             "function removeSelectedCreateRows(){const selected=[...state.createSelected].filter(index=>state.importedInvoices[index]);"),
+            ("const removing=new Set(selected);state.invoices=state.invoices.filter((_,index)=>!removing.has(index));state.createSelected=new Set(state.invoices.map((_,index)=>index));",
+             "const removing=new Set(selected);state.importedInvoices=state.importedInvoices.filter((_,index)=>!removing.has(index));state.createSelected=new Set(state.importedInvoices.map((_,index)=>index));"),
+            ("$('#invoiceImportSummary').innerHTML=cards({'残り件数':state.invoices.length,'削除件数':selected.length,'選択件数':state.createSelected.size});",
+             "$('#invoiceImportSummary').innerHTML=cards({'残り件数':state.importedInvoices.length,'削除件数':selected.length,'選択件数':state.createSelected.size});"),
+            ("function renderCreate(){const tbody=$('#createTable tbody');if(!state.invoices.length){",
+             "function renderCreate(){const tbody=$('#createTable tbody');if(!state.importedInvoices.length){"),
+            ("for(const index of [...state.createSelected])if(index>=state.invoices.length)state.createSelected.delete(index);tbody.innerHTML=state.invoices.map((x,i)=>",
+             "for(const index of [...state.createSelected])if(index>=state.importedInvoices.length)state.createSelected.delete(index);tbody.innerHTML=state.importedInvoices.map((x,i)=>"),
+            ("tbody.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>previewInvoice(Number(b.dataset.preview)));updateCreateSelectionUi();}",
+             "tbody.querySelectorAll('[data-preview]').forEach(b=>b.onclick=()=>showInvoicePreview(state.importedInvoices[Number(b.dataset.preview)]));updateCreateSelectionUi();}"),
+            ("$('#createSelectAll').onchange=event=>{state.createSelected=event.currentTarget.checked?new Set(state.invoices.map((_,index)=>index)):new Set();renderCreate();};",
+             "$('#createSelectAll').onchange=event=>{state.createSelected=event.currentTarget.checked?new Set(state.importedInvoices.map((_,index)=>index)):new Set();renderCreate();};"),
+            ("$('#loadSample').onclick=()=>{state.invoices=C.matchPartners([",
+             "$('#loadSample').onclick=()=>{state.importedInvoices=C.matchPartners(["),
+          ]
+
+          for old, new in replacements:
+            count = s.count(old)
+            if count != 1:
+              raise SystemExit(f'expected exactly one match, found {count}: {old[:100]}')
+            s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+
+          index = Path('index.html')
+          html = index.read_text(encoding='utf-8')
+          old = 'assets/app.js?v=20260811-csv-top-save'
+          new = 'assets/app.js?v=20260811-csv-state-fix'
+          if html.count(old) != 1:
+            raise SystemExit(f'cache-buster target count={html.count(old)}')
+          index.write_text(html.replace(old, new, 1), encoding='utf-8')
+      - name: Syntax check
+        run: node --check assets/app.js
+      - name: Run tests
+        run: npm test -- --runInBand || npm test
+      - name: Commit fix
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes needed.'
+            exit 0
+          fi
+          git config user.name 'stepkobetsu-hub'
+          git config user.email 'stepkobetsu-hub@users.noreply.github.com'
+          git add assets/app.js index.html
+          git commit -m 'CSV取込途中データとD1保存済み請求書を分離'
+          git push
