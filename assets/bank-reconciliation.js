@@ -33,9 +33,17 @@
     try{const data=await window.StepInvoiceApp.cloudApi('/api/app/bank-reconciliation');const rows=data.transactions||[];$('#bankReconciliationList').innerHTML=rows.length?rows.map(transactionHtml).join(''):'<p class="invoice-list-empty">読込済みの入金明細はありません。</p>';bindActions();}
     catch(error){$('#bankReconciliationList').innerHTML=`<p class="alert error">${esc(error.message)}</p>`;}finally{loading=false;}
   }
-  function onCsvSelected(event){
-    event.target.value='';
-    status('このCSVはまだ送信していません。実際のWeb21 CSVのヘッダー・文字コードを確認してから、安全に取込を有効化します。CSVファイルを開発担当へ共有してください。','warning');
+  async function onCsvSelected(event){
+    const file=event.target.files?.[0];if(!file)return;
+    const button=$('.bank-file-button');button.classList.add('disabled');event.target.disabled=true;status('処理中…','warning');
+    try{
+      const parsed=await window.StepBankImporters.importFile(file);
+      const data=await window.StepInvoiceApp.cloudApi('/api/app/bank-transactions/import',{method:'POST',body:parsed});
+      await load();
+      const rows=($('#bankReconciliationList').querySelectorAll('.bank-transaction-card')||[]).length;
+      status(`${data.importedCount}件の入金を読み込みました。${data.duplicateCount}件は既に読み込み済みです。${data.ignoredWithdrawalCount}件の出金を除外しました。現在${rows}件の入金明細があります。保存しました。`,'success');
+    }catch(error){status(error.message,'error');}
+    finally{event.target.value='';event.target.disabled=false;button.classList.remove('disabled');}
   }
   $('#openBankReconciliation').onclick=()=>window.StepInvoiceApp.showView('bank');
   $('#backToInvoices').onclick=()=>window.StepInvoiceApp.showView('invoices');
