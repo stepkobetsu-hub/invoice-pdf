@@ -106,7 +106,7 @@
   }
   async function saveInvoiceToD1(invoice){const normalized={...invoice,invoiceDate:inputDate(invoice.invoiceDate),dueDate:inputDate(invoice.dueDate)};const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized}});return data.invoice;}
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
-  function invoiceLifecycleHtml(invoice){const sent=C.isSentStatus(invoice.sendStatus),downloaded=sent||state.invoiceDownloadedNumbers.has(String(invoice.invoiceNumber))||invoice.dlStatus==='DL済';if(!downloaded&&!sent)return '<span class="status draft">下書き</span>';return `${downloaded?'<span class="status downloaded">DL済</span>':''}${sent?'<span class="status sent">送信済</span>':''}`;}
+  function invoiceLifecycleHtml(invoice){const sent=C.isSentStatus(invoice.sendStatus);if(sent)return '<span class="status sent">送信済</span>';const downloaded=state.invoiceDownloadedNumbers.has(String(invoice.invoiceNumber))||invoice.dlStatus==='DL済';return downloaded?'<span class="status downloaded">DL済</span>':'<span class="status draft">下書き</span>';}
   const displayDlStatus=s=>{
     const status=String(s||'');
     if(['送信済み','再送済み'].includes(status))return '未アクセス';
