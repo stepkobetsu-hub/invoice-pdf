@@ -12,35 +12,35 @@ jobs:
       - shell: python
         run: |
           from pathlib import Path
+          import re
           p=Path('assets/app.js')
           s=p.read_text()
           old="  const STAFF_AUTH_KEY='stepStaffAppAuth';\n  const STAFF_LOGIN_URL='https://stepkobetsu-hub.github.io/seiseki-kanri/';"
-          new="  const STAFF_AUTH_KEY='stepStaffAppAuth';\n  const STAFF_LOGIN_URL='https://stepkobetsu-hub.github.io/seiseki-kanri/';\n  const STAFF_AUTH_API_URL='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';"
+          new=old+"\n  const STAFF_AUTH_API_URL='https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec';"
           if old not in s: raise SystemExit('constant target not found')
           s=s.replace(old,new,1)
           old2="  function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}\n  async function cloudApi(path,{method='GET',body}={}){\n    const token=staffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');"
-          new2="""  function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
-  async function ensureStaffSessionToken(){
-    const current=staffSessionToken();if(current)return current;
-    const code=String(localStorage.getItem('stepStaffAppCode')||'').trim();
-    const password=localStorage.getItem('stepStaffAppPassword')||'';
-    if(!code)return '';
-    try{
-      const response=await fetch(STAFF_AUTH_API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'staffLogin',code,password})});
-      const result=await response.json();
-      if(!result?.success||!result?.systemPortalSessionToken)return '';
-      localStorage.setItem(STAFF_AUTH_KEY,JSON.stringify({code,name:result.name||'',permissionLevel:result.permissionLevel||'',systemPortalSessionToken:result.systemPortalSessionToken||'',systemPortalExpiresAt:result.systemPortalExpiresAt||'',savedAt:new Date().toISOString()}));
-      return String(result.systemPortalSessionToken||'');
-    }catch(_){return '';}
-  }
-  async function cloudApi(path,{method='GET',body}={}){
-    const token=await ensureStaffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');"""
+          new2=("  function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}\n"
+                "  async function ensureStaffSessionToken(){\n"
+                "    const current=staffSessionToken();if(current)return current;\n"
+                "    const code=String(localStorage.getItem('stepStaffAppCode')||'').trim();\n"
+                "    const password=localStorage.getItem('stepStaffAppPassword')||'';\n"
+                "    if(!code)return '';\n"
+                "    try{\n"
+                "      const response=await fetch(STAFF_AUTH_API_URL,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'staffLogin',code,password})});\n"
+                "      const result=await response.json();\n"
+                "      if(!result?.success||!result?.systemPortalSessionToken)return '';\n"
+                "      localStorage.setItem(STAFF_AUTH_KEY,JSON.stringify({code,name:result.name||'',permissionLevel:result.permissionLevel||'',systemPortalSessionToken:result.systemPortalSessionToken||'',systemPortalExpiresAt:result.systemPortalExpiresAt||'',savedAt:new Date().toISOString()}));\n"
+                "      return String(result.systemPortalSessionToken||'');\n"
+                "    }catch(_){return '';}\n"
+                "  }\n"
+                "  async function cloudApi(path,{method='GET',body}={}){\n"
+                "    const token=await ensureStaffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');")
           if old2 not in s: raise SystemExit('cloud target not found')
           s=s.replace(old2,new2,1)
           p.write_text(s)
           h=Path('index.html')
           t=h.read_text()
-          import re
           t=re.sub(r'assets/app\.js\?v=[^\"\']+','assets/app.js?v=20260811-auto-reconnect',t,count=1)
           h.write_text(t)
       - run: node --check assets/app.js
