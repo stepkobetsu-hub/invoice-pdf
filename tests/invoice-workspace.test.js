@@ -24,7 +24,15 @@ window.HTMLFormElement.prototype.submit=function(){
 };
 window.print=()=>{};
 window.confirm=()=>true;
-window.fetch=async()=>({ok:true,json:async()=>({results:[]})});
+window.fetch=async(url,options={})=>{
+  if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
+    if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}})};
+    if(options.method==='POST'&&String(url).includes('/payment')){const number=decodeURIComponent(String(url).split('/').at(-2));const source=invoices.find(item=>item.invoiceNumber===number);return {ok:true,json:async()=>({ok:true,data:{invoice:{...source,...JSON.parse(options.body)}}})};}
+    if(options.method==='DELETE')return {ok:true,json:async()=>({ok:true,data:{deleted:1}})};
+    if(options.method==='POST'){const invoice=JSON.parse(options.body).invoice;return {ok:true,json:async()=>({ok:true,data:{invoice}})};}
+  }
+  return {ok:true,json:async()=>({results:[]})};
+};
 window.eval(fs.readFileSync(path.join(root,'assets/core.js'),'utf8'));
 window.eval(fs.readFileSync(path.join(root,'assets/invoice-pdf.js'),'utf8'));
 window.eval(fs.readFileSync(path.join(root,'assets/receipt-pdf.js'),'utf8'));
@@ -40,6 +48,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(document.querySelector('#invoiceList .invoice-list-item:first-child').textContent,/最新の取引先/);
   assert.equal(document.querySelector('#invoiceList .invoice-list-item:first-child').classList.contains('active'),true);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/最新の取引先/);
+  assert.match(document.querySelector('.invoice-detail-column').textContent,/デモ送信/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/CSV一括追加/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/請求書を作成/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/編集/);
@@ -61,6 +70,17 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(document.querySelector('[name="documentNumber"]').value,/^\d{9}$/);
   assert.match(document.querySelector('[name="subject"]').value,/^2026年[89]月分$/);
   assert.match(document.querySelector('#documentEditorPreview').textContent,/領収書/);
+  document.querySelector('#documentEditorDialog').close();
+  Object.assign(window.StepInvoiceApp.state.partners.at(-1),{'学年':'中3','教室':'大手'});
+  window.StepReceipts.openNewReceipt();
+  document.querySelector('#documentPartnerCombo > button').click();
+  document.querySelector('#documentPartnerResults [data-partner-code]:first-child').click();
+  assert.equal(document.querySelector('#documentEditorForm [name="memo"]').value,'中3');
+  assert.equal(document.querySelector('#documentEditorForm [name="tags"]').value,'大手');
+  document.querySelector('#documentEditorDialog').close();
+  window.StepReceipts.openDemoReceipt();
+  assert.equal(document.querySelector('#documentEditorForm [name="subject"]').value,'テスト送信');
+  assert.equal(document.querySelectorAll('#documentEditorDetails tr').length,2);
   document.querySelector('#documentEditorDialog').close();
   assert.ok(document.querySelector('#paymentDateDialog'));
   document.querySelector('[data-payment-value="入金済"]').click();
@@ -142,5 +162,22 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(worker,/お支払期限<\/dt>/);
   assert.match(worker,/ダウンロード期限：/);
   assert.doesNotMatch(worker,/請求日<\/dt>/);
+  document.querySelector('#invoiceMailDialog').close();
+  document.querySelector('#createDemoInvoiceFromList').click();
+  await new Promise(resolve=>window.setTimeout(resolve,0));
+  assert.equal(document.querySelector('#view-create').classList.contains('active'),true);
+  assert.equal(document.querySelector('#createSinglePane').classList.contains('active'),true);
+  assert.equal(document.querySelector('#singleInvoiceForm').elements.subject.value,'テスト送信');
+  const demoRows=document.querySelectorAll('#singleDetailBody tr');
+  assert.equal(demoRows.length,2);
+  assert.equal(demoRows[0].querySelector('[name="detailName"]').value,'テスト');
+  assert.equal(demoRows[0].querySelector('[name="detailUnitPrice"]').value,'100');
+  assert.equal(demoRows[1].querySelector('[name="detailName"]').value,'テスト割引');
+  assert.equal(demoRows[1].querySelector('[name="detailUnitPrice"]').value,'-100');
+  const demoInvoiceDate=document.querySelector('#singleInvoiceForm').elements.invoiceDate.value;
+  const demoDueDate=document.querySelector('#singleInvoiceForm').elements.dueDate.value;
+  assert.equal((new Date(`${demoDueDate}T00:00:00`)-new Date(`${demoInvoiceDate}T00:00:00`))/86400000,21);
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/テスト送信/);
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/テスト割引/);
   console.log('invoice workspace tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});

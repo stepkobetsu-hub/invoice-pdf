@@ -1,6 +1,7 @@
 (function(global){
   'use strict';
-  const PARTNER_HEADERS=['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ'];
+  const PARTNER_HEADERS=['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ','学年','教室'];
+  const PARTNER_REQUIRED_HEADERS=PARTNER_HEADERS.slice(0,20);
   const EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const DEMO_PARTNERS=[
     ['DEMO001','ダミー取引先1','ダミー トリヒキサキ イチ','様','','','','487-0001','愛知県','春日井市テスト町1-1','','','','','','mintcocoajasmine@gmail.com','','','','検証用ダミー取引先（実在しません）'],
@@ -51,9 +52,15 @@
       '郵便番号':normalizePostal(student?.postal),'都道府県':first.prefecture,
       '住所1':`${first.rest}${String(student?.addressV||'').trim()}`,
       '住所2':String(student?.addressW||'').trim(),'メールアドレス':String(student?.email||'').trim(),
-      'メモ':`生徒マスタから取込${student?.grade?`（学年：${String(student.grade).trim()}）`:''}`
+      'メモ':'生徒マスタから取込','学年':String(student?.grade||'').trim(),'教室':normalizeCampus(student?.classroom||student?.campus)
     });
     return partner;
+  }
+  function normalizeCampus(value){const text=String(value||'').trim();if(text.includes('神領'))return '神領';if(text.includes('大手'))return '大手';return '';}
+  function partnerDocumentDefaults(partner){
+    const note=String(partner?.['メモ']||'');
+    const legacyGrade=(note.match(/学年\s*[：:]\s*([^）)\]\s]+)/)||[])[1]||'';
+    return {memo:String(partner?.['学年']||legacyGrade).trim(),tags:normalizeCampus(partner?.['教室']||partner?.['校舎'])};
   }
   function normalizeStudentCode(value){
     return String(value??'').trim().replace(/[Ａ-Ｚａ-ｚ０-９]/g,char=>String.fromCharCode(char.charCodeAt(0)-0xFEE0));
@@ -102,7 +109,7 @@
   function parsePartners(rows){
     if(rows.length<2)throw new Error('取引先CSVにデータ行がありません。');
     const actual=rows[0].map(x=>x.trim());
-    const missing=PARTNER_HEADERS.filter(x=>!actual.includes(x));if(missing.length)throw new Error(`取引先CSVの必須列がありません: ${missing.join('、')}`);
+    const missing=PARTNER_REQUIRED_HEADERS.filter(x=>!actual.includes(x));if(missing.length)throw new Error(`取引先CSVの必須列がありません: ${missing.join('、')}`);
     return rows.slice(1).filter(r=>r.some(Boolean)).map(r=>Object.fromEntries(PARTNER_HEADERS.map(h=>[h,String(r[actual.indexOf(h)]??'')])));
   }
 
@@ -169,6 +176,6 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,normalizeStudentCode,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,partnerDocumentDefaults,normalizeStudentCode,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);

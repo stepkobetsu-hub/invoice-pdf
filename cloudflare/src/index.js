@@ -17,6 +17,10 @@ export default {
           : html(servicePausedPage(), 503);
       }
 
+      if (url.pathname.startsWith("/api/app/")) {
+        return await serveAppRequest(request, env, url);
+      }
+
       if (url.pathname.startsWith("/api/admin/")) {
         return await serveAdminRequest(request, env, ctx, url);
       }
@@ -38,12 +42,394 @@ export default {
       return html(notFoundPage(), 404);
     } catch (error) {
       console.error(JSON.stringify({ event: "request_failed", path: url.pathname, method: request.method, error: String(error?.message || error) }));
+      if (url.pathname.startsWith("/api/app/") && isAllowedAppOrigin(request, env)) {
+        return appJson(request, env, { ok: false, error: "INTERNAL_ERROR" }, 500);
+      }
       return url.pathname.startsWith("/api/")
         ? json({ ok: false, error: "INTERNAL_ERROR" }, 500)
         : html(servicePausedPage(), 500);
     }
   },
 };
+
+async function serveAppRequest(request, env, url) {
+  if (!isAllowedAppOrigin(request, env)) return json({ ok: false, error: "ORIGIN_NOT_ALLOWED" }, 403);
+  if (request.method === "OPTIONS") return appResponse(request, env, null, 204);
+
+  const auth = await verifyStaffSession(request, env);
+  if (!auth.ok) return appJson(request, env, { ok: false, error: auth.error }, auth.status);
+
+  if (request.method === "GET" && url.pathname === "/api/app/dashboard") {
+    const data = await loadInvoiceDashboard(env);
+    return appJson(request, env, { ok: true, data: { ...data, user: auth.user.name || auth.user.email || "接続済み" } });
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/app/invoices") {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    try {
+      const invoice = await saveInvoiceRecord(env, payload.value.invoice || {}, auth.user, "保存");
+      return appJson(request, env, { ok: true, data: { invoice } });
+    } catch (error) {
+      return appJson(request, env, { ok: false, error: String(error.message || "INVALID_INVOICE") }, 400);
+    }
+  }
+
+  const paymentMatch = url.pathname.match(/^\/api\/app\/invoices\/([^/]+)\/payment$/);
+  if (request.method === "POST" && paymentMatch) {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    try {
+      const invoiceNumber = decodeURIComponent(paymentMatch[1]);
+      const invoice = await updateInvoicePayment(env, invoiceNumber, payload.value, auth.user);
+      return appJson(request, env, { ok: true, data: { invoice } });
+    } catch (error) {
+      return appJson(request, env, { ok: false, error: String(error.message || "PAYMENT_UPDATE_FAILED") }, 400);
+    }
+  }
+
+  const deleteMatch = url.pathname.match(/^\/api\/app\/invoices\/([^/]+)$/);
+  if (request.method === "DELETE" && deleteMatch) {
+    const invoiceNumber = decodeURIComponent(deleteMatch[1]);
+    const deleted = await softDeleteInvoice(env, invoiceNumber, auth.user);
+    return appJson(request, env, { ok: true, data: { invoiceNumber, deleted } });
+  }
+
+  return appJson(request, env, { ok: false, error: "APP_ROUTE_NOT_FOUND" }, 404);
+}
+
+function isAllowedAppOrigin(request, env) {
+  const origin = request.headers.get("origin") || "";
+  return Boolean(origin && env.APP_ORIGIN && origin === env.APP_ORIGIN);
+}
+
+function appCorsHeaders(request, env) {
+  const headers = new Headers();
+  if (isAllowedAppOrigin(request, env)) headers.set("access-control-allow-origin", request.headers.get("origin"));
+  headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
+  headers.set("access-control-allow-headers", "authorization, content-type");
+  headers.set("access-control-max-age", "600");
+  headers.set("vary", "Origin");
+  return headers;
+}
+
+function appResponse(request, env, body, status = 200) {
+  const headers = appCorsHeaders(request, env);
+  headers.set("cache-control", "no-store");
+  if (body !== null) headers.set("content-type", "application/json; charset=utf-8");
+  return new Response(body === null ? null : JSON.stringify(body), { status, headers });
+}
+
+function appJson(request, env, body, status = 200) {
+  return appResponse(request, env, body, status);
+}
+
+function withAppCors(response, request, env) {
+  const headers = new Headers(response.headers);
+  appCorsHeaders(request, env).forEach((value, key) => headers.set(key, value));
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function verifyStaffSession(request, env) {
+  const authorization = request.headers.get("authorization") || "";
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token || token.length > 2048 || !env.STAFF_AUTH_API_URL) return { ok: false, status: 401, error: "STAFF_LOGIN_REQUIRED" };
+
+  const digest = await sha256Hex(new TextEncoder().encode(token));
+  const cache = caches.default;
+  const cacheKey = new Request(`https://step-auth-cache.invalid/session/${digest}`);
+  const cached = await cache.match(cacheKey);
+  if (cached) return { ok: true, user: await cached.json() };
+
+  let response;
+  try {
+    response = await fetch(env.STAFF_AUTH_API_URL, {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "verifySystemPortal", systemPortalSessionToken: token }),
+    });
+  } catch (_error) {
+    return { ok: false, status: 503, error: "STAFF_AUTH_UNAVAILABLE" };
+  }
+  let result;
+  try { result = await response.json(); } catch (_error) { result = null; }
+  const permissionLevel = String(result?.permissionLevel || result?.data?.permissionLevel || "");
+  const success = response.ok && (result?.success === true || result?.ok === true) && ["2", "3", "4"].includes(permissionLevel);
+  if (!success) return { ok: false, status: 401, error: "STAFF_LOGIN_REQUIRED" };
+  const user = { name: String(result?.name || result?.data?.name || ""), email: String(result?.email || result?.data?.email || ""), permissionLevel };
+  await cache.put(cacheKey, new Response(JSON.stringify(user), { headers: { "content-type": "application/json", "cache-control": "max-age=120" } }));
+  return { ok: true, user };
+}
+
+async function loadInvoiceDashboard(env) {
+  const invoiceQuery = env.DB.prepare(`
+    SELECT i.*,
+      COALESCE(i.customer_code, p.customer_code, '') AS resolved_customer_code,
+      COALESCE(i.partner_name, p.name, '') AS resolved_partner_name,
+      COALESCE(i.honorific, p.honorific, '様') AS resolved_honorific,
+      COALESCE(i.postal_code, p.postal_code, '') AS resolved_postal_code,
+      COALESCE(i.prefecture, p.prefecture, '') AS resolved_prefecture,
+      COALESCE(i.address1, p.address1, '') AS resolved_address1,
+      COALESCE(i.address2, p.address2, '') AS resolved_address2,
+      COALESCE(i.email, p.email, '') AS resolved_email,
+      COALESCE(i.cc_email, p.cc_email, '') AS resolved_cc_email,
+      d.delivery_id, d.status AS delivery_status, d.updated_at AS delivery_updated_at,
+      d.first_opened_at, d.downloaded_at, d.expires_at,
+      it.line_number, it.service_date, it.description, it.unit_price, it.quantity, it.unit, it.amount, it.tax_rate
+    FROM invoices i
+    JOIN partners p ON p.partner_id = i.partner_id
+    LEFT JOIN deliveries d ON d.delivery_id = (
+      SELECT d2.delivery_id FROM deliveries d2 WHERE d2.invoice_id = i.invoice_id ORDER BY d2.updated_at DESC LIMIT 1
+    )
+    LEFT JOIN invoice_items it ON it.invoice_id = i.invoice_id
+    WHERE i.deleted_at IS NULL AND i.invoice_number NOT LIKE 'R%'
+    ORDER BY i.created_at DESC, i.invoice_number DESC, it.line_number ASC
+  `).all();
+  const deliveryHistoryQuery = env.DB.prepare(`
+    SELECT d.updated_at AS timestamp,
+      CASE WHEN d.resend_count > 0 THEN '再送' ELSE '初回送信' END AS action,
+      i.invoice_number, COALESCE(i.partner_name, p.name, '') AS name,
+      d.delivery_id, d.status, d.downloaded_at, d.first_opened_at
+    FROM deliveries d
+    JOIN invoices i ON i.invoice_id = d.invoice_id
+    JOIN partners p ON p.partner_id = i.partner_id
+    WHERE i.deleted_at IS NULL AND i.invoice_number NOT LIKE 'R%'
+    ORDER BY d.updated_at DESC LIMIT 300
+  `).all();
+  const operationHistoryQuery = env.DB.prepare(`
+    SELECT occurred_at AS timestamp, action, target_id AS invoice_number, result, detail_json
+    FROM operation_logs WHERE target_type = 'invoice' ORDER BY occurred_at DESC LIMIT 300
+  `).all();
+  const [rows, deliveryHistory, operationHistory] = await Promise.all([invoiceQuery, deliveryHistoryQuery, operationHistoryQuery]);
+  const byNumber = new Map();
+  for (const row of rows.results || []) {
+    const number = String(row.invoice_number);
+    if (!byNumber.has(number)) byNumber.set(number, invoiceRowToClient(row));
+    if (row.line_number != null) byNumber.get(number).details.push({
+      deliveryDate: row.service_date || "", name: row.description || "", itemCode: "",
+      unitPrice: Number(row.unit_price || 0), quantity: Number(row.quantity || 0), unit: row.unit || "",
+      amount: Number(row.amount || 0), taxRate: `${Math.round(Number(row.tax_rate || 0) * 100)}%`,
+    });
+  }
+  const deliveryEvents = (deliveryHistory.results || []).map(row => {
+    const state = deliveryState(row.status, row.first_opened_at, row.downloaded_at);
+    return { timestamp: row.timestamp || "", action: row.action || "初回送信", invoiceNumber: row.invoice_number || "", name: row.name || "", deliveryId: maskIdentifier(row.delivery_id), sendStatus: state.sendStatus, urlStatus: state.dlStatus, result: "正常" };
+  });
+  const operationEvents = (operationHistory.results || []).map(row => ({ timestamp: row.timestamp || "", action: row.action || "更新", invoiceNumber: row.invoice_number || "", name: "", deliveryId: "", sendStatus: "", urlStatus: "", result: row.result || "正常" }));
+  return {
+    invoices: [...byNumber.values()],
+    history: deliveryEvents.concat(operationEvents).sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp))).slice(0, 300),
+  };
+}
+
+function maskIdentifier(value) {
+  const text = String(value || "");
+  return text.length <= 8 ? text : `${text.slice(0, 4)}…${text.slice(-4)}`;
+}
+
+function invoiceRowToClient(row) {
+  const delivery = deliveryState(row.delivery_status, row.first_opened_at, row.downloaded_at);
+  return {
+    invoiceNumber: String(row.invoice_number || ""), customerCode: row.resolved_customer_code || "",
+    partnerName: row.resolved_partner_name || "", honorific: row.resolved_honorific || "様",
+    subject: row.subject_month || "", invoiceDate: row.issue_date || "", dueDate: row.due_date || "",
+    postal: row.resolved_postal_code || "", prefecture: row.resolved_prefecture || "", address1: row.resolved_address1 || "", address2: row.resolved_address2 || "",
+    memo: row.memo || "", tags: row.tags || "", paymentStatus: row.payment_status || "未入金",
+    paymentDate: row.payment_date || "", paymentAmount: row.payment_amount == null ? "" : Number(row.payment_amount), paymentMemo: row.payment_memo || "",
+    bank: row.bank || "", note: row.note || "", subtotal: Number(row.subtotal || 0), tax: Number(row.tax || 0), total: Number(row.total || 0),
+    email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.status === "ready" && row.r2_object_key ? "PDF作成済み" : "未作成",
+    pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
+    sendStatus: delivery.sendStatus, sentAt: row.delivery_updated_at || "", dlStatus: delivery.dlStatus,
+    downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
+  };
+}
+
+function deliveryState(status, openedAt, downloadedAt) {
+  if (downloadedAt || status === "downloaded") return { sendStatus: "送信済み", dlStatus: "DL済" };
+  if (openedAt || status === "opened") return { sendStatus: "送信済み", dlStatus: "URLアクセス済み" };
+  if (status === "sent") return { sendStatus: "送信済み", dlStatus: "未アクセス" };
+  if (status === "revoked") return { sendStatus: "無効化", dlStatus: "無効化" };
+  if (status === "pending") return { sendStatus: "送信待ち", dlStatus: "送信前" };
+  return { sendStatus: "未送信", dlStatus: "未取得" };
+}
+
+async function saveInvoiceRecord(env, rawInvoice, actor = {}, action = "保存") {
+  const invoice = normalizeInvoice(rawInvoice);
+  const now = new Date().toISOString();
+  const actorName = String(actor.name || actor.email || "staff").slice(0, 200);
+  const partnerId = `partner:${invoice.customerCode}`;
+  const invoiceId = `invoice:${invoice.invoiceNumber}`;
+  const statements = [
+    env.DB.prepare(`
+      INSERT INTO partners (partner_id, customer_code, name, name_kana, honorific, postal_code, prefecture, address1, address2, phone, email, cc_email, created_at, updated_at)
+      VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7, ?8, '', ?9, ?10, ?11, ?11)
+      ON CONFLICT(customer_code) DO UPDATE SET name=excluded.name, honorific=excluded.honorific,
+        postal_code=excluded.postal_code, prefecture=excluded.prefecture, address1=excluded.address1,
+        address2=excluded.address2, email=excluded.email, cc_email=excluded.cc_email, updated_at=excluded.updated_at
+    `).bind(partnerId, invoice.customerCode, invoice.partnerName, invoice.honorific, invoice.postal, invoice.prefecture, invoice.address1, invoice.address2, invoice.email, invoice.cc, now),
+    env.DB.prepare(`
+      INSERT INTO invoices (
+        invoice_id, invoice_number, partner_id, subject_month, issue_date, due_date,
+        subtotal, tax, total, status, created_at, updated_at,
+        customer_code, partner_name, honorific, postal_code, prefecture, address1, address2,
+        email, cc_email, memo, tags, payment_status, payment_date, payment_amount,
+        payment_memo, bank, note, deleted_at, created_by, updated_by
+      ) VALUES (
+        ?1, ?2, (SELECT partner_id FROM partners WHERE customer_code=?3), ?4, ?5, ?6, ?7, ?8, ?9, 'draft', ?10, ?11,
+        ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25,
+        ?26, ?27, ?28, NULL, ?29, ?29
+      )
+      ON CONFLICT(invoice_number) DO UPDATE SET
+        partner_id=excluded.partner_id, subject_month=excluded.subject_month, issue_date=excluded.issue_date,
+        due_date=excluded.due_date, subtotal=excluded.subtotal, tax=excluded.tax, total=excluded.total,
+        status='draft',
+        updated_at=excluded.updated_at, customer_code=excluded.customer_code, partner_name=excluded.partner_name,
+        honorific=excluded.honorific, postal_code=excluded.postal_code, prefecture=excluded.prefecture,
+        address1=excluded.address1, address2=excluded.address2, email=excluded.email, cc_email=excluded.cc_email,
+        memo=excluded.memo, tags=excluded.tags, payment_status=excluded.payment_status,
+        payment_date=excluded.payment_date, payment_amount=excluded.payment_amount, payment_memo=excluded.payment_memo,
+        bank=excluded.bank, note=excluded.note, deleted_at=NULL, updated_by=excluded.updated_by
+    `).bind(
+      invoiceId, invoice.invoiceNumber, invoice.customerCode, invoice.subject, invoice.invoiceDate, invoice.dueDate,
+      invoice.subtotal, invoice.tax, invoice.total, invoice.createdAt || now, now,
+      invoice.customerCode, invoice.partnerName, invoice.honorific, invoice.postal, invoice.prefecture,
+      invoice.address1, invoice.address2, invoice.email, invoice.cc, invoice.memo, invoice.tags,
+      invoice.paymentStatus, invoice.paymentDate || null, invoice.paymentAmount === "" ? null : invoice.paymentAmount,
+      invoice.paymentMemo, invoice.bank, invoice.note, actorName,
+    ),
+    env.DB.prepare("DELETE FROM invoice_items WHERE invoice_id = (SELECT invoice_id FROM invoices WHERE invoice_number = ?1)").bind(invoice.invoiceNumber),
+  ];
+  invoice.details.forEach((item, index) => statements.push(env.DB.prepare(`
+    INSERT INTO invoice_items (item_id, invoice_id, line_number, service_date, description, unit_price, quantity, unit, amount, tax_rate)
+    VALUES (?1, (SELECT invoice_id FROM invoices WHERE invoice_number = ?2), ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+  `).bind(`${invoiceId}:item:${index + 1}`, invoice.invoiceNumber, index + 1, item.deliveryDate, item.name, item.unitPrice, item.quantity, item.unit, item.amount, item.taxRate)));
+  statements.push(operationLogStatement(env, actorName, action, invoice.invoiceNumber, now, { total: invoice.total }));
+  await env.DB.batch(statements);
+  return loadInvoiceByNumber(env, invoice.invoiceNumber);
+}
+
+function normalizeInvoice(raw) {
+  const invoiceNumber = String(raw.invoiceNumber || "").trim();
+  const customerCode = String(raw.customerCode || "").trim();
+  const partnerName = String(raw.partnerName || "").trim();
+  const invoiceDate = String(raw.invoiceDate || raw.issueDate || "").trim();
+  if (!/^\d{9}$/.test(invoiceNumber)) throw new Error("請求書番号は9桁の数字で入力してください。");
+  if (!customerCode || !partnerName) throw new Error("取引先を選択してください。");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) throw new Error("請求日を入力してください。");
+  const details = (Array.isArray(raw.details) ? raw.details : []).slice(0, 100).map((item, index) => {
+    const name = String(item.name || "").trim();
+    const unitPrice = strictMoney(item.unitPrice);
+    const quantity = Number(item.quantity == null ? 1 : item.quantity);
+    if (!name || !Number.isFinite(quantity) || quantity <= 0) throw new Error(`明細${index + 1}を正しく入力してください。`);
+    return { deliveryDate: String(item.deliveryDate || ""), name, unitPrice, quantity, unit: String(item.unit || ""), amount: strictMoney(item.amount == null ? unitPrice * quantity : item.amount), taxRate: positiveTaxRate(item.taxRate) };
+  });
+  if (!details.length) throw new Error("請求明細を1行以上入力してください。");
+  const subtotal = strictNonNegativeMoney(raw.subtotal);
+  const tax = strictNonNegativeMoney(raw.tax);
+  const total = strictNonNegativeMoney(raw.total);
+  if (subtotal + tax !== total) throw new Error("税抜小計と消費税額の合計が請求金額と一致しません。");
+  const paymentStatus = ["未設定", "未入金", "入金済"].includes(String(raw.paymentStatus)) ? String(raw.paymentStatus) : "未入金";
+  const paymentAmount = paymentStatus === "入金済" ? strictNonNegativeMoney(raw.paymentAmount === "" || raw.paymentAmount == null ? total : raw.paymentAmount) : "";
+  return {
+    invoiceNumber, customerCode, partnerName, invoiceDate, details, subtotal, tax, total, paymentStatus, paymentAmount,
+    subject: String(raw.subject || ""), dueDate: String(raw.dueDate || ""), honorific: String(raw.honorific || "様"),
+    postal: String(raw.postal || ""), prefecture: String(raw.prefecture || ""), address1: String(raw.address1 || ""), address2: String(raw.address2 || ""),
+    email: String(raw.email || ""), cc: String(raw.cc || ""), memo: String(raw.memo || ""), tags: String(raw.tags || ""),
+    paymentDate: paymentStatus === "入金済" ? String(raw.paymentDate || "") : "", paymentMemo: paymentStatus === "入金済" ? String(raw.paymentMemo || "") : "",
+    bank: String(raw.bank || ""), note: String(raw.note || ""), createdAt: String(raw.createdAt || ""),
+  };
+}
+
+function strictMoney(value) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) throw new Error("金額を半角数字で入力してください。");
+  return number;
+}
+
+function strictNonNegativeMoney(value) {
+  const number = strictMoney(value);
+  if (number < 0) throw new Error("請求額合計は0円以上にしてください。");
+  return number;
+}
+
+function operationLogStatement(env, actor, action, invoiceNumber, now, detail = {}) {
+  return env.DB.prepare(`INSERT INTO operation_logs (log_id, actor_user_id, action, target_type, target_id, result, detail_json, occurred_at)
+    VALUES (?1, NULL, ?2, 'invoice', ?3, '成功', ?4, ?5)`)
+    .bind(crypto.randomUUID(), String(action), String(invoiceNumber), JSON.stringify({ actor, ...detail }), now);
+}
+
+async function loadInvoiceByNumber(env, invoiceNumber) {
+  const rows = await env.DB.prepare(`
+    SELECT i.*,
+      COALESCE(i.customer_code, p.customer_code, '') AS resolved_customer_code,
+      COALESCE(i.partner_name, p.name, '') AS resolved_partner_name,
+      COALESCE(i.honorific, p.honorific, '様') AS resolved_honorific,
+      COALESCE(i.postal_code, p.postal_code, '') AS resolved_postal_code,
+      COALESCE(i.prefecture, p.prefecture, '') AS resolved_prefecture,
+      COALESCE(i.address1, p.address1, '') AS resolved_address1,
+      COALESCE(i.address2, p.address2, '') AS resolved_address2,
+      COALESCE(i.email, p.email, '') AS resolved_email,
+      COALESCE(i.cc_email, p.cc_email, '') AS resolved_cc_email,
+      d.status AS delivery_status, d.updated_at AS delivery_updated_at, d.first_opened_at, d.downloaded_at, d.expires_at,
+      it.line_number, it.service_date, it.description, it.unit_price, it.quantity, it.unit, it.amount, it.tax_rate
+    FROM invoices i JOIN partners p ON p.partner_id=i.partner_id
+    LEFT JOIN deliveries d ON d.delivery_id=(SELECT d2.delivery_id FROM deliveries d2 WHERE d2.invoice_id=i.invoice_id ORDER BY d2.updated_at DESC LIMIT 1)
+    LEFT JOIN invoice_items it ON it.invoice_id=i.invoice_id
+    WHERE i.invoice_number=?1 AND i.deleted_at IS NULL ORDER BY it.line_number ASC
+  `).bind(invoiceNumber).all();
+  const first = rows.results?.[0];
+  const invoice = first ? invoiceRowToClient(first) : null;
+  for (const row of rows.results || []) if (row.line_number != null) invoice.details.push({
+    deliveryDate: row.service_date || "", name: row.description || "", itemCode: "", unitPrice: Number(row.unit_price || 0),
+    quantity: Number(row.quantity || 0), unit: row.unit || "", amount: Number(row.amount || 0), taxRate: `${Math.round(Number(row.tax_rate || 0) * 100)}%`,
+  });
+  if (!invoice) throw new Error("請求書が見つかりません。");
+  return invoice;
+}
+
+async function updateInvoicePayment(env, invoiceNumber, input, actor) {
+  if (!/^\d{9}$/.test(String(invoiceNumber))) throw new Error("請求書番号が不正です。");
+  const status = String(input.paymentStatus || "未入金");
+  if (!["未設定", "未入金", "入金済"].includes(status)) throw new Error("入金状態が不正です。");
+  const date = status === "入金済" ? String(input.paymentDate || "") : "";
+  if (status === "入金済" && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("入金日を入力してください。");
+  const amount = status === "入金済" ? strictNonNegativeMoney(input.paymentAmount) : null;
+  const now = new Date().toISOString();
+  const actorName = String(actor.name || actor.email || "staff").slice(0, 200);
+  const update = env.DB.prepare(`UPDATE invoices SET payment_status=?1, payment_date=?2, payment_amount=?3,
+    payment_memo=?4, updated_at=?5, updated_by=?6 WHERE invoice_number=?7 AND deleted_at IS NULL`)
+    .bind(status, date || null, amount, status === "入金済" ? String(input.paymentMemo || "") : "", now, actorName, invoiceNumber);
+  const result = await env.DB.batch([update, operationLogStatement(env, actorName, `入金状態を${status}に更新`, invoiceNumber, now, { paymentDate: date, paymentAmount: amount })]);
+  if (!Number(result[0]?.meta?.changes || 0)) throw new Error("請求書が見つかりません。");
+  return loadInvoiceByNumber(env, invoiceNumber);
+}
+
+async function softDeleteInvoice(env, invoiceNumber, actor) {
+  if (!/^\d{9}$/.test(String(invoiceNumber))) return 0;
+  const now = new Date().toISOString();
+  const actorName = String(actor.name || actor.email || "staff").slice(0, 200);
+  const invoice = await env.DB.prepare("SELECT invoice_id FROM invoices WHERE invoice_number=?1 AND deleted_at IS NULL LIMIT 1").bind(invoiceNumber).first();
+  if (!invoice) return 0;
+  const results = await env.DB.batch([
+    env.DB.prepare("UPDATE invoices SET deleted_at=?1, updated_at=?1, updated_by=?2 WHERE invoice_id=?3").bind(now, actorName, invoice.invoice_id),
+    env.DB.prepare("UPDATE deliveries SET status='revoked', revoked_at=?1, updated_at=?1 WHERE invoice_id=?2 AND status!='revoked'").bind(now, invoice.invoice_id),
+    operationLogStatement(env, actorName, "削除", invoiceNumber, now),
+  ]);
+  return Number(results[0]?.meta?.changes || 0);
+}
+
+async function importInvoices(request, env) {
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
+  const invoices = Array.isArray(payload.value.invoices) ? payload.value.invoices.slice(0, 100) : [];
+  if (!invoices.length) return json({ ok: false, error: "NO_INVOICES" }, 400);
+  const imported = [];
+  for (const invoice of invoices) {
+    const saved = await saveInvoiceRecord(env, invoice, { name: "apps-script-migration" }, "D1移行");
+    imported.push(saved.invoiceNumber);
+  }
+  return json({ ok: true, imported, count: imported.length });
+}
 
 async function serveAdminRequest(request, env, ctx, url) {
   if (env.EMERGENCY_STOP === "true" || env.ADMIN_API_ENABLED !== "true") {
@@ -55,6 +441,10 @@ async function serveAdminRequest(request, env, ctx, url) {
 
   if (request.method === "POST" && url.pathname === "/api/admin/invoices") {
     return uploadInvoice(request, env, ctx);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/admin/migrations/invoices") {
+    return importInvoices(request, env);
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/deliveries") {
@@ -493,9 +883,10 @@ function positiveQuantity(value) {
 }
 
 function positiveTaxRate(value) {
-  const number = Number(value == null ? 0.1 : value);
+  const raw = String(value == null ? "0.1" : value).trim();
+  const number = Number(raw.replace(/%$/, ""));
   if (!Number.isFinite(number) || number < 0) return 0.1;
-  return number > 1 ? number / 100 : number;
+  return raw.endsWith("%") || number > 1 ? number / 100 : number;
 }
 
 function validFutureDate(value) {
@@ -563,3 +954,5 @@ function escapeHtml(value) {
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[char]);
 }
+
+export const __test = { normalizeInvoice, deliveryState, positiveTaxRate };

@@ -8,7 +8,7 @@
 - PDFをGoogle Driveへ保存しない
 - Cloudflare R2バケットを公開しない
 - 請求書番号や顧客コードをダウンロードURLへ含めない
-- トークンはハッシュ化してSpreadsheetへ保存する
+- トークンはハッシュ化してCloudflare D1へ保存する
 - URLアクセスとPDF取得を別々に記録する
 - 本番メール送信は `PRODUCTION_SEND_APPROVED=true` になるまで拒否する
 - 管理APIはデプロイURLに加えて管理APIキーで認証する
@@ -28,7 +28,9 @@
 4. Apps ScriptのScript Propertiesへ `CLOUDFLARE_API_URL` と、Workerと同じ `CLOUDFLARE_ADMIN_API_KEY` を設定する。
 5. Webアプリとして「自分として実行」「全員がアクセス可」でデプロイする。Apps Scriptは管理APIとメール送信を担当し、PDF配信はCloudflareだけが担当する。
 6. `基本設定` シートの `webAppUrl` をデプロイURLへ更新する。
-7. GitHub Pages管理画面の基本設定へデプロイURLと管理APIキーを入力する。
+7. GitHub Pages管理画面の詳細設定へApps ScriptデプロイURLを入力する。Cloudflareの管理APIキーはブラウザへ入力しない。
+
+請求書一覧・通常の保存・編集・入金更新・削除はCloudflare D1へ直接接続します。Apps Scriptは取引先・設定との互換処理、PDF準備、メールキューに限定しています。本番切替順は `cloudflare/README.md` を参照してください。
 
 ## PDF金額ルール
 

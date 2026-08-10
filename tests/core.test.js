@@ -38,13 +38,16 @@ assert.deepEqual(C.DEMO_PARTNERS.map(p=>p['メールアドレス']),[
   'skase.days@gmail.com',
   'chloeandnina1@gmail.com'
 ]);
-const studentPartner=C.studentToPartner({studentCode:'999',name:'テスト生徒',kana:'テストセイト',grade:'小５',postal:'4850802',addressU:'愛知県小牧市大草',addressV:'1220',addressW:'テストハイツ101',email:'student@example.com'});
+const studentPartner=C.studentToPartner({studentCode:'999',name:'テスト生徒',kana:'テストセイト',grade:'小５',classroom:'神領校',postal:'4850802',addressU:'愛知県小牧市大草',addressV:'1220',addressW:'テストハイツ101',email:'student@example.com'});
 assert.equal(studentPartner['顧客コード'],'999');
 assert.equal(studentPartner['都道府県'],'愛知県');
 assert.equal(studentPartner['住所1'],'小牧市大草1220');
 assert.equal(studentPartner['住所2'],'テストハイツ101');
 assert.equal(studentPartner['郵便番号'],'485-0802');
-assert.match(studentPartner['メモ'],/小５/);
+assert.equal(studentPartner['学年'],'小５');
+assert.equal(studentPartner['教室'],'神領');
+assert.deepEqual(C.partnerDocumentDefaults(studentPartner),{memo:'小５',tags:'神領'});
+assert.deepEqual(C.partnerDocumentDefaults({'メモ':'生徒マスタから取込（学年：中2）','教室':'大手町校'}),{memo:'中2',tags:'大手'});
 assert.equal(C.normalizeStudentCode(' １３２０ '),'1320');
 assert.equal(C.normalizeStudentCode(' Ａb１２ '),'Ab12');
 const manual=C.buildManualInvoice({invoiceNumber:'202608101',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-31',note:'個別作成テスト'},[

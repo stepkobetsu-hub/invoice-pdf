@@ -22,20 +22,35 @@ window.HTMLFormElement.prototype.submit=function(){
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
 };
 window.print=()=>{};
-window.fetch=async()=>({ok:true,json:async()=>({status:200,results:[{address1:'愛知県',address2:'春日井市',address3:'大留町'}]})});
+window.fetch=async(url,options={})=>{
+  if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
+    if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{invoices:[],history:[],user:'テスト担当者'}})};
+    if(String(url).endsWith('/api/app/invoices')){const invoice=JSON.parse(options.body).invoice;return {ok:true,json:async()=>({ok:true,data:{invoice:{...invoice,details:invoice.details||[],sendStatus:'未送信',dlStatus:'未取得',pdfStatus:'未作成',warnings:[]}}})};}
+  }
+  return {ok:true,json:async()=>({status:200,results:[{address1:'愛知県',address2:'春日井市',address3:'大留町'}]})};
+};
 window.eval(fs.readFileSync(path.join(root, 'assets/core.js'), 'utf8'));
 window.eval(fs.readFileSync(path.join(root, 'assets/invoice-pdf.js'), 'utf8'));
 window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
 
 async function main(){
   const document=window.document;
-  assert.equal(document.querySelector('#view-partners').classList.contains('active'),true);
+  assert.equal(document.querySelector('#view-invoices').classList.contains('active'),true);
+  assert.equal(window.location.hash,'#invoices');
+  assert.equal(window.StepInvoiceApp.initialViewForNavigation('navigate','#settings'),'invoices');
+  assert.equal(window.StepInvoiceApp.initialViewForNavigation('reload','#settings'),'settings');
+  assert.equal(window.StepInvoiceApp.initialViewForNavigation('back_forward','#receipts'),'receipts');
   document.querySelector('[data-view="create"]').click();
   assert.equal(window.location.hash,'#create');
   document.querySelector('[data-create-method="single"]').click();
   await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.equal(submittedStaffToken,'test-staff-session');
   assert.equal(document.querySelector('#createSinglePane').classList.contains('active'),true);
+  assert.ok(document.querySelector('.single-invoice-editor-layout'));
+  assert.ok(document.querySelector('.single-invoice-editor-fields'));
+  assert.ok(document.querySelector('.single-invoice-live-preview'));
+  assert.ok(document.querySelector('#singleInvoiceLivePreview .invoice-page'));
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/取引先未選択/);
   assert.match(document.querySelector('[name="invoiceNumber"]').value,/^\d{9}$/);
   assert.equal(document.querySelector('[name="invoiceNumber"]').readOnly,true);
   const invoiceDate=document.querySelector('[name="invoiceDate"]').value;
@@ -94,6 +109,9 @@ async function main(){
   document.querySelector('[name="detailQuantity"]').value='1';
   document.querySelector('[name="detailUnitPrice"]').dispatchEvent(new window.Event('input',{bubbles:true}));
   assert.equal(document.querySelector('#singleTotal').textContent,'27,500円');
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/ダミー取引先1/);
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/202608501/);
+  assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/27,500/);
   document.querySelector('#previewSingleInvoice').click();
   assert.equal(document.querySelector('#previewDialog').open,true);
   assert.equal(document.querySelectorAll('#previewDialog #printPreview').length,1);
@@ -119,11 +137,16 @@ async function main(){
   partnerForm.elements.customerCode.value='NEW001';
   partnerForm.elements.name.value='個別入力テスト';
   partnerForm.elements.email.value='new@example.com';
+  partnerForm.elements.grade.value='中2';
+  partnerForm.elements.campus.value='神領';
   partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト/);
   document.querySelector('#singlePartnerSearch').value='NEW001';
   document.querySelector('#singlePartnerSearch').dispatchEvent(new window.Event('input',{bubbles:true}));
   assert.match(document.querySelector('#singlePartnerResults').textContent,/個別入力テスト/);
+  document.querySelector('#singlePartnerResults [data-partner-code="NEW001"]').click();
+  assert.equal(form.elements.memo.value,'中2');
+  assert.equal(form.elements.tags.value,'神領');
   document.querySelector('[data-edit-partner="NEW001"]').click();
   assert.equal(document.querySelector('#partnerDialogTitle').textContent,'取引先を編集');
   assert.equal(partnerForm.elements.customerCode.readOnly,true);
