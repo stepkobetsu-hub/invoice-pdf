@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-pdf-layout-fix" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260810-settings-save-status" defer></script>
+  <script src="assets/app.js?v=20260810-student-import-home" defer></script>
   <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
@@ -24,7 +24,7 @@
     </div>
   </div>
   <header class="topbar">
-    <div class="brand"><img src="assets/step-logo.png?v=20260802-logo" alt="個別指導ステップ"><div><strong>STEP請求書</strong><span>PDF作成・配信システム</span></div></div>
+    <button id="brandHome" class="brand brand-home" type="button" aria-label="請求書一覧へ戻る"><img src="assets/step-logo.png?v=20260802-logo" alt="個別指導ステップ"><span class="brand-copy"><strong>STEP請求書</strong><small>PDF作成・配信システム</small></span></button>
     <div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">未接続</span><a id="staffLoginLink" class="staff-login-link" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログイン</a></div>
   </header>
   <div class="app-shell">
@@ -63,7 +63,7 @@
               <div class="single-invoice-editor-fields">
                 <div class="individual-heading"><div><h2>請求書を1件作成</h2><p>左側で入力し、右側のプレビューで仕上がりを確認できます。</p></div><button id="loadDemoPartners" class="button secondary" type="button">ダミー取引先4件を再表示</button></div>
                 <div class="form-grid">
-                  <label><span class="field-label-row"><span>取引先<span class="required">必須</span></span><button id="goPartnerCreate" class="mini-link" type="button">取引先マスタ登録へ</button></span><span id="singlePartnerCombo" class="partner-combobox"><input id="singlePartnerSearch" type="text" role="combobox" aria-expanded="false" aria-controls="singlePartnerResults" autocomplete="off" placeholder="名称・顧客コード・メールで検索"><button type="button" aria-label="取引先一覧を開く">▼</button><span id="singlePartnerResults" class="partner-combobox-results hidden" role="listbox"></span></span><input id="singlePartner" name="partnerCode" type="hidden"></label>
+                  <label><span class="field-label-row"><span>取引先<span class="required">必須</span></span><span class="field-label-actions"><button id="openStudentImportFromInvoice" class="mini-link" type="button">生徒マスタから取込</button><button id="goPartnerCreate" class="mini-link" type="button">取引先マスタ登録へ</button></span></span><span id="singlePartnerCombo" class="partner-combobox"><input id="singlePartnerSearch" type="text" role="combobox" aria-expanded="false" aria-controls="singlePartnerResults" autocomplete="off" placeholder="名称・顧客コード・メールで検索"><button type="button" aria-label="取引先一覧を開く">▼</button><span id="singlePartnerResults" class="partner-combobox-results hidden" role="listbox"></span></span><input id="singlePartner" name="partnerCode" type="hidden"></label>
                   <label>請求書番号<span class="required">自動作成</span><input name="invoiceNumber" inputmode="numeric" pattern="[0-9]{9,}" readonly required></label>
                   <label>件名<span class="required">必須</span><input name="subject" placeholder="例：2026年8月分" required></label>
                   <label>請求日<span class="required">必須</span><input name="invoiceDate" type="date" required></label>
