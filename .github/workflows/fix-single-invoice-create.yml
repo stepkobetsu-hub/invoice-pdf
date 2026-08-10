@@ -1,0 +1,56 @@
+name: Fix single invoice create
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-single-invoice-create.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix invoice number refresh and save UI
+        shell: python
+        run: |
+          from pathlib import Path
+
+          app = Path('assets/app.js')
+          s = app.read_text(encoding='utf-8')
+
+          old = "async function prepareSingleInvoice(){setSingleDefaults();if(state.dashboardLoaded){updateSingleLivePreview();return;}try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
+          new = "async function prepareSingleInvoice(){setSingleDefaults();try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
+          if old not in s:
+            raise SystemExit('prepareSingleInvoice target not found')
+          s = s.replace(old, new, 1)
+
+          old = "save.textContent=enabled?'保存する':'保存して発行リストへ追加';"
+          new = "save.textContent='保存';"
+          if old not in s:
+            raise SystemExit('save label target not found')
+          s = s.replace(old, new, 1)
+          app.write_text(s, encoding='utf-8')
+
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          preview = '<button id="previewSingleInvoice" class="button secondary" type="button">大きくプレビュー</button>'
+          if preview not in h:
+            raise SystemExit('preview button target not found')
+          h = h.replace(preview, '', 1)
+          h = h.replace('<button id="saveSingleInvoice" class="button primary" type="submit">保存して発行リストへ追加</button>', '<button id="saveSingleInvoice" class="button primary" type="submit">保存</button>', 1)
+          h = h.replace('assets/app.js?v=20260811-production-mail', 'assets/app.js?v=20260811-single-number-save', 1)
+          index.write_text(h, encoding='utf-8')
+
+      - name: Syntax check
+        run: node --check assets/app.js
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'stepkobetsu-hub'
+          git config user.email 'stepkobetsu-hub@users.noreply.github.com'
+          git add assets/app.js index.html
+          git commit -m '個別請求書の採番を最新化し保存UIを簡素化'
+          git push
