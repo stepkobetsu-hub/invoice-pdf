@@ -157,6 +157,8 @@ async function main(){
   assert.equal(document.querySelector('#removeSelectedCreateRows').textContent,'選択した1件を削除');
   assert.equal(document.querySelector('#removeSelectedCreateRowsTop').disabled,false);
   assert.equal(document.querySelector('#removeSelectedCreateRowsTop').textContent,'選択した1件を削除');
+  assert.equal(document.querySelector('#addToSendTop').disabled,false);
+  assert.equal(document.querySelector('#addToSendTop').textContent,'保存して請求書を作成');
   document.querySelector('#removeSelectedCreateRowsTop').click();
   assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/202608501/);
   assert.match(document.querySelector('#invoiceImportSummary').textContent,/削除件数/);
