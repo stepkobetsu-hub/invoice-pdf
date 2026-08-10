@@ -23,7 +23,7 @@
 - ブランチ: `feature/bank-payment-reconciliation`
 - 仕様・migration・復旧手順: `docs/BANK_PAYMENT_RECONCILIATION.md`
 - migration: `cloudflare/migrations/0005_bank_payment_reconciliation.sql`
-- 状態: SMBC Web21 / Trunkの実CSV確認待ち。本番未反映。
+- 状態: 実CSV（CP932固定レコード形式）確認・取込アダプター実装済み。本番未反映。
 
 ## 2. 関連するが、請求書本体とは別のもの
 
