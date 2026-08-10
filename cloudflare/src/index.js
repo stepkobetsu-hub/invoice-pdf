@@ -926,10 +926,10 @@ function downloadPage({ token, total, invoiceNumber, partnerName, dueDate, expir
   const isReceipt=documentType==="receipt",label=isReceipt?"領収書":"請求書";
   return `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>STEP${label}ダウンロード</title><style>${pageCss()}</style></head>
+<title>個別指導ステップ ${label}ダウンロード</title><style>${pageCss()}</style></head>
 <body><main class="card"><div class="brand">個別指導ステップ</div>
 <h1>${label}ダウンロード</h1>
-<p class="lead">${escapeHtml(partnerName)} 様の${label}をご用意しました。</p>
+<p class="lead">個別指導ステップより ${escapeHtml(partnerName)}様に${label}が届いています。</p>
 <dl><div class="invoice-total"><dt>${isReceipt?"領収金額":"ご請求金額"}</dt><dd>${escapeHtml(formatMoney(total))}</dd></div><div><dt>${label}番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div>${isReceipt?"":`<div><dt>お支払期限</dt><dd>${escapeHtml(formatDate(dueDate))}</dd></div>`}</dl>
 <a class="button" href="/d/${encodeURIComponent(token)}/pdf">${label}PDFを表示・ダウンロード</a>
 <p class="download-expiry">ダウンロード期限：${escapeHtml(formatDate(expiresAt))}</p>
