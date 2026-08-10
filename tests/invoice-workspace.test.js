@@ -45,6 +45,8 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   const document=window.document;
   assert.equal(JSON.parse(window.localStorage.getItem('stepInvoiceSettings')).apiUrl,'https://script.google.com/macros/s/AKfycbwo1DdSQ2eUVVU35v1TqermHTgIEsT1u4U-M_67KfA50VelbHsh28W_pec56OlyBkxqaw/exec');
   assert.equal(document.querySelector('#view-invoices').classList.contains('active'),true);
+  assert.ok(document.querySelector('#brandHome'));
+  assert.ok(document.querySelector('#openStudentImportFromInvoice'));
   assert.equal(document.querySelectorAll('.app-shell > .sidebar').length,1);
   assert.equal(document.querySelectorAll('#invoiceList .invoice-list-item').length,2);
   assert.match(document.querySelector('#invoiceList .invoice-list-item:first-child').textContent,/最新の取引先/);
