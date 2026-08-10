@@ -33,7 +33,7 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const plusDays=(dateValue,days)=>{const [year,month,day]=String(dateValue).split('-').map(Number),date=new Date(year,month-1,day);date.setDate(date.getDate()+days);return localIso(date);};
   function alert(message,type='warning'){const el=$('#globalAlert');el.textContent=message;el.className=`alert ${type}`;setTimeout(()=>el.classList.add('hidden'),7000);}
-  let operationOverlayCount=1;
+  let operationOverlayCount=0;
   function showOperationOverlay(message){operationOverlayCount+=1;const overlay=$('#operationOverlay');if(!overlay)return;$('#operationOverlayText').textContent=message;overlay.classList.remove('hidden');overlay.setAttribute('aria-busy','true');}
   function hideOperationOverlay(){operationOverlayCount=Math.max(0,operationOverlayCount-1);if(operationOverlayCount)return;const overlay=$('#operationOverlay');if(!overlay)return;overlay.classList.add('hidden');overlay.setAttribute('aria-busy','false');}
   function activateStep(index){$$('#createSteps li').forEach((el,i)=>{el.classList.toggle('active',i===index);el.classList.toggle('done',i<index);});}
