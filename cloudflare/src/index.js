@@ -1,5 +1,6 @@
 import { html, json } from "./core/http.js";
 import { hashOpaqueToken, isOpaqueToken } from "./core/token.js";
+import { cancelBankMatch, confirmBankMatch, importNormalizedBankTransactions, loadBankReconciliation, setBankTransactionExcluded } from "./bank-reconciliation-store.js";
 
 const UNAVAILABLE_REASON = "このURLは利用できません。";
 
@@ -62,6 +63,30 @@ async function serveAppRequest(request, env, url) {
   if (request.method === "GET" && url.pathname === "/api/app/dashboard") {
     const data = await loadInvoiceDashboard(env);
     return appJson(request, env, { ok: true, data: { ...data, user: auth.user.name || auth.user.email || "接続済み" } });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/app/bank-reconciliation") {
+    return appJson(request, env, { ok: true, data: await loadBankReconciliation(env) });
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/app/bank-transactions/import") {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    try { return appJson(request, env, { ok: true, data: await importNormalizedBankTransactions(env, payload.value, auth.user) }); }
+    catch (error) { return appJson(request, env, { ok: false, error: String(error.message || "BANK_IMPORT_FAILED") }, 400); }
+  }
+
+  const bankAction = url.pathname.match(/^\/api\/app\/bank-transactions\/([^/]+)\/(match|cancel-match|exclude|unexclude)$/);
+  if (request.method === "POST" && bankAction) {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    const transactionId = decodeURIComponent(bankAction[1]);
+    try {
+      if (bankAction[2] === "match") return appJson(request, env, { ok: true, data: await confirmBankMatch(env, transactionId, String(payload.value.invoiceNumber || ""), auth.user) });
+      if (bankAction[2] === "cancel-match") return appJson(request, env, { ok: true, data: await cancelBankMatch(env, transactionId, payload.value.reason, auth.user) });
+      await setBankTransactionExcluded(env, transactionId, bankAction[2] === "exclude", payload.value.reason, auth.user);
+      return appJson(request, env, { ok: true, data: { bankTransactionId: transactionId } });
+    } catch (error) { return appJson(request, env, { ok: false, error: String(error.message || "BANK_RECONCILIATION_FAILED") }, 400); }
   }
 
   if (request.method === "POST" && url.pathname === "/api/app/invoices") {
@@ -173,6 +198,8 @@ async function loadInvoiceDashboard(env) {
       COALESCE(i.address2, p.address2, '') AS resolved_address2,
       COALESCE(i.email, p.email, '') AS resolved_email,
       COALESCE(i.cc_email, p.cc_email, '') AS resolved_cc_email,
+      (SELECT COUNT(*) FROM bank_transactions bt
+       WHERE bt.deposit_amount=i.total AND bt.reconciliation_status IN ('pending','candidate','review')) AS bank_candidate_count,
       d.delivery_id, d.status AS delivery_status, d.updated_at AS delivery_updated_at,
       d.first_opened_at, d.downloaded_at, d.expires_at,
       it.line_number, it.service_date, it.description, it.unit_price, it.quantity, it.unit, it.amount, it.tax_rate
@@ -236,6 +263,7 @@ function invoiceRowToClient(row) {
     postal: row.resolved_postal_code || "", prefecture: row.resolved_prefecture || "", address1: row.resolved_address1 || "", address2: row.resolved_address2 || "",
     memo: row.memo || "", tags: row.tags || "", paymentStatus: row.payment_status || "未入金",
     paymentDate: row.payment_date || "", paymentAmount: row.payment_amount == null ? "" : Number(row.payment_amount), paymentMemo: row.payment_memo || "",
+    paymentReconciliationStatus: row.payment_status === "入金済" ? "入金済み" : Number(row.bank_candidate_count || 0) > 1 ? "要確認" : Number(row.bank_candidate_count || 0) === 1 ? "入金候補あり" : "未入金",
     bank: row.bank || "", note: row.note || "", subtotal: Number(row.subtotal || 0), tax: Number(row.tax || 0), total: Number(row.total || 0),
     email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.status === "ready" && row.r2_object_key ? "PDF作成済み" : "未作成",
     pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
