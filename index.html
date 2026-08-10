@@ -12,6 +12,7 @@
   <script src="assets/invoice-pdf.js?v=20260810-continuation-layout" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
   <script src="assets/app.js?v=20260810-start-invoices" defer></script>
+  <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
 </head>
 <body>
@@ -93,7 +94,7 @@
       </section>
 
       <section id="view-invoices" class="view active">
-        <div class="invoice-workspace-heading"><div><h1>請求書一覧</h1></div></div>
+        <div class="invoice-workspace-heading"><div><h1>請求書一覧</h1></div><button id="openBankReconciliation" class="button primary" type="button">入金確認</button></div>
         <div class="invoice-search-bar" role="search" aria-label="請求書検索">
           <div class="invoice-date-search">
             <select id="invoiceDateField" aria-label="検索する日付">
@@ -112,6 +113,16 @@
           <aside class="invoice-list-pane" aria-label="請求書一覧"><div class="invoice-list-head"><strong id="invoiceListCount">0件</strong><span>最新順</span></div><div id="invoiceList" class="invoice-list"><p class="invoice-list-empty">請求書がありません。</p></div></aside>
           <div class="invoice-detail-column"><div class="invoice-heading-actions"><button id="createDemoInvoiceFromList" class="button demo-send-button" type="button">デモ送信</button><label class="button secondary">CSV一括追加<input id="invoiceCsvFromList" type="file" accept=".csv,text/csv" hidden></label><button id="createInvoiceFromList" class="button primary" type="button">請求書を作成</button><button id="refreshInvoices" class="button secondary" type="button">最新状態を取得</button></div><section id="invoiceDetailPanel" class="invoice-detail-pane"><div class="invoice-detail-empty">左の一覧から請求書を選択してください。</div></section></div>
         </div>
+      </section>
+
+      <section id="view-bank" class="view">
+        <div class="invoice-workspace-heading"><div><h1>銀行入金確認</h1><p>銀行明細を読み込み、候補を確認してから消込します。承認前に入金済みへ変更されることはありません。</p></div><button id="backToInvoices" class="button secondary" type="button">請求書一覧へ戻る</button></div>
+        <div class="bank-import-panel">
+          <label class="button primary bank-file-button">銀行明細CSVを読み込む<input id="bankCsvFile" type="file" accept=".csv,text/csv" hidden></label>
+          <p id="bankCsvFormatNotice">三井住友銀行 Web21 / Trunkの実CSV形式を確認後に取込を有効化します。</p>
+          <div id="bankImportStatus" class="alert hidden" role="status" aria-live="polite"></div>
+        </div>
+        <div id="bankReconciliationList" class="bank-reconciliation-list"><p class="invoice-list-empty">読込済みの入金明細を取得しています。</p></div>
       </section>
 
       <section id="view-receipts" class="view">
