@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const root=path.resolve(__dirname,'..');
+const sandbox={window:{StepInvoicePdf:{toBlob:()=>{}}}};vm.createContext(sandbox);vm.runInContext(fs.readFileSync(path.join(root,'assets/receipt-pdf.js'),'utf8'),sandbox);
+const receipt={receiptNumber:'202608001',partnerName:'テスト取引先',honorific:'様',issueDate:'2026-08-10',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',subject:'8月分授業料',subtotal:700,tax:70,total:770,details:[{name:'授業料',unitPrice:700,quantity:1,amount:700,taxRate:'10%'}]};
+const html=sandbox.window.StepReceiptPdf.pageHtml(receipt);
+assert.match(html,/領収書/);assert.match(html,/領収書番号：202608001/);assert.match(html,/合計金額/);assert.match(html,/770 円/);assert.match(html,/10%対象/);assert.match(html,/授業料/);assert.match(html,/個別指導ステップ/);
+const index=fs.readFileSync(path.join(root,'index.html'),'utf8'),app=fs.readFileSync(path.join(root,'assets/app.js'),'utf8'),backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
+assert.match(index,/領収書一覧/);assert.match(index,/data-receipt-create/);assert.match(index,/documentEditorPreview/);assert.match(index,/documentDueDateField/);assert.match(index,/領収書メールの確認/);assert.match(app,/data-invoice-action="duplicate_invoice"/);assert.match(app,/data-invoice-action="convert_receipt"/);assert.match(backend,/領収書データ/);assert.match(backend,/saveReceiptData/);assert.match(backend,/saveReceiptPdf/);assert.match(backend,/enqueueReceiptSend/);assert.match(backend,/receiptItems_/);
+console.log('receipt tests passed');

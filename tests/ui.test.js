@@ -75,7 +75,9 @@ async function main(){
   document.querySelector('#loadDemoPartners').click();
   await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.equal(document.querySelectorAll('#partnerTable tbody tr').length,4);
-  assert.equal(document.querySelectorAll('#singlePartner option').length,5);
+  document.querySelector('#singlePartnerCombo > button').click();
+  assert.equal(document.querySelectorAll('#singlePartnerResults [data-partner-code]').length,4);
+  assert.match(document.querySelector('#singlePartnerResults [data-partner-code]:first-child').textContent,/ダミー取引先4/);
   assert.match(document.querySelector('#partnerTable').textContent,/mintcocoajasmine@gmail\.com/);
   assert.match(document.querySelector('#partnerTable').textContent,/kk8989892000@yahoo\.co\.jp/);
   assert.match(document.querySelector('#partnerTable').textContent,/skase\.days@gmail\.com/);
@@ -119,7 +121,9 @@ async function main(){
   partnerForm.elements.email.value='new@example.com';
   partnerForm.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   assert.match(document.querySelector('#partnerTable').textContent,/個別入力テスト/);
-  assert.match(document.querySelector('#singlePartner').textContent,/NEW001/);
+  document.querySelector('#singlePartnerSearch').value='NEW001';
+  document.querySelector('#singlePartnerSearch').dispatchEvent(new window.Event('input',{bubbles:true}));
+  assert.match(document.querySelector('#singlePartnerResults').textContent,/個別入力テスト/);
   document.querySelector('[data-edit-partner="NEW001"]').click();
   assert.equal(document.querySelector('#partnerDialogTitle').textContent,'取引先を編集');
   assert.equal(partnerForm.elements.customerCode.readOnly,true);
@@ -163,8 +167,9 @@ async function main(){
   assert.match(backend,/installQueueTrigger_\(\);\s*return response/);
   assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
   assert.match(backend,/STEP_SPREADSHEET_CACHE_/);
-  assert.match(backend,/const rows=retained\.concat\(replacements\)/);
-  assert.doesNotMatch(backend,/replaceInvoiceDetails_[\s\S]*?\.forEach\(r=>ds\.deleteRow/);
+  assert.match(backend,/replaceDetailRows_\(ds,/);
+  assert.match(backend,/sheet\.deleteRows\(run\.start,run\.count\)/);
+  assert.doesNotMatch(backend,/const rows=retained\.concat\(replacements\)/);
   assert.match(backend,/staff-auth:'\+hashToken_\(token\)/);
   assert.match(backend,/student-partner:' \+ code\.toLowerCase\(\)/);
   document.querySelector('#studentImportDialog').close();

@@ -130,11 +130,13 @@ async function uploadInvoice(request, env, ctx) {
 
   const payload = await readJson(request);
   if (!payload.ok) return payload.response;
-  const invoice = payload.value.invoice || {};
-  const invoiceNumber = String(invoice.invoiceNumber || "").trim();
+  const invoice = payload.value.invoice || payload.value.receipt || {};
+  const documentType = String(invoice.documentType || payload.value.documentType || "invoice") === "receipt" ? "receipt" : "invoice";
+  const displayNumber = String(documentType === "receipt" ? invoice.receiptNumber : invoice.invoiceNumber || "").trim();
+  const invoiceNumber = documentType === "receipt" ? `R${displayNumber}` : displayNumber;
   const customerCode = String(invoice.customerCode || "").trim();
   const partnerName = String(invoice.partnerName || "").trim();
-  if (!/^\d{9}$/.test(invoiceNumber) || !customerCode || !partnerName) {
+  if (!/^\d{9}$/.test(displayNumber) || !customerCode || !partnerName) {
     return json({ ok: false, error: "INVALID_INVOICE" }, 400);
   }
 
@@ -149,14 +151,14 @@ async function uploadInvoice(request, env, ctx) {
   const now = new Date().toISOString();
   const partnerId = `partner:${customerCode}`;
   const invoiceId = `invoice:${invoiceNumber}`;
-  const objectKey = `invoices/${invoiceNumber.slice(0, 4)}/${invoiceNumber.slice(4, 6)}/${invoiceNumber}-${crypto.randomUUID()}.pdf`;
+  const objectKey = `${documentType === "receipt" ? "receipts" : "invoices"}/${displayNumber.slice(0, 4)}/${displayNumber.slice(4, 6)}/${invoiceNumber}-${crypto.randomUUID()}.pdf`;
   const old = await env.DB.prepare("SELECT r2_object_key FROM invoices WHERE invoice_number = ?1 LIMIT 1").bind(invoiceNumber).first();
   const pdfHash = await sha256Hex(pdfBytes);
   const items = Array.isArray(invoice.details) ? invoice.details.slice(0, 100) : [];
 
   await env.PDFS.put(objectKey, pdfBytes, {
     httpMetadata: { contentType: "application/pdf", contentDisposition: "inline; filename=invoice.pdf", cacheControl: "private, no-store" },
-    customMetadata: { invoiceNumber, sha256: pdfHash },
+    customMetadata: { invoiceNumber: displayNumber, documentType, sha256: pdfHash },
   });
 
   const statements = [
@@ -174,7 +176,7 @@ async function uploadInvoice(request, env, ctx) {
         issue_date=excluded.issue_date, due_date=excluded.due_date, subtotal=excluded.subtotal, tax=excluded.tax,
         total=excluded.total, status='ready', r2_object_key=excluded.r2_object_key, pdf_sha256=excluded.pdf_sha256,
         pdf_size=excluded.pdf_size, updated_at=excluded.updated_at
-    `).bind(invoiceId, invoiceNumber, partnerId, String(invoice.subject || ""), String(invoice.invoiceDate || ""), String(invoice.dueDate || ""), positiveMoney(invoice.subtotal), positiveMoney(invoice.tax), positiveMoney(invoice.total), objectKey, pdfHash, pdfBytes.byteLength, now),
+    `).bind(invoiceId, invoiceNumber, partnerId, String(invoice.subject || ""), String(invoice.invoiceDate || invoice.issueDate || ""), String(invoice.dueDate || ""), positiveMoney(invoice.subtotal), positiveMoney(invoice.tax), positiveMoney(invoice.total), objectKey, pdfHash, pdfBytes.byteLength, now),
     env.DB.prepare("DELETE FROM invoice_items WHERE invoice_id = ?1").bind(invoiceId),
   ];
   items.forEach((item, index) => statements.push(env.DB.prepare(`
@@ -193,7 +195,7 @@ async function uploadInvoice(request, env, ctx) {
     if (ctx?.waitUntil) ctx.waitUntil(cleanup);
     else await cleanup;
   }
-  return json({ ok: true, invoiceId, invoiceNumber, objectKey, fileName: `${invoiceNumber}_${safeFileName(partnerName)}様.pdf` });
+  return json({ ok: true, invoiceId, invoiceNumber: displayNumber, documentType, objectKey, fileName: `${displayNumber}_${safeFileName(partnerName)}様_${documentType === "receipt" ? "領収書" : "請求書"}.pdf` });
 }
 
 async function createDelivery(request, env, url) {
@@ -279,7 +281,8 @@ async function serveDownloadPage(request, env, token) {
   return html(downloadPage({
     token,
     total: delivery.row.total,
-    invoiceNumber: delivery.row.invoice_number,
+    invoiceNumber: String(delivery.row.invoice_number).replace(/^R/, ""),
+    documentType: String(delivery.row.invoice_number).startsWith("R") ? "receipt" : "invoice",
     partnerName: delivery.row.partner_name,
     dueDate: delivery.row.due_date,
     expiresAt: delivery.row.expires_at,
@@ -427,7 +430,7 @@ function pdfResponse(object) {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("content-type", "application/pdf");
-  headers.set("content-disposition", "inline; filename=invoice.pdf");
+  headers.set("content-disposition", `inline; filename=${object.customMetadata?.documentType === "receipt" ? "receipt" : "invoice"}.pdf`);
   headers.set("cache-control", "private, no-store");
   headers.set("x-content-type-options", "nosniff");
   return new Response(object.body, { headers });
@@ -500,15 +503,16 @@ function validFutureDate(value) {
   return Number.isFinite(time) && time > Date.now() ? new Date(time).toISOString() : "";
 }
 
-function downloadPage({ token, total, invoiceNumber, partnerName, dueDate, expiresAt }) {
+function downloadPage({ token, total, invoiceNumber, partnerName, dueDate, expiresAt, documentType="invoice" }) {
+  const isReceipt=documentType==="receipt",label=isReceipt?"領収書":"請求書";
   return `<!doctype html>
 <html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>STEP請求書ダウンロード</title><style>${pageCss()}</style></head>
+<title>STEP${label}ダウンロード</title><style>${pageCss()}</style></head>
 <body><main class="card"><div class="brand">個別指導ステップ</div>
-<h1>請求書ダウンロード</h1>
-<p class="lead">${escapeHtml(partnerName)} 様の請求書をご用意しました。</p>
-<dl><div class="invoice-total"><dt>ご請求金額</dt><dd>${escapeHtml(formatMoney(total))}</dd></div><div><dt>請求書番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div><div><dt>お支払期限</dt><dd>${escapeHtml(formatDate(dueDate))}</dd></div></dl>
-<a class="button" href="/d/${encodeURIComponent(token)}/pdf">請求書PDFを表示・ダウンロード</a>
+<h1>${label}ダウンロード</h1>
+<p class="lead">${escapeHtml(partnerName)} 様の${label}をご用意しました。</p>
+<dl><div class="invoice-total"><dt>${isReceipt?"領収金額":"ご請求金額"}</dt><dd>${escapeHtml(formatMoney(total))}</dd></div><div><dt>${label}番号</dt><dd>${escapeHtml(invoiceNumber)}</dd></div>${isReceipt?"":`<div><dt>お支払期限</dt><dd>${escapeHtml(formatDate(dueDate))}</dd></div>`}</dl>
+<a class="button" href="/d/${encodeURIComponent(token)}/pdf">${label}PDFを表示・ダウンロード</a>
 <p class="download-expiry">ダウンロード期限：${escapeHtml(formatDate(expiresAt))}</p>
 <p class="note">PDFはSTEPの保護された配信経路から取得されます。</p>
 </main></body></html>`;
