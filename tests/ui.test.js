@@ -35,6 +35,18 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
 
 async function main(){
   const document=window.document;
+  const invoiceForLayout={partnerName:'テスト',honorific:'様',postal:'',prefecture:'',address1:'',address2:'',customerCode:'',invoiceNumber:'202608001',invoiceDate:'2026/08/10',dueDate:'2026/08/31',subject:'2026年8月分',subtotal:2300,tax:230,total:2530,bank:'振込先',note:'備考'};
+  const layoutHost=document.createElement('div');
+  layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:10},(_,index)=>({name:`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
+  assert.equal(layoutHost.querySelectorAll('.invoice-page').length,1);
+  assert.equal(layoutHost.querySelectorAll('.invoice-page .detail tbody tr').length,10);
+  layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:23},(_,index)=>({name:`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
+  const layoutPages=layoutHost.querySelectorAll('.invoice-page');
+  assert.equal(layoutPages.length,2);
+  assert.equal(layoutPages[0].querySelectorAll('.detail tbody tr').length,21);
+  assert.equal(layoutPages[1].querySelectorAll('.detail tbody tr').length,2);
+  assert.equal(layoutPages[1].querySelector('.invoice-title'),null);
+  assert.match(layoutPages[1].textContent,/納品日/);
   assert.equal(document.querySelector('#view-invoices').classList.contains('active'),true);
   assert.equal(window.location.hash,'#invoices');
   assert.equal(window.StepInvoiceApp.initialViewForNavigation('navigate','#settings'),'invoices');
