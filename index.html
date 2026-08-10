@@ -12,6 +12,7 @@
   <script src="assets/invoice-pdf.js?v=20260810-continuation-layout" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
   <script src="assets/app.js?v=20260810-start-invoices" defer></script>
+  <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
 </head>
@@ -119,7 +120,7 @@
         <div class="invoice-workspace-heading"><div><h1>銀行入金確認</h1><p>銀行明細を読み込み、候補を確認してから消込します。承認前に入金済みへ変更されることはありません。</p></div><button id="backToInvoices" class="button secondary" type="button">請求書一覧へ戻る</button></div>
         <div class="bank-import-panel">
           <label class="button primary bank-file-button">銀行明細CSVを読み込む<input id="bankCsvFile" type="file" accept=".csv,text/csv" hidden></label>
-          <p id="bankCsvFormatNotice">三井住友銀行 Web21 / Trunkの実CSV形式を確認後に取込を有効化します。</p>
+          <p id="bankCsvFormatNotice">三井住友銀行 Web21 / TrunkのCP932入出金明細CSVに対応しています。出金明細は照合対象になりません。</p>
           <div id="bankImportStatus" class="alert hidden" role="status" aria-live="polite"></div>
         </div>
         <div id="bankReconciliationList" class="bank-reconciliation-list"><p class="invoice-list-empty">読込済みの入金明細を取得しています。</p></div>
