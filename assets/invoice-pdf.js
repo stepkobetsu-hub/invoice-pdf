@@ -50,13 +50,13 @@
       </div>`;
     }).join('');
   }
-  async function toBlob(element){
+  async function toBlob(element,{scale=3}={}){
     if(!global.html2canvas||!global.jspdf)throw new Error('PDF生成ライブラリを読み込めません。通信環境を確認してください。');
     const pages=element.matches&&element.matches('.invoice-page')?[element]:Array.from(element.querySelectorAll('.invoice-page'));
     if(!pages.length)throw new Error('PDFにする請求書ページが見つかりません。');
     const pdf=new global.jspdf.jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
     for(let index=0;index<pages.length;index++){
-      const canvas=await global.html2canvas(pages[index],{scale:3,backgroundColor:'#fff',useCORS:true,logging:false});
+      const canvas=await global.html2canvas(pages[index],{scale,backgroundColor:'#fff',useCORS:true,logging:false});
       if(index>0)pdf.addPage('a4','portrait');
       pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,595.28,841.89,undefined,'FAST');
     }
