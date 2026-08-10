@@ -1,7 +1,7 @@
 # Cloudflare foundation
 
-This directory contains the isolated Cloudflare implementation for STEP invoices.
-It does not use Google Drive, Google Apps Script, Google Sheets, or Brevo.
+This directory contains the Cloudflare implementation for STEP invoices.
+Invoice list/save/edit/payment/delete operations use D1 directly. Apps Script remains only for staff-session verification, partner/settings compatibility, PDF generation orchestration, and the existing mail queue. PDF files never use Google Drive.
 
 ## Production storage and download service
 
@@ -29,6 +29,30 @@ Required Worker secrets:
 - `TOKEN_PEPPER`
 
 `BREVO_API_KEY` is not used. Mail delivery remains in the existing Apps Script queue; only PDF storage and recipient downloads use Cloudflare.
+
+## D1 direct invoice workspace
+
+- The browser calls `/api/app/dashboard` and `/api/app/invoices` directly.
+- The browser sends the existing staff-app session token; it never receives `ADMIN_API_KEY`.
+- The Worker accepts the fixed GitHub Pages origin only and verifies the staff session before every staff operation (verification is cached for 120 seconds).
+- Invoice writes use prepared statements and `DB.batch()`. Item unit prices and amounts may be negative for discounts.
+- Deletion is a soft delete and also revokes active delivery links.
+- Email/PDF actions still mirror the selected invoice to Apps Script immediately before the existing send flow.
+
+### Safe production switch order
+
+Run from the repository root. Do not publish the new frontend until steps 1-4 have succeeded.
+
+```powershell
+New-Item -ItemType Directory -Force backups | Out-Null
+npx.cmd wrangler d1 export step-invoice-db --remote --output backups\step-invoice-before-workspace.sql --config cloudflare/wrangler.jsonc
+npx.cmd wrangler d1 migrations apply step-invoice-db --remote --config cloudflare/wrangler.jsonc
+npx.cmd wrangler deploy --config cloudflare/wrangler.jsonc
+```
+
+Then replace and redeploy `apps-script/Code.gs`, and manually run `migrateInvoiceDataToCloudflare` once in the Apps Script editor. The function is idempotent and may be run again if a batch is interrupted. Confirm that its return value reports the same `imported` and `total` count, then publish the GitHub Pages frontend.
+
+After the switch, newly saved invoices are authoritative in D1. The spreadsheet remains a compatibility mirror for email/PDF operations and is no longer used for the invoice list or ordinary saves.
 
 ## Environments
 

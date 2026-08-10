@@ -8,7 +8,7 @@ const STEP = Object.freeze({
     DETAILS: '請求書明細', DELIVERIES: '請求書配信履歴', DOWNLOADS: 'ダウンロード履歴', LOGS: '操作ログ',
     USERS: 'ユーザー権限', QUEUE: '送信キュー', RECEIPTS: '領収書データ', RECEIPT_DETAILS: '領収書明細'
   },
-  PARTNER_HEADERS: ['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ'],
+  PARTNER_HEADERS: ['顧客コード','名称','名称(カナ)','敬称','支払い期限(月)','支払い期限(日)','土日祝日','郵便番号','都道府県','住所1','住所2','担当者部署','担当者役職','担当者氏名','電話番号','メールアドレス','CCメールアドレス','自社担当者名','Peppol ID','メモ','学年','教室'],
   INVOICE_HEADERS: ['請求書番号','顧客コード','宛名','敬称','対象年月','請求日','支払期限','郵便番号','住所','税抜小計','消費税額','請求金額','メールアドレス','CCメールアドレス','PDF状態','PDFファイルID','PDFファイル名','現在状態','作成日時','更新日時','メモ','タグ','入金状態','入金日','入金金額','入金メモ','振込先','備考'],
   DETAIL_HEADERS: ['請求書番号','行番号','納品日','品目・納品書番号','品目コード','単価','数量','単位','価格','税率'],
   RECEIPT_HEADERS: ['領収書番号','元請求書番号','顧客コード','宛名','敬称','件名','発行日','郵便番号','都道府県','住所1','住所2','税抜小計','消費税額','合計金額','メールアドレス','CCメールアドレス','PDF状態','PDFファイルID','PDFファイル名','送信状態','作成日時','更新日時','メモ','タグ','備考'],
@@ -47,7 +47,7 @@ function doPost(e) {
     const action = String(body.action || '');
     const payload = body.payload || {};
     const routes = {
-      getDashboard: () => getDashboard_(requestAuth, payload.syncStatuses === true), importPartners: () => importPartners_(payload.partners || [], requestAuth),
+      getDashboard: () => getDashboard_(requestAuth, payload.syncStatuses === true), getSupportData: () => getSupportData_(requestAuth), importPartners: () => importPartners_(payload.partners || [], requestAuth),
       deletePartner: () => deletePartner_(payload.customerCode, requestAuth),
       findStudentForPartner: () => findStudentForPartner_(payload.studentCode, requestAuth),
       savePdf: () => savePdf_(payload.invoice || {}, payload.pdfBase64 || '', requestAuth), saveInvoiceData: () => saveInvoiceData_(payload.invoice || {}, requestAuth),
@@ -122,7 +122,7 @@ function processSendQueue() {
 function importPartners_(partners, requestAuth) {
   requirePermission_('取引先編集', requestAuth);
   if (!Array.isArray(partners) || !partners.length) throw new Error('取引先データがありません。');
-  const sheet = sheet_(STEP.SHEETS.PARTNERS);
+  const sheet = ensurePartnerColumns_();
   const rows = partners.map(p => STEP.PARTNER_HEADERS.map(h => String(p[h] == null ? '' : p[h])));
   if (sheet.getLastRow() > 1) sheet.getRange(2,1,sheet.getLastRow()-1,STEP.PARTNER_HEADERS.length).clearContent();
   sheet.getRange(2,1,rows.length,STEP.PARTNER_HEADERS.length).setNumberFormat('@').setValues(rows);
@@ -379,7 +379,7 @@ function validateToken_(token, recordAccess) {
 }
 
 function getDashboard_(requestAuth, syncStatuses) {
-  requirePermission_('履歴閲覧', requestAuth);ensureInvoiceColumns_();ensureReceiptSheets_();if(syncStatuses===true)syncCloudflareStatuses_();
+  requirePermission_('履歴閲覧', requestAuth);ensureInvoiceColumns_();ensurePartnerColumns_();ensureReceiptSheets_();if(syncStatuses===true)syncCloudflareStatuses_();
   const invoices=table_(sheet_(STEP.SHEETS.INVOICES)),details=table_(sheet_(STEP.SHEETS.DETAILS)),deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)),logs=table_(sheet_(STEP.SHEETS.LOGS)),partners=table_(sheet_(STEP.SHEETS.PARTNERS));
   const partnerByCode={},partnerByName={};partners.rows.forEach(r=>{const p=objectRow_(r.values,partners.map);partnerByCode[String(p['顧客コード'])]=p;partnerByName[String(p['名称']).replace(/\s/g,'')]=p;});
   const receiptTable=table_(sheet_(STEP.SHEETS.RECEIPTS));
@@ -390,6 +390,18 @@ function getDashboard_(requestAuth, syncStatuses) {
   const deliveryHistory=deliveries.rows.filter(r=>activeNumbers.has(String(r.values[deliveries.map['請求書番号']]))).map(r=>({timestamp:formatDateTime_(r.values[deliveries.map['更新日時']]),action:Number(r.values[deliveries.map['再送回数']]||0)>0?'再送':'初回送信',invoiceNumber:r.values[deliveries.map['請求書番号']],name:r.values[deliveries.map['宛名']],deliveryId:maskId_(r.values[deliveries.map['配信ID']]),sendStatus:r.values[deliveries.map['送信状態']],urlStatus:r.values[deliveries.map['現在状態']],result:r.values[deliveries.map['送信エラー']]||'正常'}));
   const operationHistory=logs.rows.filter(r=>activeNumbers.has(String(r.values[logs.map['請求書番号']]))).map(r=>({timestamp:formatDateTime_(r.values[logs.map['日時']]),action:String(r.values[logs.map['操作種別']]||'更新'),invoiceNumber:r.values[logs.map['請求書番号']],name:'',deliveryId:maskId_(r.values[logs.map['配信ID']]),sendStatus:'',urlStatus:'',result:r.values[logs.map['結果']]||r.values[logs.map['エラー']]||'正常'}));
   return {user:requestAuth.name||activeEmail_(),settings:settings_(),invoices:invoiceItems.sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||String(b.invoiceNumber).localeCompare(String(a.invoiceNumber))),receipts:receiptItems_(),history:deliveryHistory.concat(operationHistory).sort((a,b)=>String(b.timestamp).localeCompare(String(a.timestamp))).slice(0,300)};
+}
+
+function getSupportData_(requestAuth) {
+  requirePermission_('履歴閲覧', requestAuth);
+  ensureReceiptSheets_();
+  const partners=table_(ensurePartnerColumns_());
+  return {
+    user:requestAuth.name||activeEmail_(),
+    settings:settings_(),
+    partners:partners.rows.map(r=>objectRow_(r.values,partners.map)),
+    receipts:receiptItems_()
+  };
 }
 
 function upsertInvoice_(inv,fileId,fileName){ensureInvoiceColumns_();const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),now=new Date(),existing=t.rows.find(r=>String(r.values[t.map['請求書番号']])===String(inv.invoiceNumber));const partner=findPartner_(inv.customerCode,inv.partnerName);const payment=String(inv.paymentStatus||existing&&existing.values[t.map['入金状態']]||'未入金'),paymentDate=payment==='入金済'?String(inv.paymentDate||existing&&existing.values[t.map['入金日']]||''):'',storedPaymentAmount=existing&&t.map['入金金額']!==undefined?existing.values[t.map['入金金額']]:'',paymentAmount=payment==='入金済'?Number(inv.paymentAmount!==undefined&&inv.paymentAmount!==''?inv.paymentAmount:(storedPaymentAmount!==''?storedPaymentAmount:inv.total||0)):'';const row={'請求書番号':String(inv.invoiceNumber),'顧客コード':String(inv.customerCode||''),'宛名':inv.partnerName||'','敬称':inv.honorific||'様','対象年月':inv.subject||'','請求日':inv.invoiceDate||'','支払期限':inv.dueDate||'','郵便番号':String(inv.postal||''),'住所':String(inv.prefecture||'')+String(inv.address1||'')+String(inv.address2||''),'税抜小計':Number(inv.subtotal||0),'消費税額':Number(inv.tax||0),'請求金額':Number(inv.total||0),'メールアドレス':partner['メールアドレス']||inv.email||'','CCメールアドレス':partner['CCメールアドレス']||inv.cc||'','PDF状態':'PDF作成済み','PDFファイルID':fileId,'PDFファイル名':fileName,'現在状態':'PDF作成済み','作成日時':existing?existing.values[t.map['作成日時']]:now,'更新日時':now,'メモ':String(inv.memo||''),'タグ':String(inv.tags||''),'入金状態':payment,'入金日':paymentDate,'入金金額':paymentAmount,'振込先':String(inv.bank||''),'備考':String(inv.note||'')};if(existing)updateRow_(sh,existing.rowNumber,t.map,row);else sh.appendRow(STEP.INVOICE_HEADERS.map(h=>row[h]));replaceInvoiceDetails_(inv.invoiceNumber,inv.details||[]);}
@@ -409,6 +421,7 @@ function defaultMailBody_(){return '{{取引先名}} {{敬称}}\n\nお世話に�
 
 function ensureSheet_(ss,name,headers){let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);if(sh.getLastRow()===0||String(sh.getRange(1,1).getValue())!==headers[0]){sh.clear();sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e8eaed');sh.setFrozenRows(1);sh.getRange(1,1,Math.max(2,sh.getMaxRows()),headers.length).setWrap(false);sh.autoResizeColumns(1,headers.length);}return sh;}
 function ensureInvoiceColumns_(){const sh=sheet_(STEP.SHEETS.INVOICES),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.INVOICE_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
+function ensurePartnerColumns_(){const sh=sheet_(STEP.SHEETS.PARTNERS),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.PARTNER_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
 function sheet_(name){if(STEP_SHEET_CACHE_[name])return STEP_SHEET_CACHE_[name];const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw new Error('初期設定が未完了です。setupSystemを実行してください。');if(!STEP_SPREADSHEET_CACHE_)STEP_SPREADSHEET_CACHE_=SpreadsheetApp.openById(id);const sh=STEP_SPREADSHEET_CACHE_.getSheetByName(name);if(!sh)throw new Error(`シートがありません: ${name}`);STEP_SHEET_CACHE_[name]=sh;return sh;}
 function table_(sh){const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();const values=lastRow?sh.getRange(1,1,lastRow,lastCol).getValues():[];const headers=values[0]||[],map={};headers.forEach((h,i)=>map[String(h)]=i);return {headers,map,rows:values.slice(1).map((v,i)=>({values:v,rowNumber:i+2}))};}
 function objectRow_(values,map){const o={};Object.keys(map).forEach(k=>o[k]=values[map[k]]);return o;}
@@ -426,6 +439,24 @@ function takeCachedDownloadUrl_(id){return CacheService.getScriptCache().get('cl
 function clearCachedDownloadUrl_(id){CacheService.getScriptCache().remove('cloudflare-download-url:'+id);}
 function cloudflareConfig_(){const p=PropertiesService.getScriptProperties(),url=String(p.getProperty('CLOUDFLARE_API_URL')||'').replace(/\/+$/,''),key=String(p.getProperty('CLOUDFLARE_ADMIN_API_KEY')||'');if(!/^https:\/\/[^/]+/.test(url)||!key)throw new Error('Cloudflare連携が未設定です。Script Propertiesを確認してください。');return {url:url,key:key};}
 function cloudflareAdminFetch_(path,method,payload){const c=cloudflareConfig_(),response=UrlFetchApp.fetch(c.url+path,{method:method||'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.key},payload:JSON.stringify(payload||{}),muteHttpExceptions:true});let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('Cloudflareから正しい応答を受信できませんでした。');}if(response.getResponseCode()<200||response.getResponseCode()>=300||!result.ok)throw new Error('Cloudflare連携に失敗しました: '+String(result.error||response.getResponseCode()));return result;}
+/**
+ * One-time, idempotent migration from the legacy invoice sheets to D1.
+ * Run this named function manually after deploying the matching Worker and
+ * applying migration 0004.  Re-running it updates the same invoice numbers.
+ */
+function migrateInvoiceDataToCloudflare(){
+  const auth={method:'systemPortal',permissionLevel:'4',name:activeEmail_()||'migration'};
+  const invoices=getDashboard_(auth,false).invoices||[];
+  let imported=0;
+  for(let offset=0;offset<invoices.length;offset+=25){
+    const chunk=invoices.slice(offset,offset+25);
+    const result=cloudflareAdminFetch_('/api/admin/migrations/invoices','post',{invoices:chunk});
+    imported+=Number(result.count||0);
+  }
+  PropertiesService.getScriptProperties().setProperty('D1_INVOICE_MIGRATED_AT',new Date().toISOString());
+  console.log('Cloudflare D1 invoice migration completed: '+imported+'/'+invoices.length);
+  return {success:true,imported:imported,total:invoices.length};
+}
 function createCloudflareDelivery_(values){return cloudflareAdminFetch_('/api/admin/deliveries','post',{deliveryId:String(values.deliveryId||''),invoiceNumber:String(values.invoiceNumber||''),recipientEmail:String(values.recipientEmail||''),ccEmail:String(values.ccEmail||''),expiresAt:new Date(values.expiresAt).toISOString(),createdBy:String(values.createdBy||'apps-script')});}
 function rotateCloudflareDelivery_(deliveryId,expiresAt){return cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/rotate','post',{expiresAt:new Date(expiresAt).toISOString()});}
 function syncCloudflareStatuses_(){try{const sh=sheet_(STEP.SHEETS.DELIVERIES),t=table_(sh),rows=t.rows.slice(-100),ids=rows.map(r=>String(r.values[t.map['配信ID']]||'')).filter(Boolean);if(!ids.length)return;const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:ids}),byId={};(result.items||[]).forEach(item=>byId[String(item.delivery_id)]=item);rows.forEach(r=>{const item=byId[String(r.values[t.map['配信ID']]||'')];if(!item)return;const changes={'更新日時':new Date()};if(item.status==='downloaded'){changes['現在状態']='DL済';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['初回ダウンロード日時']=item.downloaded_at?new Date(item.downloaded_at):r.values[t.map['初回ダウンロード日時']];changes['アクセス回数']=Number(item.open_count||0);changes['ダウンロード回数']=Number(item.download_count||0);}else if(item.status==='opened'){changes['現在状態']='URLアクセス済み';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['アクセス回数']=Number(item.open_count||0);}else if(item.status==='revoked'||item.revoked_at){changes['現在状態']='無効化';changes['無効化日時']=item.revoked_at?new Date(item.revoked_at):new Date();}else if(item.expires_at&&new Date(item.expires_at).getTime()<Date.now()){changes['現在状態']='期限切れ';}else{return;}updateRow_(sh,r.rowNumber,t.map,changes);});}catch(err){console.warn('Cloudflare状態同期を保留: '+safeError_(err));}}

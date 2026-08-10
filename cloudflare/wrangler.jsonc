@@ -17,6 +17,8 @@
     "PDF_UPLOAD_ENABLED": "true",
     "ADMIN_API_ENABLED": "true",
     "EMERGENCY_STOP": "false",
+    "APP_ORIGIN": "https://stepkobetsu-hub.github.io",
+    "STAFF_AUTH_API_URL": "https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec",
     "PARENT_LINK_TTL_DAYS": "180",
     "PDF_DOWNLOAD_MAX_TOTAL": "20",
     "PDF_DOWNLOAD_MAX_DAILY": "10",
