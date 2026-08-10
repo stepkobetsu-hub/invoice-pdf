@@ -18,6 +18,13 @@
 | Cloudflare D1 | 請求書配信管理DB | `step-invoice-db` / `e92d6d76-04d2-40de-9ddf-8804850402c8` |
 | Cloudflare R2 | PDFの非公開保管 | `step-invoice-pdfs` |
 
+## 開発中：銀行入金確認・請求書消込
+
+- ブランチ: `feature/bank-payment-reconciliation`
+- 仕様・migration・復旧手順: `docs/BANK_PAYMENT_RECONCILIATION.md`
+- migration: `cloudflare/migrations/0005_bank_payment_reconciliation.sql`
+- 状態: SMBC Web21 / Trunkの実CSV確認待ち。本番未反映。
+
 ## 2. 関連するが、請求書本体とは別のもの
 
 | 区分 | URL / 識別子 | 注意 |
