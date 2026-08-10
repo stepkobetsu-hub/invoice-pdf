@@ -17,7 +17,7 @@ const STEP = Object.freeze({
   DOWNLOAD_HEADERS: ['日時','配信ID','請求書番号','種別','結果','ユーザーエージェント保存有無','IP保存有無'],
   LOG_HEADERS: ['日時','操作者','操作種別','請求書番号','顧客コード','配信ID','結果','エラー','変更前','変更後'],
   USER_HEADERS: ['メールアドレス','表示名','管理者','PDF作成','メール送信','再送','配信停止','取引先編集','基本設定変更','履歴閲覧','有効'],
-  QUEUE_HEADERS: ['キューID','配信ID','請求書番号','テストモード','再送','新規トークン','状態','試行回数','登録日時','開始日時','完了日時','エラー'],
+  QUEUE_HEADERS: ['キューID','配信ID','請求書番号','テストモード','再送','新規トークン','状態','試行回数','登録日時','開始日時','完了日時','エラー','バッチID','メール事業者ID'],
   TEMPLATE_HEADERS: ['テンプレートID','名称','件名','本文','有効'],
   SETTING_HEADERS: ['キー','値','説明']
 });
@@ -58,7 +58,8 @@ function doPost(e) {
       releasePreparedSend: () => releasePreparedSend_(payload.deliveryId, requestAuth),
       disableDelivery: () => disableDelivery_(payload.invoiceNumber, requestAuth), saveSettings: () => saveSettings_(payload, requestAuth),
       recoverQueue: () => recoverStuckQueue_(requestAuth),
-      processPendingSends: () => processPendingSends_(requestAuth)
+      processPendingSends: () => processPendingSends_(requestAuth),
+      getSendBatchStatus: () => getSendBatchStatus_(payload.batchId, requestAuth)
     };
     if (!routes[action]) throw new Error('未対応の操作です。');
     const result = {ok:true,data:routes[action]()};
@@ -102,9 +103,14 @@ function processSendQueue() {
   if (!lock.tryLock(1000)) return;
   try {
     const settings = settings_();
-    const limit = Math.max(1, Math.min(20, Number(settings.batchSize || 5)));
+    ensureQueueColumns_();
+    const useBrevo = Boolean(PropertiesService.getScriptProperties().getProperty('BREVO_API_KEY'));
+    const limit = useBrevo ? 100 : Math.max(1, Math.min(20, Number(settings.batchSize || 5)));
     const queueSheet = sheet_(STEP.SHEETS.QUEUE), data = table_(queueSheet), now = new Date();
-    const pending = data.rows.filter(x => x.values[data.map['状態']] === '送信待ち').slice(0,limit);
+    const allPending = data.rows.filter(x => x.values[data.map['状態']] === '送信待ち');
+    const firstBatch = allPending.length&&data.map['バッチID']!==undefined?String(allPending[0].values[data.map['バッチID']]||''):'';
+    const pending = allPending.filter(x=>!firstBatch||String(x.values[data.map['バッチID']]||'')===firstBatch).slice(0,limit);
+    if (useBrevo && pending.length) return processBrevoQueueBatch_(pending, queueSheet, data, settings, now);
     pending.forEach(item => {
       try {
         updateRow_(queueSheet,item.rowNumber,data.map,{'状態':'送信中','開始日時':now,'試行回数':Number(item.values[data.map['試行回数']]||0)+1});
@@ -276,31 +282,38 @@ function enqueueSend_(payload, requestAuth) {
   const testMode = payload.testMode !== false;
   if (!testMode && PropertiesService.getScriptProperties().getProperty('PRODUCTION_SEND_APPROVED') !== 'true') throw new Error('本番送信は管理者の最終承認前のため無効です。');
   const numbers = [...new Set((payload.invoiceNumbers || []).map(String))]; if (!numbers.length) throw new Error('請求書が選択されていません。');
+  if(numbers.length>100)throw new Error('一括送信は100件までです。');
+  ensureQueueColumns_();
+  const batchId=String(payload.batchId||Utilities.getUuid());
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   let response;
   try {
-    const queue = sheet_(STEP.SHEETS.QUEUE), deliveries = table_(sheet_(STEP.SHEETS.DELIVERIES)), invoices = table_(sheet_(STEP.SHEETS.INVOICES));
-    const queued = table_(queue).rows;
-    const results=[];
-    numbers.forEach(number => {
+    const queue=sheet_(STEP.SHEETS.QUEUE),queueTable=table_(queue),deliverySheet=sheet_(STEP.SHEETS.DELIVERIES),deliveries=table_(deliverySheet),invoices=table_(sheet_(STEP.SHEETS.INVOICES)),queued=queueTable.rows,queueMap=queueTable.map;
+    const settings=settings_(),now=new Date(),expires=new Date(now.getTime()+Number(settings.validDays||180)*86400000),createdBy=activeEmail_()||requestAuth.name||'apps-script';
+    const entries=numbers.map(number => {
       const inv = invoices.rows.find(x => String(x.values[invoices.map['請求書番号']]) === number); if (!inv) throw new Error(`${number}: 請求書データがありません。`);
       if (inv.values[invoices.map['PDF状態']] !== 'PDF作成済み') throw new Error(`${number}: PDF未作成です。`);
       const email = inv.values[invoices.map['メールアドレス']]; if (!email) throw new Error(`${number}: メールアドレス未登録です。`);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`${number}: メールアドレス形式不正です。`);
-      if (queued.some(q => String(q.values[table_(queue).map['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[table_(queue).map['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
+      if (queued.some(q => String(q.values[queueMap['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[queueMap['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
       if (payload.resend && payload.newToken !== false) invalidateByInvoice_(number);
-      const deliveryId = Utilities.getUuid(), queueId = Utilities.getUuid(), now = new Date();
-      const settings=settings_(), expires=new Date(now.getTime()+Number(settings.validDays||180)*86400000);
-      const subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
-      const prepared = payload.preflight === true, initialStatus = prepared ? '送信前確認' : '送信待ち';
-      const cloudDelivery=createCloudflareDelivery_({deliveryId:deliveryId,invoiceNumber:number,recipientEmail:email,ccEmail:inv.values[invoices.map['CCメールアドレス']],expiresAt:expires,createdBy:activeEmail_()||requestAuth.name||'apps-script'});
-      sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],email,inv.values[invoices.map['CCメールアドレス']],subject,'',initialStatus,'','Cloudflare管理',now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
-      cacheDownloadUrlForQueue_(deliveryId,cloudDelivery.downloadUrl);
-      queue.appendRow([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','']);
-      results.push({invoiceNumber:number,deliveryId,queueId,preflightUrl:prepared?cloudDelivery.downloadUrl:''});
-      log_(payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','');
+      return {number:number,inv:inv,email:String(email),cc:String(inv.values[invoices.map['CCメールアドレス']]||''),deliveryId:Utilities.getUuid(),queueId:Utilities.getUuid()};
     });
-    response={queued:results.length,items:results,testMode};
+    const clouds=createCloudflareDeliveriesParallel_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})));
+    const results=[],deliveryRows=[],queueRows=[],logRows=[],subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
+    entries.forEach((entry,index)=>{
+      const number=entry.number,inv=entry.inv,deliveryId=entry.deliveryId,queueId=entry.queueId,cloud=clouds[index];
+      const prepared = payload.preflight === true, initialStatus = prepared ? '送信前確認' : '送信待ち';
+      deliveryRows.push([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],entry.email,entry.cc,subject,'',initialStatus,'','Cloudflare管理',now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',createdBy,now,now]);
+      queueRows.push([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','',batchId,'']);
+      cacheDownloadUrlForQueue_(deliveryId,cloud.downloadUrl);
+      results.push({invoiceNumber:number,deliveryId:deliveryId,queueId:queueId,preflightUrl:prepared?cloud.downloadUrl:''});
+      logRows.push([now,activeEmail_(),payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','','','']);
+    });
+    if(deliveryRows.length)deliverySheet.getRange(deliverySheet.getLastRow()+1,1,deliveryRows.length,STEP.DELIVERY_HEADERS.length).setValues(deliveryRows);
+    if(queueRows.length)queue.getRange(queue.getLastRow()+1,1,queueRows.length,STEP.QUEUE_HEADERS.length).setValues(queueRows);
+    if(logRows.length){const logSheet=sheet_(STEP.SHEETS.LOGS);logSheet.getRange(logSheet.getLastRow()+1,1,logRows.length,STEP.LOG_HEADERS.length).setValues(logRows);}
+    response={queued:results.length,items:results,testMode,batchId:batchId};
   } finally { lock.releaseLock(); }
   installQueueTrigger_();
   return response;
@@ -352,6 +365,70 @@ function sendOne_(queueValues, queueMap, settings) {
   updateInvoiceState_(d[m['請求書番号']],status);
   log_('メール送信',d[m['請求書番号']],d[m['顧客コード']],deliveryId,'成功','');
 }
+
+function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedAt){
+  const properties=PropertiesService.getScriptProperties(),apiKey=String(properties.getProperty('BREVO_API_KEY')||'');
+  if(!apiKey)throw new Error('Brevo APIキーが設定されていません。');
+  const deliverySheet=sheet_(STEP.SHEETS.DELIVERIES),deliveryTable=table_(deliverySheet),invoiceSheet=sheet_(STEP.SHEETS.INVOICES),invoiceTable=table_(invoiceSheet);
+  ensureReceiptSheets_();
+  const receiptSheet=sheet_(STEP.SHEETS.RECEIPTS),receiptTable=table_(receiptSheet),deliveryById={},invoiceByNumber={},receiptByNumber={};
+  deliveryTable.rows.forEach(row=>deliveryById[String(row.values[deliveryTable.map['配信ID']])]=row);
+  invoiceTable.rows.forEach(row=>invoiceByNumber[String(row.values[invoiceTable.map['請求書番号']])]=row);
+  receiptTable.rows.forEach(row=>receiptByNumber['R'+String(row.values[receiptTable.map['領収書番号']])]=row);
+  const prepared=[];
+  pending.forEach(queueRow=>{
+    const q=queueRow.values,qm=queueTable.map,deliveryId=String(q[qm['配信ID']]||''),deliveryRow=deliveryById[deliveryId];
+    if(!deliveryRow)throw new Error('配信履歴がありません: '+deliveryId);
+    const d=deliveryRow.values,dm=deliveryTable.map,number=String(d[dm['請求書番号']]||''),isReceipt=number.startsWith('R');
+    const sourceRow=isReceipt?receiptByNumber[number]:invoiceByNumber[number];
+    if(!sourceRow)throw new Error('請求書データがありません: '+number);
+    const source=objectRow_(sourceRow.values,isReceipt?receiptTable.map:invoiceTable.map),testMode=String(q[qm['テストモード']])==='true'||q[qm['テストモード']]===true;
+    const recipient=testMode?settings.testRecipient:d[dm['送信先メールアドレス']];
+    if(!recipient||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(recipient)))throw new Error(number+': メールアドレスが未登録または不正です。');
+    let url=takeCachedDownloadUrl_(deliveryId);if(!url)url=rotateCloudflareDelivery_(deliveryId,d[dm['トークン有効期限']]).downloadUrl;
+    if(!/^https:\/\//.test(url)||/script\.google\.com|drive\.google\.com/i.test(url))throw new Error(number+': Cloudflare配信URLを発行できませんでした。');
+    const displayNumber=isReceipt?number.slice(1):number,values={'取引先名':d[dm['宛名']],'敬称':source['敬称']||'様','顧客コード':d[dm['顧客コード']],'対象年月':source[isReceipt?'件名':'対象年月']||'','請求書番号':displayNumber,'請求金額':Number(source[isReceipt?'合計金額':'請求金額']||0).toLocaleString('ja-JP')+'円','支払期限':source['支払期限']||'','有効日数':settings.validDays||180,'有効期限':formatDate_(d[dm['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
+    let subject=merge_(settings.subject||d[dm['メール件名']],values),body=merge_(settings.body||defaultMailBody_(),values);
+    if(isReceipt){subject=subject.replace(/請求書/g,'領収書');body=body.replace(/次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。/,'領収書を送付いたしますので、ご確認ください。').replace(/請求書/g,'領収書');}
+    if(testMode){subject='【テスト】'+subject;body='これはテスト送信です。\n本来の送信先: '+d[dm['送信先メールアドレス']]+'\n\n'+body;}
+    const version={to:[{email:String(recipient),name:String(d[dm['宛名']]||'')}],subject:subject,htmlContent:'<!doctype html><html><body style="font-family:sans-serif;white-space:pre-wrap">'+htmlEscape_(body).replace(/\n/g,'<br>')+'</body></html>'};
+    const cc=[testMode?'':d[dm['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).map(email=>({email:String(email)}));if(cc.length)version.cc=cc;
+    prepared.push({queueRow:queueRow,deliveryRow:deliveryRow,sourceRow:sourceRow,isReceipt:isReceipt,deliveryId:deliveryId,number:number,version:version});
+    mutateRow_(queueRow,queueTable.map,{'状態':'送信中','開始日時':startedAt,'試行回数':Number(q[qm['試行回数']]||0)+1,'エラー':''});
+  });
+  flushTableRows_(queueSheet,queueTable);
+  const batchId=String(prepared[0].queueRow.values[queueTable.map['バッチID']]||Utilities.getUuid()),sandboxConfigured=String(properties.getProperty('BREVO_SANDBOX_MODE')||'').toLowerCase()==='true',largeTest=prepared.length>10&&prepared.every(item=>String(item.queueRow.values[queueTable.map['テストモード']])==='true'||item.queueRow.values[queueTable.map['テストモード']]===true),allowLargeTest=String(properties.getProperty('BREVO_ALLOW_LARGE_TEST_DELIVERY')||'').toLowerCase()==='true',sandbox=sandboxConfigured||(largeTest&&!allowLargeTest);
+  const requestBody=buildBrevoBatchPayload_(prepared,settings,batchId,sandbox);
+  try{
+    const response=UrlFetchApp.fetch('https://api.brevo.com/v3/smtp/email',{method:'post',contentType:'application/json',headers:{'api-key':apiKey,accept:'application/json'},payload:JSON.stringify(requestBody),muteHttpExceptions:true}),code=response.getResponseCode();
+    let result={};try{result=JSON.parse(response.getContentText()||'{}');}catch(_){}
+    if(code<200||code>=300)throw new Error('Brevo送信受付エラー: '+String(result.message||result.code||code));
+    const messageIds=Array.isArray(result.messageIds)?result.messageIds:result.messageId?[result.messageId]:[];
+    if(messageIds.length&&messageIds.length!==prepared.length)throw new Error('Brevo受付件数が一致しません: '+messageIds.length+'/'+prepared.length);
+    const completedAt=new Date(),cloudRequests=[],config=cloudflareConfig_(),logRows=[];
+    prepared.forEach((item,index)=>{
+      const status=Number(item.deliveryRow.values[deliveryTable.map['再送回数']]||0)>0?'再送済み':'送信済み',providerId=String(messageIds[index]||result.messageId||batchId);
+      mutateRow_(item.queueRow,queueTable.map,{'状態':'完了','完了日時':completedAt,'エラー':'','メール事業者ID':providerId});
+      mutateRow_(item.deliveryRow,deliveryTable.map,{'送信日時':completedAt,'送信状態':status,'送信エラー':'','現在状態':status,'更新日時':completedAt});
+      mutateRow_(item.sourceRow,item.isReceipt?receiptTable.map:invoiceTable.map,item.isReceipt?{'送信状態':status,'更新日時':completedAt}:{'現在状態':status,'更新日時':completedAt});
+      clearCachedDownloadUrl_(item.deliveryId);
+      cloudRequests.push({url:config.url+'/api/admin/deliveries/'+encodeURIComponent(item.deliveryId)+'/sent',method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+config.key},payload:'{}',muteHttpExceptions:true});
+      logRows.push([completedAt,activeEmail_(),'メール送信',item.number,item.deliveryRow.values[deliveryTable.map['顧客コード']],item.deliveryId,sandbox?'サンドボックス成功':'成功','',JSON.stringify({provider:'brevo',batchId:batchId}).slice(0,1000),'']);
+    });
+    flushTableRows_(queueSheet,queueTable);flushTableRows_(deliverySheet,deliveryTable);flushTableRows_(invoiceSheet,invoiceTable);flushTableRows_(receiptSheet,receiptTable);
+    if(cloudRequests.length)UrlFetchApp.fetchAll(cloudRequests);
+    if(logRows.length){const logSheet=sheet_(STEP.SHEETS.LOGS);logSheet.getRange(logSheet.getLastRow()+1,1,logRows.length,STEP.LOG_HEADERS.length).setValues(logRows);}
+    return {processed:prepared.length,batchId:batchId,provider:'brevo',sandbox:sandbox};
+  }catch(error){
+    const failedAt=new Date(),message=safeError_(error);
+    prepared.forEach(item=>{const attempts=Number(item.queueRow.values[queueTable.map['試行回数']]||0),retry=attempts<3;mutateRow_(item.queueRow,queueTable.map,{'状態':retry?'送信待ち':'送信失敗','完了日時':retry?'':failedAt,'エラー':message});if(!retry)mutateRow_(item.deliveryRow,deliveryTable.map,{'送信状態':'送信失敗','送信エラー':message,'現在状態':'送信失敗','更新日時':failedAt});});
+    flushTableRows_(queueSheet,queueTable);flushTableRows_(deliverySheet,deliveryTable);installQueueTrigger_();throw error;
+  }
+}
+
+function buildBrevoBatchPayload_(prepared,settings,batchId,sandbox){const payload={sender:{email:String(settings.senderEmail||'invoice@step-edu.net'),name:String(settings.senderName||'個別指導ステップ【請求書】')},subject:'STEP請求書',htmlContent:'<html><body>STEP請求書</body></html>',replyTo:{email:String(settings.replyTo||'stepkobetsu@gmail.com')},headers:{idempotencyKey:String(batchId)},messageVersions:(prepared||[]).slice(0,100).map(item=>item.version),tags:['step-invoice-batch']};if(sandbox)payload.headers['X-Sib-Sandbox']='drop';return payload;}
+
+function getSendBatchStatus_(batchId,requestAuth){requirePermission_('履歴閲覧',requestAuth);ensureQueueColumns_();const id=String(batchId||'');if(!id)throw new Error('送信バッチIDがありません。');const t=table_(sheet_(STEP.SHEETS.QUEUE)),rows=t.rows.filter(row=>String(row.values[t.map['バッチID']]||'')===id),counts={total:rows.length,pending:0,sending:0,sent:0,failed:0};rows.forEach(row=>{const status=String(row.values[t.map['状態']]||'');if(status==='送信待ち')counts.pending++;else if(status==='送信中')counts.sending++;else if(status==='完了')counts.sent++;else if(status==='送信失敗')counts.failed++;});return Object.assign({batchId:id,complete:counts.total>0&&counts.pending===0&&counts.sending===0},counts);}
 
 function assertHourlyLimit_(settings) {
   const limit = Math.max(1, Number(settings.hourlyLimit || 50));
@@ -421,10 +498,14 @@ function defaultMailBody_(){return '{{取引先名}} {{敬称}}\n\nお世話に�
 
 function ensureSheet_(ss,name,headers){let sh=ss.getSheetByName(name);if(!sh)sh=ss.insertSheet(name);if(sh.getLastRow()===0||String(sh.getRange(1,1).getValue())!==headers[0]){sh.clear();sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold').setBackground('#e8eaed');sh.setFrozenRows(1);sh.getRange(1,1,Math.max(2,sh.getMaxRows()),headers.length).setWrap(false);sh.autoResizeColumns(1,headers.length);}return sh;}
 function ensureInvoiceColumns_(){const sh=sheet_(STEP.SHEETS.INVOICES),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.INVOICE_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
+function ensureQueueColumns_(){const sh=sheet_(STEP.SHEETS.QUEUE),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.QUEUE_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
 function ensurePartnerColumns_(){const sh=sheet_(STEP.SHEETS.PARTNERS),lastCol=Math.max(1,sh.getLastColumn()),headers=sh.getRange(1,1,1,lastCol).getValues()[0].map(String),missing=STEP.PARTNER_HEADERS.filter(header=>!headers.includes(header));if(missing.length)sh.getRange(1,lastCol+1,1,missing.length).setValues([missing]).setFontWeight('bold').setBackground('#e8eaed');return sh;}
 function sheet_(name){if(STEP_SHEET_CACHE_[name])return STEP_SHEET_CACHE_[name];const id=PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');if(!id)throw new Error('初期設定が未完了です。setupSystemを実行してください。');if(!STEP_SPREADSHEET_CACHE_)STEP_SPREADSHEET_CACHE_=SpreadsheetApp.openById(id);const sh=STEP_SPREADSHEET_CACHE_.getSheetByName(name);if(!sh)throw new Error(`シートがありません: ${name}`);STEP_SHEET_CACHE_[name]=sh;return sh;}
 function table_(sh){const lastRow=sh.getLastRow(),lastCol=sh.getLastColumn();const values=lastRow?sh.getRange(1,1,lastRow,lastCol).getValues():[];const headers=values[0]||[],map={};headers.forEach((h,i)=>map[String(h)]=i);return {headers,map,rows:values.slice(1).map((v,i)=>({values:v,rowNumber:i+2}))};}
 function objectRow_(values,map){const o={};Object.keys(map).forEach(k=>o[k]=values[map[k]]);return o;}
+function mutateRow_(row,map,changes){Object.keys(changes||{}).forEach(key=>{if(map[key]!==undefined)row.values[map[key]]=changes[key];});}
+function flushTableRows_(sh,table){if(table.rows.length)sh.getRange(2,1,table.rows.length,sh.getLastColumn()).setValues(table.rows.map(row=>row.values));}
+function htmlEscape_(value){return String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
 function updateRow_(sh,rowNumber,map,changes){const lastCol=sh.getLastColumn(),row=sh.getRange(rowNumber,1,1,lastCol).getValues()[0];Object.keys(changes).forEach(k=>{if(map[k]!==undefined)row[map[k]]=changes[k];});sh.getRange(rowNumber,1,1,lastCol).setValues([row]);}
 function updateDeliveryCells_(row,changes){updateRow_(row.sheet,row.rowNumber,row.map,changes);}
 function updateDeliveryById_(id,changes){const r=findDeliveryById_(id);if(r)updateDeliveryCells_(r,changes);}
@@ -458,6 +539,7 @@ function migrateInvoiceDataToCloudflare(){
   return {success:true,imported:imported,total:invoices.length};
 }
 function createCloudflareDelivery_(values){return cloudflareAdminFetch_('/api/admin/deliveries','post',{deliveryId:String(values.deliveryId||''),invoiceNumber:String(values.invoiceNumber||''),recipientEmail:String(values.recipientEmail||''),ccEmail:String(values.ccEmail||''),expiresAt:new Date(values.expiresAt).toISOString(),createdBy:String(values.createdBy||'apps-script')});}
+function createCloudflareDeliveriesParallel_(values){const c=cloudflareConfig_(),requests=(values||[]).map(value=>({url:c.url+'/api/admin/deliveries',method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.key},payload:JSON.stringify({deliveryId:String(value.deliveryId||''),invoiceNumber:String(value.invoiceNumber||''),recipientEmail:String(value.recipientEmail||''),ccEmail:String(value.ccEmail||''),expiresAt:new Date(value.expiresAt).toISOString(),createdBy:String(value.createdBy||'apps-script')}),muteHttpExceptions:true})),responses=UrlFetchApp.fetchAll(requests);return responses.map((response,index)=>{let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('Cloudflareから正しい応答を受信できませんでした: '+String(values[index].invoiceNumber||''));}if(response.getResponseCode()<200||response.getResponseCode()>=300||!result.ok)throw new Error('Cloudflare連携に失敗しました: '+String(result.error||response.getResponseCode()));return result;});}
 function rotateCloudflareDelivery_(deliveryId,expiresAt){return cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/rotate','post',{expiresAt:new Date(expiresAt).toISOString()});}
 function syncCloudflareStatuses_(){try{const sh=sheet_(STEP.SHEETS.DELIVERIES),t=table_(sh),rows=t.rows.slice(-100),ids=rows.map(r=>String(r.values[t.map['配信ID']]||'')).filter(Boolean);if(!ids.length)return;const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:ids}),byId={};(result.items||[]).forEach(item=>byId[String(item.delivery_id)]=item);rows.forEach(r=>{const item=byId[String(r.values[t.map['配信ID']]||'')];if(!item)return;const changes={'更新日時':new Date()};if(item.status==='downloaded'){changes['現在状態']='DL済';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['初回ダウンロード日時']=item.downloaded_at?new Date(item.downloaded_at):r.values[t.map['初回ダウンロード日時']];changes['アクセス回数']=Number(item.open_count||0);changes['ダウンロード回数']=Number(item.download_count||0);}else if(item.status==='opened'){changes['現在状態']='URLアクセス済み';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['アクセス回数']=Number(item.open_count||0);}else if(item.status==='revoked'||item.revoked_at){changes['現在状態']='無効化';changes['無効化日時']=item.revoked_at?new Date(item.revoked_at):new Date();}else if(item.expires_at&&new Date(item.expires_at).getTime()<Date.now()){changes['現在状態']='期限切れ';}else{return;}updateRow_(sh,r.rowNumber,t.map,changes);});}catch(err){console.warn('Cloudflare状態同期を保留: '+safeError_(err));}}
 function testCloudflareIntegration(){const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:[]});return {ok:result.ok===true,apiUrl:cloudflareConfig_().url,storage:'Cloudflare R2'};}
