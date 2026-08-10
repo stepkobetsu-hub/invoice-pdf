@@ -132,3 +132,8 @@
 
 /* D1 duplicate save feedback and print-safe page number — 2026-08-10 */
 .invoice-page .page-number{top:auto!important;bottom:82px!important}
+
+
+/* Clear mail action label and compact envelope icon — 2026-08-10 */
+.invoice-output-actions .mail-button{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.invoice-output-actions .mail-button::before{content:'✉';font-size:15px;line-height:1;font-weight:400}
