@@ -96,13 +96,13 @@
   function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
   async function cloudApi(path,{method='GET',body}={}){
     const token=staffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    const timeoutMs=path==='/api/app/invoices/pdf'?60000:15000,controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const response=await fetch(`${DEFAULT_CLOUDFLARE_API_URL}${path}`,{method,headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:controller.signal});
       let result=null;try{result=await response.json();}catch(_){}
       if(!response.ok||!result?.ok){const code=String(result?.error||response.status);if(['STAFF_LOGIN_REQUIRED','401'].includes(code))localStorage.removeItem(STAFF_AUTH_KEY);throw new Error(code==='STAFF_LOGIN_REQUIRED'?'ログイン情報が無効です。スタッフ用アプリからもう一度ログインしてください。':`請求書データの通信に失敗しました：${code}`);}
       return result.data;
-    }catch(error){if(error?.name==='AbortError')throw new Error('Cloudflare D1が15秒以内に応答しませんでした。');throw error;}finally{clearTimeout(timer);}
+    }catch(error){if(error?.name==='AbortError')throw new Error(`Cloudflareが${Math.round(timeoutMs/1000)}秒以内に応答しませんでした。`);throw error;}finally{clearTimeout(timer);}
   }
   async function saveInvoiceToD1(invoice){const normalized={...invoice,invoiceDate:inputDate(invoice.invoiceDate),dueDate:inputDate(invoice.dueDate)};const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized}});return data.invoice;}
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
@@ -255,7 +255,7 @@
   function blobToBase64(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob);});}
   async function safeApi(action,payload){if(!state.settings.apiUrl)return null;return api(action,payload);}
   function selectedItems(){return [...state.selected].map(i=>state.invoices[i]).filter(Boolean);}
-  async function ensurePdfsForSend(items,onProgress){const pending=items.filter(item=>item&&item.pdfStatus!=='PDF作成済み');if(!pending.length){onProgress?.(items.length,items.length);return;}alert(`${pending.length}件の送信用PDFを自動作成しています。`,'success');let completed=items.length-pending.length,cursor=0;onProgress?.(completed,items.length);const worker=async()=>{while(true){const index=cursor++;if(index>=pending.length)return;const inv=pending[index],blob=await createPdf(inv,{scale:1.75}),base64=await blobToBase64(blob),result=await api('savePdf',{invoice:inv,pdfBase64:base64});inv.pdfStatus='PDF作成済み';inv.pdfFileId=result?.pdfFileId||'';inv.pdfFileName=result?.pdfFileName||`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}.pdf`;completed+=1;onProgress?.(completed,items.length);}};await Promise.all(Array.from({length:Math.min(8,pending.length)},worker));renderCreate();renderInvoices();}
+  async function ensurePdfsForSend(items,onProgress){const pending=items.filter(item=>item&&item.pdfStatus!=='PDF作成済み');if(!pending.length){onProgress?.(items.length,items.length);return;}alert(`${pending.length}件の送信用PDFを自動作成しています。`,'success');let completed=items.length-pending.length,cursor=0;onProgress?.(completed,items.length);const worker=async()=>{while(true){const index=cursor++;if(index>=pending.length)return;const inv=pending[index],blob=await createPdf(inv,{scale:1.75}),base64=await blobToBase64(blob),result=await cloudApi('/api/app/invoices/pdf',{method:'POST',body:{invoice:inv,pdfBase64:base64}});inv.pdfStatus='PDF作成済み';inv.pdfFileId=result?.invoiceId||'';inv.pdfFileName=result?.fileName||`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}.pdf`;await api('saveInvoiceData',{invoice:inv});completed+=1;onProgress?.(completed,items.length);}};await Promise.all(Array.from({length:Math.min(8,pending.length)},worker));renderCreate();renderInvoices();}
   async function openSendDialog(items){
     try{await ensurePdfsForSend(items);}catch(e){alert(`送信用PDFを作成できませんでした。${e.message}`,'error');return;}
     const groups=C.classifySendSelection(items);
