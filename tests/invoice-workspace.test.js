@@ -117,6 +117,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.equal(document.querySelector('[name="receiptBusinessName"]').disabled,false);
   assert.equal(document.querySelector('[name="businessName"]').disabled,true);
   assert.equal(document.querySelector('#saveSettingsButton').textContent,'領収書設定を保存');
+  assert.ok(document.querySelector('#settingsSaveStatus'));
   document.querySelector('[data-view="invoices"]').click();
   assert.doesNotMatch(document.querySelector('#view-invoices').textContent,/新しい請求書から順に表示しています/);
   assert.deepEqual([...document.querySelectorAll('#invoiceDateField option')].map(option=>option.textContent),['作成日','請求日','最終更新日','お支払期限日']);
