@@ -31,9 +31,8 @@
   function hideOperationOverlay(){operationOverlayCount=Math.max(0,operationOverlayCount-1);if(operationOverlayCount)return;const overlay=$('#operationOverlay');if(!overlay)return;overlay.classList.add('hidden');overlay.setAttribute('aria-busy','false');}
   function activateStep(index){$$('#createSteps li').forEach((el,i)=>{el.classList.toggle('active',i===index);el.classList.toggle('done',i<index);});}
   function showView(name){const view=VIEWS.has(name)?name:'invoices';$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${view}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(location.hash!==`#${view}`)history.replaceState(null,'',`#${view}`);if(view==='invoices')renderInvoices();if(view==='receipts')window.StepReceipts?.render();}
-  function initialViewForNavigation(navigationType,hash=location.hash){
-    const requested=String(hash||'').replace(/^#/,'');
-    return ['reload','back_forward'].includes(String(navigationType||''))&&VIEWS.has(requested)?requested:'invoices';
+  function initialViewForNavigation(){
+    return 'invoices';
   }
   function browserNavigationType(){
     try{
