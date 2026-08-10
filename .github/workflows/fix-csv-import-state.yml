@@ -67,6 +67,44 @@ jobs:
           if html.count(old) != 1:
             raise SystemExit(f'cache-buster target count={html.count(old)}')
           index.write_text(html.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('tests/ui.test.js')
+          test = test_path.read_text(encoding='utf-8')
+          old_test = """  assert.match(document.querySelector('#createTable tbody').textContent,/202608501/);
+          assert.match(document.querySelector('#createTable tbody').textContent,/ダミー取引先1/);
+          const createdRowCheck=document.querySelector('[data-create-select=\"0\"]');
+          createdRowCheck.checked=true;
+          createdRowCheck.dispatchEvent(new window.Event('change',{bubbles:true}));
+          assert.equal(document.querySelector('#removeSelectedCreateRows').disabled,false);
+          assert.equal(document.querySelector('#removeSelectedCreateRows').textContent,'選択した1件を削除');
+          assert.equal(document.querySelector('#removeSelectedCreateRowsTop').disabled,false);
+          assert.equal(document.querySelector('#removeSelectedCreateRowsTop').textContent,'選択した1件を削除');
+          assert.equal(document.querySelector('#addToSendTop').disabled,false);
+          assert.equal(document.querySelector('#addToSendTop').textContent,'保存して請求書を作成');
+          document.querySelector('#removeSelectedCreateRowsTop').click();
+          assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/202608501/);
+          assert.match(document.querySelector('#invoiceImportSummary').textContent,/削除件数/);
+"""
+          new_test = """  assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/202608501/);
+          assert.match(document.querySelector('#createTable tbody').textContent,/請求書CSVを読み込むか/);
+          document.querySelector('#loadSample').click();
+          assert.match(document.querySelector('#createTable tbody').textContent,/999999001/);
+          const createdRowCheck=document.querySelector('[data-create-select=\"0\"]');
+          createdRowCheck.checked=true;
+          createdRowCheck.dispatchEvent(new window.Event('change',{bubbles:true}));
+          assert.equal(document.querySelector('#removeSelectedCreateRows').disabled,false);
+          assert.equal(document.querySelector('#removeSelectedCreateRows').textContent,'選択した1件を削除');
+          assert.equal(document.querySelector('#removeSelectedCreateRowsTop').disabled,false);
+          assert.equal(document.querySelector('#removeSelectedCreateRowsTop').textContent,'選択した1件を削除');
+          assert.equal(document.querySelector('#addToSendTop').disabled,false);
+          assert.equal(document.querySelector('#addToSendTop').textContent,'保存して請求書を作成');
+          document.querySelector('#removeSelectedCreateRowsTop').click();
+          assert.doesNotMatch(document.querySelector('#createTable tbody').textContent,/999999001/);
+          assert.match(document.querySelector('#invoiceImportSummary').textContent,/削除件数/);
+"""
+          if test.count(old_test) != 1:
+            raise SystemExit(f'ui test target count={test.count(old_test)}')
+          test_path.write_text(test.replace(old_test, new_test, 1), encoding='utf-8')
       - name: Syntax check
         run: node --check assets/app.js
       - name: Install dependencies
@@ -82,6 +120,6 @@ jobs:
           fi
           git config user.name 'stepkobetsu-hub'
           git config user.email 'stepkobetsu-hub@users.noreply.github.com'
-          git add assets/app.js index.html
+          git add assets/app.js index.html tests/ui.test.js
           git commit -m 'CSV取込途中データとD1保存済み請求書を分離'
           git push
