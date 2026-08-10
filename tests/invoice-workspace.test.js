@@ -28,7 +28,7 @@ window.confirm=()=>true;
 window.fetch=async(url,options={})=>{
   if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
     if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}})};
-    if(options.method==='POST'&&String(url).includes('/payment')){const number=decodeURIComponent(String(url).split('/').at(-2));const source=invoices.find(item=>item.invoiceNumber===number);return {ok:true,json:async()=>({ok:true,data:{invoice:{...source,...JSON.parse(options.body)}}})};}
+    if(options.method==='POST'&&String(url).includes('/payment')){const number=decodeURIComponent(String(url).split('/').at(-2));const source=window.StepInvoiceApp.state.invoices.find(item=>item.invoiceNumber===number);return {ok:true,json:async()=>({ok:true,data:{invoice:{...source,...JSON.parse(options.body)}}})};}
     if(options.method==='DELETE')return {ok:true,json:async()=>({ok:true,data:{deleted:1}})};
     if(options.method==='POST'){const invoice=JSON.parse(options.body).invoice;return {ok:true,json:async()=>({ok:true,data:{invoice}})};}
   }
@@ -63,6 +63,25 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.equal(document.querySelector('#bulkMailReviewDialog').open,true);
   assert.equal(document.querySelectorAll('#bulkMailReviewRows tr').length,2);
   document.querySelector('#bulkMailReviewDialog').close();
+  document.querySelector('#invoiceBulkAction').value='paid';
+  document.querySelector('#invoiceBulkAction').dispatchEvent(new window.Event('change',{bubbles:true}));
+  assert.equal(document.querySelector('#bulkPaymentDialog').open,true);
+  assert.equal(document.querySelector('#bulkPaymentCount').textContent,'2件');
+  assert.match(document.querySelector('#bulkPaymentDate').value,/^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(document.querySelector('#confirmBulkPayment').textContent,'入金済みにする');
+  document.querySelector('#bulkPaymentDialog').close();
+  window.StepInvoiceApp.state.invoiceBulkSelected.clear();
+  window.StepInvoiceApp.state.invoiceBulkSelected.add('202608102');
+  window.StepInvoiceApp.renderInvoices();
+  document.querySelector('#invoiceBulkAction').value='paid';
+  document.querySelector('#invoiceBulkAction').dispatchEvent(new window.Event('change',{bubbles:true}));
+  document.querySelector('#bulkPaymentDate').value='2026-08-10';
+  document.querySelector('#bulkPaymentForm').dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(resolve=>window.setTimeout(resolve,20));
+  assert.equal(window.StepInvoiceApp.state.invoices[0].paymentStatus,'入金済');
+  assert.equal(window.StepInvoiceApp.state.invoices[0].paymentDate,'2026-08-10');
+  assert.equal(window.StepInvoiceApp.state.invoices[0].paymentAmount,11000);
+  Object.assign(window.StepInvoiceApp.state.invoices[0],{paymentStatus:'未入金',paymentDate:'',paymentAmount:'',paymentMemo:''});
   window.StepInvoiceApp.state.invoiceBulkSelected.clear();
   window.StepInvoiceApp.renderInvoices();
   const originalInvoices=[...window.StepInvoiceApp.state.invoices];
