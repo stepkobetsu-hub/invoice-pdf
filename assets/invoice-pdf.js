@@ -7,15 +7,19 @@
     const items=details.length?details:[{name:'',unitPrice:0,quantity:0,amount:0}];
     // A4を有効に使い、通常の請求書はできるだけ1ページに収める。
     // 集計欄を含む最終ページと、明細だけの継続ページでは収容量を分ける。
-    const singlePageCapacity=10,firstPageCapacity=21,finalContinuationCapacity=18,fullContinuationCapacity=34;
+    const singlePageCapacity=8,firstPageCapacity=21,finalContinuationCapacity=8,fullContinuationCapacity=34;
     if(items.length<=singlePageCapacity)return [items];
-    const pages=[items.slice(0,Math.min(firstPageCapacity,items.length-1))];
+    // 明細が1ページ目に収まる場合は、明細を途中で1行だけ次ページへ送らず、
+    // 明細を連続表示した後に集計専用ページを付ける。
+    if(items.length<=firstPageCapacity)return [items,[]];
+    const pages=[items.slice(0,firstPageCapacity)];
     let remaining=items.slice(pages[0].length);
-    while(remaining.length>finalContinuationCapacity){
+    while(remaining.length>fullContinuationCapacity){
       pages.push(remaining.slice(0,fullContinuationCapacity));
       remaining=remaining.slice(fullContinuationCapacity);
     }
-    pages.push(remaining);
+    if(remaining.length<=finalContinuationCapacity)pages.push(remaining);
+    else{pages.push(remaining);pages.push([]);}
     return pages;
   }
   function headerHtml(inv){
@@ -35,11 +39,12 @@
       const finalPage=index===totalPages-1;
       const details=detailItems.map(rowHtml).join('');
       const watermark=options.preview===true?'<div class="preview-watermark" aria-hidden="true">プレビュー</div>':'';
-      const firstPage=index===0,summaryTop=(firstPage?500:80)+(detailItems.length*26);
+      const firstPage=index===0,hasDetails=detailItems.length>0;
+      const summaryTop=hasDetails?(firstPage?527:100)+(detailItems.length*26):60;
       const pageClasses=['invoice-page',firstPage?'invoice-first-page':'invoice-following-page',finalPage?'invoice-final-page':'invoice-continuation-page'].join(' ');
       return `<div class="${pageClasses}" ${firstPage?'id="invoicePage"':''} style="--detail-count:${Math.max(1,detailItems.length)};--summary-top:${summaryTop}px">
         ${watermark}${firstPage?headerHtml(inv):''}
-        <table class="detail"><thead><tr><th>納品日</th><th>品目・納品書番号</th><th class="num">単価</th><th class="num">数量</th><th class="num">価格</th></tr></thead><tbody>${details}</tbody></table>
+        ${hasDetails?`<table class="detail"><thead><tr><th>納品日</th><th>品目・納品書番号</th><th class="num">単価</th><th class="num">数量</th><th class="num">価格</th></tr></thead><tbody>${details}</tbody></table>`:''}
         ${finalPage?summaryHtml(inv):''}
         <footer class="invoice-footer" aria-label="ページ番号">${index+1} / ${totalPages}</footer>
       </div>`;
