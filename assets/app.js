@@ -59,7 +59,7 @@
     const choose=code=>{const partner=state.partners.find(item=>String(item['顧客コード'])===String(code));if(!partner)return;hiddenEl.value=String(partner['顧客コード']);inputEl.value=partnerLabel(partner);close();onSelect?.(partner);};
     const draw=()=>{const query=String(inputEl.value||'').normalize('NFKC').toLowerCase().replace(/\s+/g,''),ordered=[...state.partners].reverse(),matches=(showAll||!query?ordered:ordered.filter(partner=>partnerSearchText(partner).includes(query))).slice(0,80);resultsEl.innerHTML=matches.length?matches.map(partner=>`<button type="button" role="option" data-partner-code="${esc(partner['顧客コード'])}"><strong>${esc(partner['名称'])}</strong><small>${esc(partner['顧客コード'])}　${esc(partner['メールアドレス']||'メール未登録')}</small></button>`).join(''):'<span class="partner-combobox-empty">一致する取引先がありません。</span>';resultsEl.classList.remove('hidden');inputEl.setAttribute('aria-expanded','true');resultsEl.querySelectorAll('[data-partner-code]').forEach(button=>button.onclick=()=>choose(button.dataset.partnerCode));};
     inputEl.addEventListener('input',()=>{showAll=false;hiddenEl.value='';draw();onSelect?.(null);});
-    inputEl.addEventListener('focus',()=>{showAll=!inputEl.value;draw();});
+    inputEl.addEventListener('focus',()=>{showAll=true;inputEl.select();draw();});
     inputEl.addEventListener('keydown',event=>{if(event.key==='Escape')close();if(event.key==='Enter'){const first=resultsEl.querySelector('[data-partner-code]');if(first){event.preventDefault();choose(first.dataset.partnerCode);}}});
     rootEl.querySelector('button').onclick=()=>{if(!resultsEl.classList.contains('hidden'))return close();showAll=true;draw();inputEl.focus();};
     document.addEventListener('pointerdown',event=>{if(!rootEl.contains(event.target))close();});
@@ -98,7 +98,7 @@
       return result.data;
     }catch(error){if(error?.name==='AbortError')throw new Error('Cloudflare D1が15秒以内に応答しませんでした。');throw error;}finally{clearTimeout(timer);}
   }
-  async function saveInvoiceToD1(invoice){const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice}});return data.invoice;}
+  async function saveInvoiceToD1(invoice){const normalized={...invoice,invoiceDate:inputDate(invoice.invoiceDate),dueDate:inputDate(invoice.dueDate)};const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized}});return data.invoice;}
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
   const displayDlStatus=s=>{
     const status=String(s||'');
@@ -131,8 +131,9 @@
   function bindDetailNumber(element,update){element.addEventListener('input',event=>{if(!event.isComposing){normalizeDetailNumber(element);update();}});element.addEventListener('compositionend',()=>{normalizeDetailNumber(element);update();});element.addEventListener('blur',()=>{normalizeDetailNumber(element);update();});}
   function addSingleDetail(data={},focusName=false){const row=document.createElement('tr');row.innerHTML=`<td><input name="detailName" type="text" inputmode="text" lang="ja" autocomplete="off" value="${esc(data.name||'')}" placeholder="例：授業料・割引" required></td><td><input name="detailUnitPrice" type="text" inputmode="decimal" value="${esc(data.unitPrice??'')}" placeholder="例：25000／割引は-10000" required></td><td><input name="detailQuantity" type="text" inputmode="decimal" value="${esc(data.quantity??1)}" required></td><td><input name="detailUnit" type="text" inputmode="text" lang="ja" value="${esc(data.unit||'')}" placeholder="回・月"></td><td><select name="detailTaxRate"><option value="10" ${Number(data.taxRate??10)===10?'selected':''}>10%</option><option value="8" ${Number(data.taxRate)===8?'selected':''}>8%</option><option value="0" ${Number(data.taxRate)===0?'selected':''}>0%</option></select></td><td class="num" data-detail-amount>0円</td><td><button class="remove-detail" type="button" aria-label="明細を削除">削除</button></td>`;row.querySelector('[name="detailName"]').addEventListener('input',updateSingleTotals);row.querySelector('[name="detailUnit"]').addEventListener('input',updateSingleTotals);row.querySelector('[name="detailTaxRate"]').addEventListener('input',updateSingleTotals);bindDetailNumber(row.querySelector('[name="detailUnitPrice"]'),updateSingleTotals);bindDetailNumber(row.querySelector('[name="detailQuantity"]'),updateSingleTotals);row.querySelector('.remove-detail').onclick=()=>{if($$('#singleDetailBody tr').length===1)return alert('明細は1行以上必要です。');row.remove();updateSingleTotals();saveSingleDraft();};$('#singleDetailBody').appendChild(row);updateSingleTotals();if(focusName){saveSingleDraft();setTimeout(()=>row.querySelector('[name="detailName"]').focus(),0);}}
   function setSingleSaveStatus(message='',type='working'){const status=$('#singleSaveStatus');status.textContent=message;status.className=message?`mail-submit-status ${type}`:'mail-submit-status hidden';}
-  function resetSingleForm(){localStorage.removeItem(SINGLE_DRAFT_KEY);const form=$('#singleInvoiceForm');form.reset();$('#singleDetailBody').innerHTML='';addSingleDetail();renderPartnerOptions();setSingleDefaults(true);setSingleSaveStatus();}
-  async function openDemoSendInvoice(){showView('create');await setCreateMethod('single');resetSingleForm();const form=$('#singleInvoiceForm'),today=localIso(new Date());form.elements.subject.value='テスト送信';form.elements.invoiceDate.value=today;form.elements.dueDate.value=plusDays(today,21);form.elements.invoiceNumber.value=C.nextInvoiceNumber(today,state.invoices);$('#singleDetailBody').innerHTML='';addSingleDetail({name:'テスト',unitPrice:100,quantity:1,unit:'',taxRate:10});addSingleDetail({name:'テスト割引',unitPrice:-100,quantity:1,unit:'',taxRate:10});saveSingleDraft();updateSingleTotals();setSingleSaveStatus('取引先を選択し、右側のプレビューを確認してください。','working');}
+  function setSingleDemoMode(enabled){$('#saveSingleInvoice').classList.toggle('hidden',enabled);$('#saveAndSendSingleInvoice').classList.toggle('hidden',!enabled);}
+  function resetSingleForm(){setSingleDemoMode(false);localStorage.removeItem(SINGLE_DRAFT_KEY);const form=$('#singleInvoiceForm');form.reset();$('#singleDetailBody').innerHTML='';addSingleDetail();renderPartnerOptions();setSingleDefaults(true);setSingleSaveStatus();}
+  async function openDemoSendInvoice(){showView('create');await setCreateMethod('single');resetSingleForm();const form=$('#singleInvoiceForm'),today=localIso(new Date());form.elements.subject.value='テスト送信';form.elements.invoiceDate.value=today;form.elements.dueDate.value=plusDays(today,21);form.elements.invoiceNumber.value=C.nextInvoiceNumber(today,state.invoices);$('#singleDetailBody').innerHTML='';addSingleDetail({name:'テスト',unitPrice:100,quantity:1,unit:'',taxRate:10});addSingleDetail({name:'テスト割引',unitPrice:-100,quantity:1,unit:'',taxRate:10});saveSingleDraft();updateSingleTotals();setSingleDemoMode(true);singlePartnerCombo?.clear();setSingleSaveStatus('取引先を選択し、右側のプレビューを確認して「保存して送信する」を押してください。','working');}
   function validateSingleInvoiceForPreview(){
     const form=$('#singleInvoiceForm'),missing=[],mark=(element,label)=>{if(!element||String(element.value||'').trim())return;element.classList.add('field-missing');missing.push(label);};
     $$('#singleInvoiceForm .field-missing').forEach(element=>element.classList.remove('field-missing'));
@@ -146,6 +147,35 @@
   function currentSingleInvoice(){const form=$('#singleInvoiceForm'),values=Object.fromEntries(new FormData(form).entries()),partner=state.partners.find(item=>item['顧客コード']===values.partnerCode);return C.matchPartners([C.buildManualInvoice(values,singleDetailRows(),partner)],state.partners)[0];}
   function updateSingleLivePreview(){const host=$('#singleInvoiceLivePreview'),form=$('#singleInvoiceForm');if(!host||!form)return;try{const values=Object.fromEntries(new FormData(form).entries()),partner=state.partners.find(item=>String(item['顧客コード'])===String(values.partnerCode))||{'顧客コード':'','名称':'取引先未選択','敬称':'様','郵便番号':'','都道府県':'','住所1':'','住所2':'','メールアドレス':''},details=singleDetailRows().map(row=>({...row,name:String(row.name||'').trim()||'（品目未入力）',unitPrice:Number.isFinite(Number(row.unitPrice))?Number(row.unitPrice):0,quantity:Number(row.quantity)>0?Number(row.quantity):1}));values.invoiceNumber=/^\d{6,}$/.test(String(values.invoiceNumber||''))?values.invoiceNumber:'000000000';values.subject=String(values.subject||'').trim()||'件名未入力';values.invoiceDate=values.invoiceDate||localIso(new Date());values.dueDate=values.dueDate||plusDays(values.invoiceDate,21);host.innerHTML=P.pageHtml(C.buildManualInvoice(values,details.length?details:[{name:'（品目未入力）',unitPrice:0,quantity:1,unit:'',taxRate:10}],partner));const page=host.querySelector('#invoicePage');if(page)page.id='singleInvoicePreviewPage';}catch(_){host.innerHTML='<div class="single-preview-empty">入力内容がここに表示されます。</div>';}}
   async function addSingleInvoice(event){event.preventDefault();if(!validateSingleInvoiceForPreview())return;const button=event.submitter||event.currentTarget.querySelector('[type="submit"]'),originalText=button?.textContent||'';if(button){button.disabled=true;button.textContent='保存中…';}showOperationOverlay('保存中');saveSingleDraft();setSingleSaveStatus('Cloudflare D1へ保存しています。','working');try{const invoice=currentSingleInvoice();if(state.invoices.some(item=>item.invoiceNumber===invoice.invoiceNumber))throw new Error('同じ請求書番号が発行リストにあります。');invoice.paymentStatus='未入金';invoice.createdAt=new Date().toISOString();const saved=await saveInvoiceToD1(invoice);state.invoices.push(saved);state.selectedInvoiceNumber=saved.invoiceNumber;renderCreate();renderInvoices();$('#invoiceImportSummary').innerHTML=cards({'作成方法':'個別作成','追加件数':1,'発行リスト':state.invoices.length,'請求金額':C.formatYen(saved.total)});$('#invoiceImportSummary').classList.remove('hidden');activateStep(4);resetSingleForm();showView('invoices');alert(`${saved.invoiceNumber} ${saved.partnerName}の請求書をD1へ保存しました。`,'success');}catch(e){const message=`請求書は保存されていません。${e.message}`;setSingleSaveStatus(message,'error');alert(message,'error');}finally{hideOperationOverlay();if(button){button.disabled=false;button.textContent=originalText;}}}
+  async function saveAndSendSingleInvoice(){
+    if(!validateSingleInvoiceForPreview())return;
+    const button=$('#saveAndSendSingleInvoice'),idleText='保存して送信する';
+    button.disabled=true;button.textContent='保存中…';showOperationOverlay('保存して送信中');saveSingleDraft();
+    let saved=null;
+    try{
+      const invoice=currentSingleInvoice();
+      if(state.invoices.some(item=>String(item.invoiceNumber)===String(invoice.invoiceNumber)))throw new Error('同じ請求書番号が発行リストにあります。');
+      invoice.paymentStatus='未入金';invoice.createdAt=new Date().toISOString();
+      setSingleSaveStatus('Cloudflare D1へ保存しています。','working');
+      saved=await saveInvoiceToD1(invoice);
+      state.invoices.push(saved);state.selectedInvoiceNumber=saved.invoiceNumber;state.preview=saved;
+      button.textContent='PDFを準備中…';setSingleSaveStatus('保存しました。送信用PDFを準備しています。','working');
+      await api('saveInvoiceData',{invoice:saved});
+      await ensurePdfsForSend([saved]);
+      button.textContent='送信中…';setSingleSaveStatus('テストメールを送信しています。','working');
+      await api('enqueueSend',{invoiceNumbers:[saved.invoiceNumber],testMode:true,resend:false,newToken:true});
+      await api('processPendingSends');
+      await refreshAll(false);
+      const refreshed=state.invoices.find(item=>String(item.invoiceNumber)===String(saved.invoiceNumber));
+      if(refreshed?.sendStatus==='送信失敗')throw new Error('配信処理が失敗しました。配信履歴をご確認ください。');
+      resetSingleForm();showView('invoices');renderInvoices();
+      alert(`${saved.invoiceNumber} ${saved.partnerName}の請求書を保存し、テスト送信しました。`,'success');
+    }catch(e){
+      const prefix=saved?'請求書は保存されましたが、送信できませんでした。':'請求書は保存されていません。';
+      setSingleSaveStatus(`${prefix}${e.message}`,'error');alert(`${prefix}${e.message}`,'error');
+      if(saved){showView('invoices');renderInvoices();}
+    }finally{hideOperationOverlay();button.disabled=false;button.textContent=idleText;}
+  }
   const invoiceSortValue=invoice=>{const date=Date.parse(String(invoice.createdAt||invoice.invoiceDate||'').replace(/\//g,'-'));return Number.isFinite(date)?date:0;};
   const sortedInvoices=()=>state.invoices.slice().sort((a,b)=>invoiceSortValue(b)-invoiceSortValue(a)||String(b.invoiceNumber).localeCompare(String(a.invoiceNumber),'ja'));
   const selectedInvoice=()=>state.invoices.find(invoice=>String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber));
@@ -271,6 +301,7 @@
   $('#addSingleDetail').onclick=()=>addSingleDetail({},true);
   $('#previewSingleInvoice').onclick=previewSingleInvoice;
   $('#singleInvoiceForm').onsubmit=addSingleInvoice;
+  $('#saveAndSendSingleInvoice').onclick=saveAndSendSingleInvoice;
   $('#singleInvoiceForm').addEventListener('input',()=>{saveSingleDraft();updateSingleLivePreview();});
   $('#singleInvoiceForm').addEventListener('change',()=>{saveSingleDraft();updateSingleLivePreview();});
   $('#singleInvoiceForm').elements.invoiceDate.onchange=updateSingleFromDate;
