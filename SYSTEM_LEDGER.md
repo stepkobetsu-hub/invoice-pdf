@@ -18,12 +18,14 @@
 | Cloudflare D1 | 請求書配信管理DB | `step-invoice-db` / `e92d6d76-04d2-40de-9ddf-8804850402c8` |
 | Cloudflare R2 | PDFの非公開保管 | `step-invoice-pdfs` |
 
-## 開発中：銀行入金確認・請求書消込
+## 本番稼働：銀行入金確認・請求書消込
 
-- ブランチ: `feature/bank-payment-reconciliation`
+- GitHub本番コミット: `95d6aba7c4eddbc9adb69bf26e6f1b9714e093d0`
 - 仕様・migration・復旧手順: `docs/BANK_PAYMENT_RECONCILIATION.md`
 - migration: `cloudflare/migrations/0005_bank_payment_reconciliation.sql`
-- 状態: 実CSV（CP932固定レコード形式）確認・取込アダプター実装済み。本番未反映。
+- Cloudflare Worker Version: `b493c278-ddd3-4d8a-9ce9-942655239208`
+- 本番前D1バックアップ: `backups/step-invoice-before-bank-20260810-205835.sql`（運用PC内・GitHubへは保存しない）
+- 状態: 2026-08-10本番反映済み。実CSV（CP932固定レコード形式）対応、D1 migration適用、Worker・GitHub Pages反映、公開画面確認済み。
 
 ## 2. 関連するが、請求書本体とは別のもの
 
