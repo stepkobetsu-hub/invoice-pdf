@@ -91,7 +91,7 @@
         <div class="table-wrap">
           <table id="createTable"><thead><tr><th><label><input id="createSelectAll" type="checkbox" aria-label="すべて選択"> すべて</label></th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>件名</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
         </div>
-        <div class="actions"><span id="createSelectedCount">0／0件を選択</span><button id="addToSend" class="button success" disabled>保存して請求書を作成</button></div>
+        <div class="actions create-list-actions"><span id="createSelectedCount">0／0件を選択</span><button id="removeSelectedCreateRows" class="button create-delete-button" type="button" disabled>選択した行を削除</button><button id="addToSend" class="button success" disabled>保存して請求書を作成</button></div>
       </section>
 
       <section id="view-invoices" class="view active">
