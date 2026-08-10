@@ -5,7 +5,9 @@
   const rowHtml=d=>`<tr><td></td><td>${esc(d.name)}</td><td class="num">${number(d.unitPrice)}</td><td class="num">${number(d.quantity)}</td><td class="num">${number(d.amount)}</td></tr>`;
   function paginate(details){
     const items=details.length?details:[{name:'',unitPrice:0,quantity:0,amount:0}];
-    const singlePageCapacity=5,firstPageCapacity=10,finalContinuationCapacity=16,fullContinuationCapacity=27;
+    // A4を有効に使い、通常の請求書はできるだけ1ページに収める。
+    // 集計欄を含む最終ページと、明細だけの継続ページでは収容量を分ける。
+    const singlePageCapacity=10,firstPageCapacity=21,finalContinuationCapacity=18,fullContinuationCapacity=34;
     if(items.length<=singlePageCapacity)return [items];
     const pages=[items.slice(0,Math.min(firstPageCapacity,items.length-1))];
     let remaining=items.slice(pages[0].length);
@@ -33,7 +35,7 @@
       const finalPage=index===totalPages-1;
       const details=detailItems.map(rowHtml).join('');
       const watermark=options.preview===true?'<div class="preview-watermark" aria-hidden="true">プレビュー</div>':'';
-      const firstPage=index===0,summaryTop=(firstPage?520:110)+(detailItems.length*34);
+      const firstPage=index===0,summaryTop=(firstPage?500:80)+(detailItems.length*26);
       const pageClasses=['invoice-page',firstPage?'invoice-first-page':'invoice-following-page',finalPage?'invoice-final-page':'invoice-continuation-page'].join(' ');
       return `<div class="${pageClasses}" ${firstPage?'id="invoicePage"':''} style="--detail-count:${Math.max(1,detailItems.length)};--summary-top:${summaryTop}px">
         ${watermark}${firstPage?headerHtml(inv):''}
