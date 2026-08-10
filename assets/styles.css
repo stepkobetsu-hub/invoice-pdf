@@ -80,10 +80,11 @@
 .preview-output-button{min-width:190px;padding:13px 20px;font-size:16px}
 .invoice-page .preview-watermark{position:absolute;left:50%;top:50%;z-index:20;transform:translate(-50%,-50%) rotate(-30deg);color:#d64545;opacity:.16;font-size:112px;font-weight:800;letter-spacing:.08em;white-space:nowrap;pointer-events:none}
 .invoice-page .detail{table-layout:fixed;border-spacing:0}
-.invoice-page .detail thead tr{height:38px}
-.invoice-page .detail tbody tr{height:34px;background:#fff!important}
-.invoice-page .detail td{height:34px;line-height:18px;background:#fff;border:0!important;box-shadow:none!important;vertical-align:middle}
-.invoice-page .detail th{height:38px;line-height:18px;vertical-align:middle}
+.invoice-page .detail thead tr{height:32px}
+.invoice-page .detail tbody tr{height:26px;background:#fff}
+.invoice-page .detail td{height:26px;padding:2px 5px;line-height:16px;background:#fff;border:0!important;border-bottom:1px solid #eeeeee!important;box-shadow:none!important;vertical-align:middle}
+.invoice-page .detail tbody tr:nth-child(even) td{background:#f7f7f7!important}
+.invoice-page .detail th{height:32px;padding:5px;line-height:17px;vertical-align:middle}
 .invoice-page .detail th:nth-child(1),.invoice-page .detail td:nth-child(1){width:105px}
 .invoice-page .detail th:nth-child(2),.invoice-page .detail td:nth-child(2){width:305px}
 .invoice-page .detail th:nth-child(3),.invoice-page .detail td:nth-child(3){width:115px}
@@ -142,14 +143,15 @@
 .invoice-page + .invoice-page{margin-top:24px}
 .invoice-page .invoice-footer{position:absolute;left:32px;right:32px;bottom:18px;height:28px;border-top:1px solid #c8c8c8;padding-top:8px;text-align:center;font-size:13px;line-height:20px;color:#333;box-sizing:border-box}
 .invoice-page.invoice-final-page .totals{top:var(--summary-top)}
-.invoice-page.invoice-final-page .tax-title{top:calc(var(--summary-top) + 34px)}
-.invoice-page.invoice-final-page .tax-table{top:calc(var(--summary-top) + 50px)}
+.invoice-page.invoice-final-page .tax-title{top:calc(var(--summary-top) + 30px)}
+.invoice-page.invoice-final-page .tax-table{top:calc(var(--summary-top) + 46px)}
 .invoice-page.invoice-following-page .detail{top:60px}
-.invoice-page.invoice-final-page .bank-title{top:calc(var(--summary-top) + 130px)}
-.invoice-page.invoice-final-page .bank-box{top:calc(var(--summary-top) + 154px)}
-.invoice-page.invoice-final-page .note-title{top:calc(var(--summary-top) + 244px)}
-.invoice-page.invoice-final-page .note-box{top:calc(var(--summary-top) + 268px)}
-.invoice-page.invoice-final-page .section-box{height:80px;box-sizing:border-box;overflow:hidden;white-space:pre-wrap;line-height:1.45}
+.invoice-page.invoice-final-page .bank-title{top:calc(var(--summary-top) + 116px)}
+.invoice-page.invoice-final-page .bank-box{top:calc(var(--summary-top) + 138px)}
+.invoice-page.invoice-final-page .note-title{top:calc(var(--summary-top) + 210px)}
+.invoice-page.invoice-final-page .note-box{top:calc(var(--summary-top) + 232px)}
+.invoice-page.invoice-final-page .section-box{height:60px;box-sizing:border-box;overflow:hidden;white-space:pre-wrap;line-height:1.35}
+.invoice-page.invoice-final-page .bank-box{height:62px}
 .pdf-render-host{height:auto!important;overflow:visible!important}
 @media print{
   body.printing-invoice .invoice-page{break-after:page;page-break-after:always}
