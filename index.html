@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260811-csv-delete-left">
+  <link rel="stylesheet" href="assets/styles.css?v=20260811-csv-top-save">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260811-bulk-fast" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260811-csv-select-delete-top" defer></script>
+  <script src="assets/app.js?v=20260811-csv-top-save" defer></script>
   <script src="assets/bank-importers.js?v=20260810-smbc-web21" defer></script>
   <script src="assets/bank-reconciliation.js?v=20260810-bank-reconciliation" defer></script>
   <script src="assets/receipts.js?v=20260810-d1-save-print" defer></script>
@@ -88,11 +88,11 @@
           </form>
         </div>
         <div id="invoiceImportSummary" class="summary-grid hidden"></div>
-        <div class="create-table-toolbar" aria-label="CSV読込行の一括操作"><span id="createSelectedCountTop">0／0件を選択</span><button id="removeSelectedCreateRowsTop" class="button create-delete-button create-delete-button-top" type="button" data-remove-create-rows disabled>選択した行を削除</button></div>
+        <div class="create-table-toolbar" aria-label="CSV読込行の一括操作"><span id="createSelectedCountTop">0／0件を選択</span><button id="removeSelectedCreateRowsTop" class="button create-delete-button create-delete-button-top" type="button" data-remove-create-rows disabled>選択した行を削除</button><button id="addToSendTop" class="button success create-save-button-top" type="button" data-save-imported-invoices disabled>保存して請求書を作成</button></div>
         <div class="table-wrap">
           <table id="createTable"><thead><tr><th><label><input id="createSelectAll" type="checkbox" aria-label="すべて選択"> すべて</label></th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>件名</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
         </div>
-        <div class="actions create-list-actions"><span id="createSelectedCount">0／0件を選択</span><button id="removeSelectedCreateRows" class="button create-delete-button" type="button" data-remove-create-rows disabled>選択した行を削除</button><button id="addToSend" class="button success" disabled>保存して請求書を作成</button></div>
+        <div class="actions create-list-actions"><span id="createSelectedCount">0／0件を選択</span><button id="removeSelectedCreateRows" class="button create-delete-button" type="button" data-remove-create-rows disabled>選択した行を削除</button><button id="addToSend" class="button success" type="button" data-save-imported-invoices disabled>保存して請求書を作成</button></div>
       </section>
 
       <section id="view-invoices" class="view active">
