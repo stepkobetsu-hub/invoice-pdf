@@ -1,0 +1,35 @@
+name: Fix stuck loading overlay
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-stuck-loading.yml'
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prevent startup overlay from blocking UI
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('assets/app.js')
+          s=p.read_text(encoding='utf-8')
+          old="const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();\n  Promise.resolve(initialLoad).finally(hideOperationOverlay);"
+          new="const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();\n  const startupOverlayTimer=setTimeout(()=>{operationOverlayCount=1;hideOperationOverlay();},15000);\n  Promise.resolve(initialLoad).finally(()=>{clearTimeout(startupOverlayTimer);operationOverlayCount=1;hideOperationOverlay();});"
+          if old not in s: raise SystemExit('startup target not found')
+          s=s.replace(old,new,1)
+          p.write_text(s,encoding='utf-8')
+          i=Path('index.html'); h=i.read_text(encoding='utf-8')
+          h=h.replace('assets/app.js?v=20260811-single-number-save','assets/app.js?v=20260811-loading-timeout',1)
+          i.write_text(h,encoding='utf-8')
+      - run: node --check assets/app.js
+      - name: Commit
+        shell: bash
+        run: |
+          git config user.name 'stepkobetsu-hub'
+          git config user.email 'stepkobetsu-hub@users.noreply.github.com'
+          git add assets/app.js index.html
+          git commit -m '起動時の読み込み表示を15秒で解除'
+          git push
