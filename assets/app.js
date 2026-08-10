@@ -405,7 +405,15 @@
   window.StepInvoiceApp={state,api,cloudApi,saveInvoiceToD1,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox};
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
-  const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();
+  const initialLoad=(async()=>{
+    const token=await ensureStaffSessionToken();
+    if(token){
+      $('#userLabel').textContent='接続済み';
+      $('#staffLoginLink').classList.add('hidden');
+      return refreshAll(false);
+    }
+    $('#userLabel').textContent='未接続';
+  })();
   const startupOverlayTimer=setTimeout(()=>{operationOverlayCount=1;hideOperationOverlay();},15000);
   Promise.resolve(initialLoad).finally(()=>{clearTimeout(startupOverlayTimer);operationOverlayCount=1;hideOperationOverlay();});
 })();
