@@ -284,7 +284,23 @@
   function applySupportDashboard(data){if(data.settings)state.settings={...state.settings,...data.settings,apiUrl:state.settings.apiUrl,adminApiKey:state.settings.adminApiKey};state.receipts=data.receipts||state.receipts;if(Array.isArray(data.partners)){state.partners=data.partners;persistPartners();renderPartners();renderPartnerOptions();window.StepReceipts?.refreshPartners?.();}state.supportLoaded=true;localStorage.setItem('stepInvoiceSettings',JSON.stringify(state.settings));restoreForms();window.StepReceipts?.render();}
   async function refreshSupportData(){if(!state.settings.apiUrl)return;try{const data=await api('getSupportData');applySupportDashboard(data);}catch(e){alert(`取引先・設定の読み込みは継続できませんでした：${e.message}`,'warning');}}
   async function refreshAll(syncStatuses=false){try{const data=await cloudApi('/api/app/dashboard');state.invoices=data.invoices||[];state.history=data.history||[];state.dashboardLoaded=true;restoreForms();renderCreate();renderInvoices();renderHistory();$('#userLabel').textContent=data.user||'接続済み';if(!state.supportLoaded||syncStatuses)void refreshSupportData();}catch(d1Error){try{const data=await api('getDashboard',{syncStatuses:syncStatuses===true});state.invoices=data.invoices||state.invoices;state.history=data.history||[];state.dashboardLoaded=true;applySupportDashboard(data);renderCreate();renderInvoices();renderHistory();$('#userLabel').textContent=data.user||'接続済み';alert(`D1に接続できないため、旧台帳を表示しました：${d1Error.message}`,'warning');}catch(fallbackError){alert(fallbackError.message,'error');}}}
-  async function saveForm(form,key){const values=Object.fromEntries(new FormData(form).entries());state.settings={...state.settings,...values};localStorage.setItem('stepInvoiceSettings',JSON.stringify(state.settings));try{const remoteValues={...values};delete remoteValues.apiUrl;delete remoteValues.adminApiKey;if(Object.keys(remoteValues).length)await api('saveSettings',remoteValues);setSingleDefaults();renderInvoices();alert('設定を保存しました。','success');}catch(e){alert(`この端末には保存しましたが、共通設定の保存に失敗しました：${e.message}`,'error');}return values;}
+  async function saveForm(form,key){
+    const values=Object.fromEntries(new FormData(form).entries()),button=$('#saveSettingsButton'),status=$('#settingsSaveStatus'),idleLabel=state.settingsDocument==='receipt'?'領収書設定を保存':'請求書設定を保存';
+    button.disabled=true;button.textContent='保存中…';status.textContent='保存中…';status.className='mail-submit-status working';showOperationOverlay('保存中…');
+    state.settings={...state.settings,...values};localStorage.setItem('stepInvoiceSettings',JSON.stringify(state.settings));
+    let sharedSaved=true;
+    try{
+      const remoteValues={...values};delete remoteValues.apiUrl;delete remoteValues.adminApiKey;
+      if(Object.keys(remoteValues).length)await api('saveSettings',remoteValues);
+    }catch(e){
+      sharedSaved=false;
+      if(!/初期設定が未完了|setupSystem/.test(String(e.message||'')))alert(`この端末には保存しました。共通設定への反映は保留されています：${e.message}`,'warning');
+    }finally{
+      setSingleDefaults();renderInvoices();button.textContent='保存しました';status.textContent=sharedSaved?'保存しました。':'この端末に保存しました。';status.className='mail-submit-status success';alert(sharedSaved?'設定を保存しました。':'設定をこの端末に保存しました。','success');hideOperationOverlay();
+      await new Promise(resolve=>setTimeout(resolve,900));button.disabled=false;button.textContent=idleLabel;
+    }
+    return values;
+  }
   function restoreForms(){$$('#settingsForm [name],#mailForm [name]').forEach(el=>{if(state.settings[el.name]!==undefined)el.value=state.settings[el.name];});}
   function selectSettingsDocument(type){const selected=type==='receipt'?'receipt':'invoice';$$('[data-settings-document]').forEach(button=>{const active=button.dataset.settingsDocument===selected;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});$$('[data-settings-panel]').forEach(panel=>{const active=panel.dataset.settingsPanel===selected;panel.classList.toggle('hidden',!active);panel.querySelectorAll('[name]').forEach(input=>input.disabled=!active);});const heading=$('#settingsDocumentHeading');heading.className=`settings-document-heading span-2 ${selected}`;heading.innerHTML=selected==='invoice'?'<strong>現在：請求書設定</strong><span>請求書の発行者情報、振込先、備考を設定しています。</span>':'<strong>現在：領収書設定</strong><span>領収書の発行者情報、但し書き、備考を設定しています。</span>';$('#saveSettingsButton').textContent=selected==='invoice'?'請求書設定を保存':'領収書設定を保存';state.settingsDocument=selected;}
   $$('.nav-item[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));
