@@ -37,9 +37,15 @@ async function main(){
   const document=window.document;
   const invoiceForLayout={partnerName:'テスト',honorific:'様',postal:'',prefecture:'',address1:'',address2:'',customerCode:'',invoiceNumber:'202608001',invoiceDate:'2026/08/10',dueDate:'2026/08/31',subject:'2026年8月分',subtotal:2300,tax:230,total:2530,bank:'振込先',note:'備考'};
   const layoutHost=document.createElement('div');
-  layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:10},(_,index)=>({name:`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
+  layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:8},(_,index)=>({name:`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
   assert.equal(layoutHost.querySelectorAll('.invoice-page').length,1);
-  assert.equal(layoutHost.querySelectorAll('.invoice-page .detail tbody tr').length,10);
+  assert.equal(layoutHost.querySelectorAll('.invoice-page .detail tbody tr').length,8);
+  layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:15},(_,index)=>({name:index===14?'CCC':`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
+  const mediumPages=layoutHost.querySelectorAll('.invoice-page');
+  assert.equal(mediumPages.length,2);
+  assert.equal(mediumPages[0].querySelectorAll('.detail tbody tr').length,15);
+  assert.match(mediumPages[0].textContent,/CCC/);
+  assert.equal(mediumPages[1].querySelector('.detail'),null);
   layoutHost.innerHTML=window.StepInvoicePdf.pageHtml({...invoiceForLayout,details:Array.from({length:23},(_,index)=>({name:`明細${index+1}`,unitPrice:100,quantity:1,amount:100}))});
   const layoutPages=layoutHost.querySelectorAll('.invoice-page');
   assert.equal(layoutPages.length,2);
@@ -126,9 +132,9 @@ async function main(){
   assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/27,500/);
   document.querySelector('#previewSingleInvoice').click();
   assert.equal(document.querySelector('#previewDialog').open,true);
-  assert.equal(document.querySelectorAll('#previewDialog #printPreview').length,1);
+  assert.equal(document.querySelectorAll('#previewDialog #printPreview').length,0);
   assert.equal(document.querySelectorAll('#previewDialog #downloadPreview').length,1);
-  assert.equal(document.querySelector('#printPreview').textContent,'プレビューを印刷');
+  assert.equal(document.querySelectorAll('#invoicePdfDialog #printSelectedInvoice').length,0);
   assert.equal(document.querySelector('#downloadPreview').textContent,'プレビューPDFを保存');
   assert.match(document.querySelector('#invoicePage').textContent,/プレビュー/);
   assert.equal(document.querySelector('#invoicePage .preview-watermark').textContent,'プレビュー');
@@ -211,8 +217,8 @@ async function main(){
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
-  assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}'));
-  assert.match(styles,/\.invoice-page \.bank-box\{[\s\S]*?min-height:92px;[\s\S]*?max-height:92px;/);
+  assert.ok(styles.includes('.invoice-page.invoice-final-page .totals{top:var(--summary-top)}'));
+  assert.match(styles,/\.invoice-page\.invoice-final-page \.bank-box\{[\s\S]*?height:92px;[\s\S]*?min-height:92px;[\s\S]*?max-height:92px/);
   assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
   console.log('ui tests passed');
 }
