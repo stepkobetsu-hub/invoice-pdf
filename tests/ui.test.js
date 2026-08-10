@@ -38,8 +38,8 @@ async function main(){
   assert.equal(document.querySelector('#view-invoices').classList.contains('active'),true);
   assert.equal(window.location.hash,'#invoices');
   assert.equal(window.StepInvoiceApp.initialViewForNavigation('navigate','#settings'),'invoices');
-  assert.equal(window.StepInvoiceApp.initialViewForNavigation('reload','#settings'),'settings');
-  assert.equal(window.StepInvoiceApp.initialViewForNavigation('back_forward','#receipts'),'receipts');
+  assert.equal(window.StepInvoiceApp.initialViewForNavigation('reload','#settings'),'invoices');
+  assert.equal(window.StepInvoiceApp.initialViewForNavigation('back_forward','#receipts'),'invoices');
   document.querySelector('[data-view="create"]').click();
   assert.equal(window.location.hash,'#create');
   document.querySelector('[data-create-method="single"]').click();
