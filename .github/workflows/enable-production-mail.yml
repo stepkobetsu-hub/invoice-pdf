@@ -1,0 +1,77 @@
+name: Enable production invoice mail
+
+on:
+  push:
+    paths:
+      - '.github/workflows/enable-production-mail.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  enable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Switch normal invoice mail from test mode to production mode
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('assets/app.js')
+          s = p.read_text(encoding='utf-8')
+
+          replacements = [
+            ("await api('enqueueSend',{invoiceNumbers:[saved.invoiceNumber],testMode:true,resend:false,newToken:true});",
+             "await api('enqueueSend',{invoiceNumbers:[saved.invoiceNumber],testMode:false,resend:false,newToken:true});"),
+            ("const queued=await api('enqueueSend',{invoiceNumbers:items.map(invoice=>invoice.invoiceNumber),testMode:true,resend:items.some(invoice=>C.isSentStatus(invoice.sendStatus)),newToken:true});",
+             "const queued=await api('enqueueSend',{invoiceNumbers:items.map(invoice=>invoice.invoiceNumber),testMode:false,resend:items.some(invoice=>C.isSentStatus(invoice.sendStatus)),newToken:true});"),
+            ("await api('enqueueSend',{invoiceNumbers:[invoice.invoiceNumber],testMode:true,resend,newToken:true});",
+             "await api('enqueueSend',{invoiceNumbers:[invoice.invoiceNumber],testMode:false,resend,newToken:true});"),
+            ("try{await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:true,resend:false,newToken:true});",
+             "try{await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:false,resend:false,newToken:true});"),
+            ("if(groups.unsent.length)await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:true,resend:false,newToken:true});",
+             "if(groups.unsent.length)await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:false,resend:false,newToken:true});"),
+            ("if(groups.resend.length)await api('enqueueSend',{invoiceNumbers:groups.resend.map(x=>x.invoiceNumber),testMode:true,resend:true,newToken:true});",
+             "if(groups.resend.length)await api('enqueueSend',{invoiceNumbers:groups.resend.map(x=>x.invoiceNumber),testMode:false,resend:true,newToken:true});"),
+            ("alert(`${saved.invoiceNumber} ${saved.partnerName}の請求書を保存し、テスト送信しました。`,'success');",
+             "alert(`${saved.invoiceNumber} ${saved.partnerName}の請求書を保存し、メール送信しました。`,'success');"),
+          ]
+
+          for old, new in replacements:
+            count = s.count(old)
+            if count != 1:
+              raise SystemExit(f'expected exactly one match, found {count}: {old[:100]}')
+            s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+
+          index = Path('index.html')
+          html = index.read_text(encoding='utf-8')
+          import re
+          pattern = r'assets/app\.js\?v=[^"\']+'
+          matches = re.findall(pattern, html)
+          if len(matches) != 1:
+            raise SystemExit(f'app.js cache-buster target count={len(matches)}')
+          html = re.sub(pattern, 'assets/app.js?v=20260811-production-mail', html, count=1)
+          index.write_text(html, encoding='utf-8')
+
+      - name: Syntax check
+        run: node --check assets/app.js
+
+      - name: Core regression check
+        run: node tests/core.test.js
+
+      - name: Commit production-mail switch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No changes needed.'
+            exit 0
+          fi
+          git config user.name 'stepkobetsu-hub'
+          git config user.email 'stepkobetsu-hub@users.noreply.github.com'
+          git add assets/app.js index.html
+          git commit -m '請求書メールを本番宛先送信へ切替'
+          git push
