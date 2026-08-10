@@ -2,7 +2,7 @@
 
 ## 現在の状態
 
-機能ブランチ `feature/bank-payment-reconciliation` で実装中。本番には未反映。
+2026-08-10に本番反映済み。GitHub本番コミットは `95d6aba7c4eddbc9adb69bf26e6f1b9714e093d0`、Cloudflare Worker Versionは `b493c278-ddd3-4d8a-9ce9-942655239208`。
 2026-08-10提供の実CSVで、CP932、ヘッダーなしの固定レコード形式であることを確認した。
 
 - `1`: 口座ヘッダー
@@ -48,7 +48,16 @@
 - APIは既存スタッフ認証と `APP_ORIGIN` 制限の内側に置く。
 - CSVの内容をlocalStorageへ保存しない。
 
-## 本番反映手順（実CSV確認後）
+## 本番反映記録
+
+- 本番前D1バックアップ: `backups/step-invoice-before-bank-20260810-205835.sql`（運用PC内のみ）
+- D1 migration `0005_bank_payment_reconciliation.sql`: 適用成功
+- Worker: `step-invoice-api` Version `b493c278-ddd3-4d8a-9ce9-942655239208`
+- GitHub Pages: main `95d6aba7c4eddbc9adb69bf26e6f1b9714e093d0`
+- 公開確認: 初期画面が請求書一覧、「入金確認」ボタン、デモの「保存する」「保存して送信する」、PDF明細レイアウトを確認
+- 回帰試験: `npm test`、`npm run check` とも成功
+
+## 本番反映手順
 
 1. 実CSVの個人情報を必要に応じて伏せた検証用コピーで、ヘッダー・区切り・改行・文字コードを確認する。
 2. SMBC importerとfixture試験を追加する。
