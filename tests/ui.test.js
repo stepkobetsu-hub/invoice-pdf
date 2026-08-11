@@ -218,6 +218,7 @@ async function main(){
   assert.match(styles,/\.invoice-page \.detail tbody tr:nth-child\(even\) td\{background:#f6f8fb!important\}/);
   assert.match(styles,/\.invoice-page \.page-number\{left:0;top:auto;bottom:26px;width:100%;text-align:center\}/);
   assert.match(styles,/\.invoice-continuation-page \.detail\{top:72px\}/);
+  assert.match(styles,/\.payment-pill\.unpaid,[^}]*background:#dc2626;color:#fff/);
   console.log('ui tests passed');
 }
 

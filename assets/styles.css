@@ -434,7 +434,7 @@ input[type="checkbox"]{width:19px;height:19px;accent-color:#4f46e5;cursor:pointe
 .status.failed{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
 .status.expired{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .status.disabled{background:#e2e8f0;color:#475569}
-.payment-pill.unpaid,.payment-dropdown:not([data-status="入金済"]):not([data-status="未設定"]) summary{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.payment-pill.unpaid,.payment-dropdown:not([data-status="入金済"]):not([data-status="未設定"]) summary{border-color:#dc2626;background:#dc2626;color:#fff}
 .payment-pill.paid,.payment-dropdown[data-status="入金済"] summary{border-color:#bbf7d0;background:#f0fdf4;color:#15803d}
 .payment-pill.unset,.payment-dropdown[data-status="未設定"] summary{border-color:#e2e8f0;background:#f1f5f9;color:#64748b}
 
