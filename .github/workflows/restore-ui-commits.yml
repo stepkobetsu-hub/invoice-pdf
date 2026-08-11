@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Make STEP logo a real home link
-        run: python scripts/fix_brand_link.py
+      - name: Restore legacy invoice bulk-action design and behavior
+        run: python scripts/restore_legacy_bulk_actions.py
       - name: Verify syntax
         run: |
           git diff --check
           node --check assets/app.js
-      - name: Commit logo navigation fix
+      - name: Commit restored legacy bulk actions
         run: |
           git config user.name "stepkobetsu-hub"
           git config user.email "stepkobetsu@gmail.com"
           git add index.html assets/app.js assets/styles.css
-          git commit -m "Fix STEP logo home navigation"
+          git commit -m "Restore legacy invoice bulk actions"
           git push origin HEAD:main
-# run-20260811-brand-link
+# run-20260811-legacy-bulk-actions
