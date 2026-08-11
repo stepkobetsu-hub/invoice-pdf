@@ -28,5 +28,7 @@ assert.match(app, /cloudApi\('\/api\/app\/apps-script',\{method:'POST',body:\{ac
 assert.doesNotMatch(app, /document\.createElement\('iframe'\)/, 'Apps Script calls do not depend on a hidden iframe response');
 assert.deepEqual(manifest.webapp, {access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'}, 'Apps Script remains reachable server-to-server while doPost enforces staff authentication');
 assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.external_request'), 'Apps Script can verify staff sessions and call Cloudflare/Brevo');
+assert.match(source, /getDeliveryDiagnostics: \(\) => getDeliveryDiagnostics_\(payload\.invoiceNumber, requestAuth\)/, 'delivery diagnostics require the normal staff-authenticated route');
+assert.match(app, /Brevoの実際の配信状況を確認しています/, 'mail dialog distinguishes provider acceptance from delivery');
 
 console.log('bulk resend performance checks passed');

@@ -57,7 +57,8 @@ function doPost(e) {
       disableDelivery: () => disableDelivery_(payload.invoiceNumber, requestAuth), saveSettings: () => saveSettings_(payload, requestAuth),
       recoverQueue: () => recoverStuckQueue_(requestAuth),
       processPendingSends: () => processPendingSends_(requestAuth),
-      getSendBatchStatus: () => getSendBatchStatus_(payload.batchId, requestAuth)
+      getSendBatchStatus: () => getSendBatchStatus_(payload.batchId, requestAuth),
+      getDeliveryDiagnostics: () => getDeliveryDiagnostics_(payload.invoiceNumber, requestAuth)
     };
     if (!routes[action]) throw new Error('未対応の操作です。');
     const result = {ok:true,data:routes[action]()};
@@ -422,6 +423,25 @@ function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedA
 function buildBrevoBatchPayload_(prepared,settings,batchId,sandbox){const payload={sender:{email:String(settings.senderEmail||'invoice@step-edu.net'),name:String(settings.senderName||'個別指導ステップ【請求書】')},subject:'STEP請求書',htmlContent:'<html><body>STEP請求書</body></html>',replyTo:{email:String(settings.replyTo||'stepkobetsu@gmail.com')},headers:{idempotencyKey:String(batchId)},messageVersions:(prepared||[]).slice(0,100).map(item=>item.version),tags:['step-invoice-batch']};if(sandbox)payload.headers['X-Sib-Sandbox']='drop';return payload;}
 
 function getSendBatchStatus_(batchId,requestAuth){requirePermission_('履歴閲覧',requestAuth);ensureQueueColumns_();const id=String(batchId||'');if(!id)throw new Error('送信バッチIDがありません。');const t=table_(sheet_(STEP.SHEETS.QUEUE)),rows=t.rows.filter(row=>String(row.values[t.map['バッチID']]||'')===id),counts={total:rows.length,pending:0,sending:0,sent:0,failed:0};rows.forEach(row=>{const status=String(row.values[t.map['状態']]||'');if(status==='送信待ち')counts.pending++;else if(status==='送信中')counts.sending++;else if(status==='完了')counts.sent++;else if(status==='送信失敗')counts.failed++;});return Object.assign({batchId:id,complete:counts.total>0&&counts.pending===0&&counts.sending===0},counts);}
+
+function getDeliveryDiagnostics_(invoiceNumber,requestAuth){
+  requirePermission_('履歴閲覧',requestAuth);
+  invoiceNumber=String(invoiceNumber||'').trim();if(!invoiceNumber)throw new Error('請求書番号がありません。');
+  const deliveryTable=table_(sheet_(STEP.SHEETS.DELIVERIES));
+  const deliveryRows=deliveryTable.rows.filter(row=>String(row.values[deliveryTable.map['請求書番号']]||'')===invoiceNumber).sort((a,b)=>b.rowNumber-a.rowNumber);
+  if(!deliveryRows.length)return {invoiceNumber:invoiceNumber,error:'DELIVERY_NOT_FOUND'};
+  const delivery=deliveryRows[0],deliveryId=String(delivery.values[deliveryTable.map['配信ID']]||''),recipient=String(delivery.values[deliveryTable.map['送信先メールアドレス']]||'');
+  ensureQueueColumns_();
+  const queueTable=table_(sheet_(STEP.SHEETS.QUEUE)),queueRow=queueTable.rows.filter(row=>String(row.values[queueTable.map['配信ID']]||'')===deliveryId).sort((a,b)=>b.rowNumber-a.rowNumber)[0];
+  const providerMessageId=queueRow?String(queueRow.values[queueTable.map['メール事業者ID']]||''):'';
+  const result={invoiceNumber:invoiceNumber,deliveryId:deliveryId,recipient:recipient,providerMessageId:providerMessageId,queueStatus:queueRow?String(queueRow.values[queueTable.map['状態']]||''):'',events:[]};
+  const apiKey=String(PropertiesService.getScriptProperties().getProperty('BREVO_API_KEY')||'');
+  if(!apiKey||!providerMessageId)return Object.assign(result,{providerError:!apiKey?'BREVO_API_KEY_MISSING':'PROVIDER_MESSAGE_ID_MISSING'});
+  const url='https://api.brevo.com/v3/smtp/statistics/events?limit=50&messageId='+encodeURIComponent(providerMessageId);
+  const response=UrlFetchApp.fetch(url,{method:'get',headers:{'api-key':apiKey,accept:'application/json'},muteHttpExceptions:true});
+  let body={};try{body=JSON.parse(response.getContentText()||'{}');}catch(_){body={raw:response.getContentText().slice(0,500)};}
+  result.providerStatus=response.getResponseCode();result.events=Array.isArray(body.events)?body.events:[];if(!result.events.length)result.providerBody=body;return result;
+}
 
 function assertHourlyLimit_(settings) {
   const limit = Math.max(1, Number(settings.hourlyLimit || 50));

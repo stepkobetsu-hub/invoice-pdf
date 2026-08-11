@@ -2,7 +2,7 @@ import { html, json } from "./core/http.js";
 import { hashOpaqueToken, isOpaqueToken } from "./core/token.js";
 
 const UNAVAILABLE_REASON = "このURLは利用できません。";
-const APP_SCRIPT_ACTIONS = new Set(["getDashboard", "getSupportData", "importPartners", "deletePartner", "findStudentForPartner", "savePdf", "saveInvoiceData", "updatePaymentStatus", "deleteInvoice", "saveReceiptData", "saveReceiptPdf", "deleteReceipt", "enqueueReceiptSend", "enqueueSend", "disableDelivery", "saveSettings", "recoverQueue", "processPendingSends", "getSendBatchStatus"]);
+const APP_SCRIPT_ACTIONS = new Set(["getDashboard", "getSupportData", "importPartners", "deletePartner", "findStudentForPartner", "savePdf", "saveInvoiceData", "updatePaymentStatus", "deleteInvoice", "saveReceiptData", "saveReceiptPdf", "deleteReceipt", "enqueueReceiptSend", "enqueueSend", "disableDelivery", "saveSettings", "recoverQueue", "processPendingSends", "getSendBatchStatus", "getDeliveryDiagnostics"]);
 
 export default {
   async fetch(request, env, ctx) {
