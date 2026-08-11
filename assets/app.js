@@ -102,7 +102,8 @@
       return result.data;
     }catch(error){if(error?.name==='AbortError')throw new Error('Cloudflare D1が15秒以内に応答しませんでした。');throw error;}finally{clearTimeout(timer);}
   }
-  async function saveInvoiceToD1(invoice){const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice}});return data.invoice;}
+  const d1Date=value=>{const match=String(value||'').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);return match?`${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`:'';};
+  async function saveInvoiceToD1(invoice){const normalized={...invoice,invoiceDate:d1Date(invoice.invoiceDate||invoice.issueDate),dueDate:d1Date(invoice.dueDate)};if(invoice.paymentDate)normalized.paymentDate=d1Date(invoice.paymentDate);const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized}});return data.invoice;}
   const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
   const displayDlStatus=s=>{
     const status=String(s||'');
