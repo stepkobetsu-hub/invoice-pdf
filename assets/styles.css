@@ -139,3 +139,6 @@
 .create-table-toolbar span{font-weight:700}
 .create-delete-button-top,.create-save-button-top{padding:7px 12px;font-size:12px}
 .single-partner-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.brand-home{border:0;background:transparent;padding:0;margin:0;text-align:left;cursor:pointer;color:inherit;font:inherit}
+.brand-home:hover{opacity:.9}
