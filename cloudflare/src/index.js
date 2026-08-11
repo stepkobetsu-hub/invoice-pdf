@@ -634,19 +634,23 @@ async function createDeliveryBatch(request, env, url) {
     const expiresAt = validFutureDate(input.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 180) * 86400000).toISOString();
     return { input, invoiceNumber, invoiceId: invoiceByNumber.get(invoiceNumber), deliveryId, token, tokenHash, expiresAt };
   }));
-  const statements = [];
-  if (payload.value.revokeExisting === true) {
-    const ids = prepared.map(item => item.invoiceId);
-    const idPlaceholders = ids.map(() => "?").join(",");
-    statements.push(env.DB.prepare(`UPDATE deliveries SET status='revoked', revoked_at=?1, updated_at=?1 WHERE invoice_id IN (${idPlaceholders}) AND status!='revoked'`).bind(now, ...ids));
-  }
-  prepared.forEach(item => statements.push(env.DB.prepare(`
+  const statements = prepared.map(item => env.DB.prepare(`
     INSERT INTO deliveries (delivery_id, invoice_id, recipient_email, cc_email, token_hash, issued_at, expires_at, status, created_by, created_at, updated_at)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?6, ?6)
     ON CONFLICT(delivery_id) DO UPDATE SET token_hash=excluded.token_hash, issued_at=excluded.issued_at,
       expires_at=excluded.expires_at, status='pending', revoked_at=NULL, updated_at=excluded.updated_at
-  `).bind(item.deliveryId, item.invoiceId, String(item.input.recipientEmail || ""), String(item.input.ccEmail || ""), item.tokenHash, now, item.expiresAt, String(item.input.createdBy || "apps-script"))));
+  `).bind(item.deliveryId, item.invoiceId, String(item.input.recipientEmail || ""), String(item.input.ccEmail || ""), item.tokenHash, now, item.expiresAt, String(item.input.createdBy || "apps-script")));
   await env.DB.batch(statements);
+  if (payload.value.revokeExisting === true) {
+    const ids = prepared.map(item => item.invoiceId);
+    const newDeliveryIds = prepared.map(item => item.deliveryId);
+    await env.DB.prepare(`
+      UPDATE deliveries SET status='revoked', revoked_at=?1, updated_at=?1
+      WHERE invoice_id IN (SELECT value FROM json_each(?2))
+        AND delivery_id NOT IN (SELECT value FROM json_each(?3))
+        AND status!='revoked'
+    `).bind(now, JSON.stringify(ids), JSON.stringify(newDeliveryIds)).run();
+  }
   return json({ ok: true, items: prepared.map(item => ({ deliveryId: item.deliveryId, invoiceNumber: item.invoiceNumber, expiresAt: item.expiresAt, downloadUrl: `${url.origin}/d/${item.token}` })) });
 }
 

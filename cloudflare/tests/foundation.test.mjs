@@ -37,6 +37,8 @@ assert.match(source, /\/api\/admin\/deliveries/);
 assert.match(source, /\/api\/admin\/deliveries\/batch/);
 assert.match(source, /async function createDeliveryBatch/);
 assert.match(source, /env\.DB\.batch\(statements\)/);
+assert.match(source, /const statements = prepared\.map/);
+assert.match(source, /json_each\(\?2\)[\s\S]*json_each\(\?3\)/);
 assert.match(source, /items\.slice\(0, 100\)/);
 assert.doesNotMatch(source, /brevo|sendinblue|google\.com|drive\.google|script\.google/i);
 assert.doesNotMatch(migration, /@gmail\.com|7132[678]|裏横地|表太田|星中山/);
