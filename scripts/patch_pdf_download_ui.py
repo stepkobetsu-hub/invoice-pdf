@@ -17,7 +17,8 @@ html = html.replace('<div class="span-2 test-banner">テスト送信モード �
 html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
 for old in ['assets/app.js?v=20260811-production-pdf-label','assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2']:
     html = html.replace(old,'assets/app.js?v=20260811-no-print')
-html = html.replace('assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label')
+for old in ['assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label']:
+    html = html.replace(old,'assets/receipts.js?v=20260811-production-recipient')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
@@ -47,4 +48,8 @@ app.write_text(js, encoding='utf-8')
 
 receipt_js = receipts.read_text(encoding='utf-8')
 receipt_js = receipt_js.replace('data-receipt-action="pdf">PDF／印刷</button>', 'data-receipt-action="pdf">PDFをダウンロード</button>')
+receipt_js = receipt_js.replace("const settings=A.state.settings||{},testRecipient=settings.testRecipient||'';$('#mailReceiptNumber').textContent=receipt.receiptNumber;$('#receiptMailTo').textContent=testRecipient?`${testRecipient}（テスト送信先／本来の宛先：${receipt.email||'未登録'}）`:receipt.email||'未登録';", "const settings=A.state.settings||{};$('#mailReceiptNumber').textContent=receipt.receiptNumber;$('#receiptMailTo').textContent=receipt.email||'未登録';")
+receipt_js = receipt_js.replace("enqueueReceiptSend',{receiptNumber:receipt.receiptNumber,testMode:true,resend,newToken:true}", "enqueueReceiptSend',{receiptNumber:receipt.receiptNumber,testMode:false,resend,newToken:true}")
+if 'testMode:true' in receipt_js:
+    raise SystemExit('testMode:true remains in receipts.js')
 receipts.write_text(receipt_js, encoding='utf-8')
