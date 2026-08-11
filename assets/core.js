@@ -71,11 +71,6 @@
     const match=String(dateValue||'').match(/^(\d{4})[\/-](\d{1,2})/);
     if(!match)throw new Error('請求日が不正です。');
     const prefix=`${match[1]}${match[2].padStart(2,'0')}`;
-    const numbers=(Array.isArray(invoices)?invoices:[]).map(invoice=>String(invoice?.invoiceNumber||'').trim()).filter(number=>/^\d+$/.test(number));
-    if(numbers.length){
-      const max=numbers.reduce((current,number)=>{const value=BigInt(number);return value>current?value:current;},0n);
-      return String(max+1n);
-    }
     const max=(Array.isArray(invoices)?invoices:[]).reduce((current,invoice)=>{
       const number=String(invoice?.invoiceNumber||'');
       if(!number.startsWith(prefix))return current;
