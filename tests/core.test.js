@@ -32,6 +32,14 @@ assert.equal(matched.email,'sample@example.com');
 assert.equal(matched.cc,'cc@example.com');
 assert.equal(matched.warnings.length,0);
 
+const directMailInvoice=C.parseInvoiceRows([
+  ['取引先名称','件名','請求日','お支払期限','請求書番号','小計','消費税','合計金額','メールアドレス'],
+  ['送信テスト','負荷テスト','2026/08/12','2026/09/02','202608925','100','10','110','direct@example.com']
+])[0];
+const directMailMatched=C.matchPartners([directMailInvoice],[])[0];
+assert.equal(directMailMatched.email,'direct@example.com');
+assert.deepEqual(directMailMatched.warnings,['取引先未照合']);
+
 assert.deepEqual(C.DEMO_PARTNERS.map(p=>p['メールアドレス']),[
   'mintcocoajasmine@gmail.com',
   'kk8989892000@yahoo.co.jp',

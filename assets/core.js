@@ -99,7 +99,7 @@
         details.push({deliveryDate:r[start]||'',name:r[start+1],itemCode:r[start+2]||'',unitPrice:Number(r[start+3]||0),quantity:Number(r[start+4]||0),unit:r[start+5]||'',deliveryNumber:r[start+6]||'',detail:r[start+7]||'',amount:Number(r[start+8]||0),withholding:r[start+9]||'',taxRate:r[start+10]||''});
       }
       const invoice={
-        csvType:r[0]||'',partnerName:r[ix('取引先名称')]||'',subject:r[ix('件名')]||'',invoiceDate:normalizeDate(r[ix('請求日')]),dueDate:normalizeDate(r[ix('お支払期限')]),invoiceNumber:String(r[ix('請求書番号')]||''),memo:r[ix('メモ')]||'',tags:r[ix('タグ')]||'',subtotal,sourceTax,sourceTotal,tax,total,honorific:r[ix('取引先敬称')]||'様',postal:normalizePostal(r[ix('取引先郵便番号')]),prefecture:r[ix('取引先都道府県')]||'',address1:r[ix('取引先住所1')]||'',address2:r[ix('取引先住所2')]||'',department:r[ix('取引先部署')]||'',position:r[ix('取引先担当者役職')]||'',contactName:r[ix('取引先担当者氏名')]||'',customerCode:String(r[ix('自社担当者氏名')]||''),note:r[ix('備考')]||'',bank:r[ix('振込先')]||'',details,pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得'
+        csvType:r[0]||'',partnerName:r[ix('取引先名称')]||'',subject:r[ix('件名')]||'',invoiceDate:normalizeDate(r[ix('請求日')]),dueDate:normalizeDate(r[ix('お支払期限')]),invoiceNumber:String(r[ix('請求書番号')]||''),memo:r[ix('メモ')]||'',tags:r[ix('タグ')]||'',subtotal,sourceTax,sourceTotal,tax,total,honorific:r[ix('取引先敬称')]||'様',postal:normalizePostal(r[ix('取引先郵便番号')]),prefecture:r[ix('取引先都道府県')]||'',address1:r[ix('取引先住所1')]||'',address2:r[ix('取引先住所2')]||'',department:r[ix('取引先部署')]||'',position:r[ix('取引先担当者役職')]||'',contactName:r[ix('取引先担当者氏名')]||'',customerCode:String(r[ix('自社担当者氏名')]||''),email:r[ix('メールアドレス')]||r[ix('取引先メールアドレス')]||'',cc:r[ix('CCメールアドレス')]||r[ix('取引先CCメールアドレス')]||'',note:r[ix('備考')]||'',bank:r[ix('振込先')]||'',details,pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得'
       };
       invoice.roundingAdjusted=sourceTotal!==total;
       return invoice;
@@ -118,8 +118,8 @@
     const byName=new Map(partners.map(p=>[String(p['名称']).replace(/\s/g,''),p]));
     return invoices.map(invoice=>{
       const partner=byCode.get(invoice.customerCode)||byName.get(invoice.partnerName.replace(/\s/g,''))||null;
-      const email=partner?.['メールアドレス']||'';
-      const cc=partner?.['CCメールアドレス']||'';
+      const email=partner?.['メールアドレス']||invoice.email||'';
+      const cc=partner?.['CCメールアドレス']||invoice.cc||'';
       const warnings=[];
       if(!partner)warnings.push('取引先未照合');
       if(!email)warnings.push('メール未登録');else if(!EMAIL.test(email))warnings.push('メール形式不正');
