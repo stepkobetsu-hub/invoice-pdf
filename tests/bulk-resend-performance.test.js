@@ -27,5 +27,6 @@ assert.match(app, /initialOverlayWatchdog=setTimeout\(forceHideOperationOverlay,
 assert.match(app, /cloudApi\('\/api\/app\/apps-script',\{method:'POST',body:\{action,payload\},timeoutMs\}\)/, 'Apps Script calls use the authenticated API proxy');
 assert.doesNotMatch(app, /document\.createElement\('iframe'\)/, 'Apps Script calls do not depend on a hidden iframe response');
 assert.deepEqual(manifest.webapp, {access:'ANYONE_ANONYMOUS',executeAs:'USER_DEPLOYING'}, 'Apps Script remains reachable server-to-server while doPost enforces staff authentication');
+assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.external_request'), 'Apps Script can verify staff sessions and call Cloudflare/Brevo');
 
 console.log('bulk resend performance checks passed');
