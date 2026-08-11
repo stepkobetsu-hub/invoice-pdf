@@ -178,4 +178,12 @@
   .invoice-list-pane{display:flex;flex-direction:column}
   .invoice-list-head{flex:0 0 48px}
   .invoice-list{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto}
+  .invoice-list-item{padding:9px 10px}
+  .invoice-list-check{padding-top:13px}
+  .invoice-list-meta{font-size:10px}
+  .invoice-list-name{margin:4px 0 3px;font-size:14px}
+  .invoice-list-subject{min-height:15px;font-size:11px}
+  .invoice-list-statuses{margin-top:5px;gap:5px}
+  .invoice-list-statuses .status,.invoice-list-statuses .payment-pill{padding:2px 6px;font-size:10px}
+  .invoice-list-amount{font-size:15px}
 }
