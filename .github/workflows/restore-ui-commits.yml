@@ -10,8 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply requested UI only
-        run: python scripts/restore_requested_ui.py
+      - name: Force invoice list home
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('assets/app.js')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("showView(initialViewForNavigation(browserNavigationType()));","showView('invoices');")
+          p.write_text(s,encoding='utf-8')
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8').replace('assets/app.js?v=20260811-production-unlocked','assets/app.js?v=20260811-invoice-home')
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Verify syntax
         run: |
           git diff --check
@@ -20,7 +30,7 @@ jobs:
         run: |
           git config user.name "stepkobetsu-hub"
           git config user.email "stepkobetsu@gmail.com"
-          git add index.html assets/app.js assets/styles.css
-          git commit -m "Restore partner master loading and header navigation"
+          git add index.html assets/app.js
+          git commit -m "Force invoice list as application home"
           git push origin HEAD:main
-# run-20260811-partner-master
+# run-20260811-invoice-home
