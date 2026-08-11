@@ -2,7 +2,9 @@ name: Patch PDF download UI
 on:
   push:
     branches: [main]
-    paths: ['scripts/patch_pdf_download_ui.py']
+    paths:
+      - 'scripts/patch_pdf_download_ui.py'
+      - '.github/workflows/patch-pdf-download-ui.yml'
 permissions:
   contents: write
 jobs:
