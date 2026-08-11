@@ -17,4 +17,10 @@ assert.doesNotMatch(app, /ensurePdfsForSend\(\[\.\.\.groups\.unsent,\.\.\.groups
 assert.doesNotMatch(source, /prepareSend:|releasePreparedSend:|function releasePreparedSend_/, '旧テスト送信モードの経路を残してはいけない');
 assert.doesNotMatch(source, /subject='【テスト】'|これはテスト送信です/, '通常送信本文をテスト送信へ差し替えてはいけない');
 
+assert.match(app, /alreadyPrepared=invoice\.pdfStatus==='PDF作成済み'&&Boolean\(invoice\.pdfFileId\)/, 'ready PDF resend is detected');
+assert.match(app, /if\(!alreadyPrepared\)await api\('saveInvoiceData'/, 'ready PDF resend skips redundant save');
+const refreshAll = app.match(/async function refreshAll\([\s\S]*?\r?\n  async function saveForm/)[0];
+assert.doesNotMatch(refreshAll, /await refreshSupportData\(\)/, 'dashboard display does not wait for support data');
+assert.match(app, /initialOverlayWatchdog=setTimeout\(forceHideOperationOverlay,15000\)/, 'initial overlay has a watchdog');
+
 console.log('bulk resend performance checks passed');
