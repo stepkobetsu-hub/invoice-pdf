@@ -196,6 +196,7 @@ async function main(){
   assert.match(styles,/\.invoice-list-statuses \.status,\.invoice-list-statuses \.payment-pill\{padding:2px 6px;font-size:10px\}/);
   assert.match(styles,/\.invoice-detail-fields\{grid-template-columns:auto minmax\(0,1fr\) auto minmax\(0,1fr\);[^}]*margin:8px 0 0/);
   assert.match(styles,/\.invoice-detail-actions\{align-items:center;flex-direction:row;margin-top:10px/);
+  assert.match(styles,/\.invoice-detail-actions \.button,\.invoice-detail-actions summary\.button\{[^}]*height:38px;[^}]*white-space:nowrap\}/);
   console.log('ui tests passed');
 }
 
