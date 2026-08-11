@@ -68,6 +68,11 @@ async function serveAppRequest(request, env, url) {
     const payload = await readJson(request);
     if (!payload.ok) return withAppCors(payload.response, request, env);
     try {
+      const requestedNumber = String(payload.value.invoice?.invoiceNumber || "").trim();
+      if (payload.value.createOnly === true) {
+        const existing = await env.DB.prepare("SELECT invoice_number FROM invoices WHERE invoice_number=?1 LIMIT 1").bind(requestedNumber).first();
+        if (existing) throw new Error("同じ請求書番号が既にあります。別の番号を入力してください。");
+      }
       const invoice = await saveInvoiceRecord(env, payload.value.invoice || {}, auth.user, "保存");
       return appJson(request, env, { ok: true, data: { invoice } });
     } catch (error) {
@@ -313,7 +318,7 @@ function normalizeInvoice(raw) {
   const customerCode = String(raw.customerCode || "").trim();
   const partnerName = String(raw.partnerName || "").trim();
   const invoiceDate = String(raw.invoiceDate || raw.issueDate || "").trim();
-  if (!/^\d{9}$/.test(invoiceNumber)) throw new Error("請求書番号は9桁の数字で入力してください。");
+  if (!/^\d+$/.test(invoiceNumber)) throw new Error("請求書番号は数字で入力してください。");
   if (!customerCode || !partnerName) throw new Error("取引先を選択してください。");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(invoiceDate)) throw new Error("請求日を入力してください。");
   const details = (Array.isArray(raw.details) ? raw.details : []).slice(0, 100).map((item, index) => {
@@ -388,7 +393,7 @@ async function loadInvoiceByNumber(env, invoiceNumber) {
 }
 
 async function updateInvoicePayment(env, invoiceNumber, input, actor) {
-  if (!/^\d{9}$/.test(String(invoiceNumber))) throw new Error("請求書番号が不正です。");
+  if (!/^\d+$/.test(String(invoiceNumber))) throw new Error("請求書番号が不正です。");
   const status = String(input.paymentStatus || "未入金");
   if (!["未設定", "未入金", "入金済"].includes(status)) throw new Error("入金状態が不正です。");
   const date = status === "入金済" ? String(input.paymentDate || "") : "";
@@ -405,7 +410,7 @@ async function updateInvoicePayment(env, invoiceNumber, input, actor) {
 }
 
 async function softDeleteInvoice(env, invoiceNumber, actor) {
-  if (!/^\d{9}$/.test(String(invoiceNumber))) return 0;
+  if (!/^\d+$/.test(String(invoiceNumber))) return 0;
   const now = new Date().toISOString();
   const actorName = String(actor.name || actor.email || "staff").slice(0, 200);
   const invoice = await env.DB.prepare("SELECT invoice_id FROM invoices WHERE invoice_number=?1 AND deleted_at IS NULL LIMIT 1").bind(invoiceNumber).first();
@@ -530,7 +535,8 @@ async function uploadInvoice(request, env, ctx) {
   const invoiceNumber = documentType === "receipt" ? `R${displayNumber}` : displayNumber;
   const customerCode = String(invoice.customerCode || "").trim();
   const partnerName = String(invoice.partnerName || "").trim();
-  if (!/^\d{9}$/.test(displayNumber) || !customerCode || !partnerName) {
+  const validDocumentNumber = documentType === "receipt" ? /^\d{9}$/.test(displayNumber) : /^\d+$/.test(displayNumber);
+  if (!validDocumentNumber || !customerCode || !partnerName) {
     return json({ ok: false, error: "INVALID_INVOICE" }, 400);
   }
 

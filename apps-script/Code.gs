@@ -177,7 +177,7 @@ function findStudentForPartner_(studentCode, requestAuth) {
 function savePdf_(invoice, pdfBase64, requestAuth) {
   requirePermission_('PDF作成', requestAuth);
   ensureInvoiceColumns_();
-  if (!/^\d{6,}$/.test(String(invoice.invoiceNumber || ''))) throw new Error('請求書番号が不正です。');
+  if (!/^\d+$/.test(String(invoice.invoiceNumber || ''))) throw new Error('請求書番号は数字で入力してください。');
   if (!pdfBase64) throw new Error('PDFデータがありません。');
   const expectedTotal = Math.floor((Number(invoice.sourceTotal == null ? invoice.total : invoice.sourceTotal) + 5) / 10) * 10;
   if (Number(invoice.total) !== expectedTotal || Number(invoice.tax) !== expectedTotal - Number(invoice.subtotal)) throw new Error('10円単位の丸め結果または税額が一致しません。');
@@ -192,7 +192,7 @@ function saveInvoiceData_(invoice, requestAuth) {
   requirePermission_('PDF作成', requestAuth);
   ensureInvoiceColumns_();
   const number=String(invoice.invoiceNumber||'').trim();
-  if(!/^\d{6,}$/.test(number))throw new Error('請求書番号が不正です。');
+  if(!/^\d+$/.test(number))throw new Error('請求書番号は数字で入力してください。');
   if(!String(invoice.partnerName||'').trim())throw new Error('取引先名を入力してください。');
   if(!Array.isArray(invoice.details)||!invoice.details.length)throw new Error('請求明細を1行以上入力してください。');
   const sh=sheet_(STEP.SHEETS.INVOICES),t=table_(sh),existing=t.rows.find(r=>String(r.values[t.map['請求書番号']])===number),now=new Date(),partner=findPartner_(invoice.customerCode,invoice.partnerName);

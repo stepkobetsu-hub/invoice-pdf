@@ -71,6 +71,11 @@
     const match=String(dateValue||'').match(/^(\d{4})[\/-](\d{1,2})/);
     if(!match)throw new Error('請求日が不正です。');
     const prefix=`${match[1]}${match[2].padStart(2,'0')}`;
+    const numbers=(Array.isArray(invoices)?invoices:[]).map(invoice=>String(invoice?.invoiceNumber||'').trim()).filter(number=>/^\d+$/.test(number));
+    if(numbers.length){
+      const max=numbers.reduce((current,number)=>{const value=BigInt(number);return value>current?value:current;},0n);
+      return String(max+1n);
+    }
     const max=(Array.isArray(invoices)?invoices:[]).reduce((current,invoice)=>{
       const number=String(invoice?.invoiceNumber||'');
       if(!number.startsWith(prefix))return current;
@@ -130,7 +135,7 @@
 
   function buildManualInvoice(values,detailRows,partner){
     const invoiceNumber=String(values?.invoiceNumber||'').trim();
-    if(!/^\d{6,}$/.test(invoiceNumber))throw new Error('請求書番号は6桁以上の数字で入力してください。');
+    if(!/^\d+$/.test(invoiceNumber))throw new Error('請求書番号は数字で入力してください。');
     if(!partner)throw new Error('取引先を選択してください。');
     if(!String(values?.subject||'').trim())throw new Error('件名を入力してください。');
     if(!values?.invoiceDate||!values?.dueDate)throw new Error('請求日と支払期限を入力してください。');

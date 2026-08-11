@@ -52,7 +52,7 @@ async function main(){
   assert.ok(document.querySelector('#singleInvoiceLivePreview .invoice-page'));
   assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/取引先未選択/);
   assert.match(document.querySelector('[name="invoiceNumber"]').value,/^\d{9}$/);
-  assert.equal(document.querySelector('[name="invoiceNumber"]').readOnly,true);
+  assert.equal(document.querySelector('[name="invoiceNumber"]').readOnly,false);
   const invoiceDate=document.querySelector('[name="invoiceDate"]').value;
   const dueDate=document.querySelector('[name="dueDate"]').value;
   assert.equal((new Date(`${dueDate}T00:00:00`)-new Date(`${invoiceDate}T00:00:00`))/86400000,21);

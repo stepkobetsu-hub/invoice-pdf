@@ -12,6 +12,9 @@ assert.match(source, /\/api\/app\/dashboard/);
 assert.match(source, /\/api\/app\/invoices/);
 assert.match(source, /\/api\/admin\/migrations\/invoices/);
 assert.match(source, /authorization/);
+assert.match(source, /payload\.value\.createOnly === true/);
+assert.match(source, /同じ請求書番号が既にあります/);
+assert.match(source, /if \(!\/\^\\d\+\$\/\.test\(invoiceNumber\)\)/);
 assert.match(source, /APP_ORIGIN/);
 
 const invoice = __test.normalizeInvoice({
