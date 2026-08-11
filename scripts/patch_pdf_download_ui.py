@@ -8,13 +8,15 @@ html = index.read_text(encoding='utf-8')
 html = html.replace('<div class="dialog-head"><h2>請求書のPDF／印刷</h2><button data-close aria-label="閉じる">×</button></div>','<div class="dialog-head"><h2>請求書PDF</h2><button data-close aria-label="閉じる">×</button></div>')
 html = html.replace('<div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p><p>PDFを端末へ保存するか、印刷画面を開きます。</p></div>','<div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p></div>')
 html = html.replace('<div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printSelectedInvoice" class="button secondary preview-output-button">印刷</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>','<div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>')
+html = html.replace('<button id="printPreview" class="button secondary preview-output-button" type="button">プレビューを印刷</button>','')
+html = html.replace('PDFはプレビュー、印刷、保存、送信時に自動作成されます。','PDFはプレビュー、保存、送信時に自動作成されます。')
 html = html.replace('<span id="modeBadge" class="badge warning">テスト送信モード</span>','<span id="modeBadge" class="badge">通常送信</span>')
 html = html.replace('<div class="page-heading"><div><h1>メール設定</h1><p>本番送信は管理者の最終承認まで有効化できません。</p></div></div>','<div class="page-heading"><div><h1>メール設定</h1><p>請求書の送信元・返信先・本文などを設定します。</p></div></div>')
 html = html.replace('<label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label>','<input name="testRecipient" type="hidden" value="">')
 html = html.replace('<div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div>','')
 html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
-for old in ['assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2']:
-    html = html.replace(old,'assets/app.js?v=20260811-production-pdf-label')
+for old in ['assets/app.js?v=20260811-production-pdf-label','assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2']:
+    html = html.replace(old,'assets/app.js?v=20260811-no-print')
 html = html.replace('assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label')
 index.write_text(html, encoding='utf-8')
 
@@ -38,6 +40,7 @@ old_to = "$('#mailTo').textContent=settings.testRecipient?`${settings.testRecipi
 if old_to in js:
     js = js.replace(old_to, "$('#mailTo').textContent=invoice.email;")
 js = js.replace("  $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');\n", '')
+js = js.replace("  $('#printPreview').onclick=printPreview;\n", '')
 if 'testMode:true' in js:
     raise SystemExit('testMode:true remains in app.js')
 app.write_text(js, encoding='utf-8')
