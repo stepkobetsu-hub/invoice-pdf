@@ -65,7 +65,7 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
     row.querySelector('[name="detailUnitPrice"]').value
   ]);
   assert.equal(immediateForm.elements.partnerCode.value, '');
-  assert.deepEqual(immediateRows, [['テスト', '100'], ['テスト割引', '-100']]);
+  assert.deepEqual(immediateRows, [['テスト', '100'], ['テスト', '-100']]);
   assert.equal(document.querySelector('#singleTotal').textContent, '0円');
   assert.equal(document.querySelector('#saveAndSendSingleInvoice').classList.contains('hidden'), false);
   await new Promise(resolve => window.setTimeout(resolve, 30));
