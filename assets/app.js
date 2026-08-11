@@ -406,13 +406,9 @@
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
   const initialLoad=(async()=>{
-    const token=await ensureStaffSessionToken();
-    if(token){
-      $('#userLabel').textContent='接続済み';
-      $('#staffLoginLink').classList.add('hidden');
-      return refreshAll(false);
-    }
-    $('#userLabel').textContent='未接続';
+    $('#userLabel').textContent='接続中';
+    $('#staffLoginLink').classList.add('hidden');
+    return refreshAll(false);
   })();
   const startupOverlayTimer=setTimeout(()=>{operationOverlayCount=1;hideOperationOverlay();},15000);
   Promise.resolve(initialLoad).finally(()=>{clearTimeout(startupOverlayTimer);operationOverlayCount=1;hideOperationOverlay();});
