@@ -176,6 +176,22 @@
     return {selected:items.length,sendable:items.filter(x=>validateEmail(x.email)&&x.pdfStatus==='PDF作成済み').length,missingEmail:items.filter(x=>!x.email).length,invalidEmail:items.filter(x=>x.email&&!validateEmail(x.email)).length,missingPdf:items.filter(x=>x.pdfStatus!=='PDF作成済み').length,alreadySent:items.filter(x=>['送信済み','再送済み'].includes(x.sendStatus)).length,errors:items.filter(x=>x.warnings?.length).length};
   }
 
-  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,partnerDocumentDefaults,normalizeStudentCode,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary};
+  function compareStudentCodeDescending(left,right){
+    const a=normalizeStudentCode(left),b=normalizeStudentCode(right);
+    if(!a&&!b)return 0;if(!a)return 1;if(!b)return -1;
+    if(/^\d+$/.test(a)&&/^\d+$/.test(b))return Number(b)-Number(a);
+    return b.localeCompare(a,'ja',{numeric:true,sensitivity:'base'});
+  }
+  function invoiceSortTimestamp(invoice){
+    const date=Date.parse(String(invoice?.createdAt||invoice?.invoiceDate||'').replace(/\//g,'-'));
+    return Number.isFinite(date)?date:0;
+  }
+  function compareInvoiceListOrder(left,right){
+    return invoiceSortTimestamp(right)-invoiceSortTimestamp(left)
+      ||compareStudentCodeDescending(left?.customerCode,right?.customerCode)
+      ||String(right?.invoiceNumber||'').localeCompare(String(left?.invoiceNumber||''),'ja',{numeric:true});
+  }
+
+  global.StepInvoiceCore={PARTNER_HEADERS,DEMO_PARTNERS,parseCsv,decodeCsvFile,roundToNearest10,formatYen,normalizeDate,nextInvoiceNumber,parseInvoiceRows,parsePartners,matchPartners,buildManualInvoice,studentToPartner,partnerDocumentDefaults,normalizeStudentCode,validateEmail,isSentStatus,isInitialSendable,isResendable,classifySendSelection,maskName,renderTemplate,selectedSummary,compareStudentCodeDescending,compareInvoiceListOrder};
   if(typeof module!=='undefined')module.exports=global.StepInvoiceCore;
 })(typeof window!=='undefined'?window:globalThis);
