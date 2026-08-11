@@ -185,12 +185,13 @@
   .invoice-list-subject{min-height:15px;font-size:11px}
   .invoice-list-statuses{margin-top:5px;gap:5px}
   .invoice-list-statuses .status,.invoice-list-statuses .payment-pill{padding:2px 6px;font-size:10px}
+  .invoice-list-statuses .payment-pill.paid{font-size:11px}
   .invoice-list-amount{font-size:15px}
   .invoice-detail-top{padding:10px 14px}
   .invoice-detail-title-row h2{font-size:18px}
   .invoice-detail-title-row>div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px}
   .invoice-detail-meta,.invoice-payment-meta{margin:0}
-  .invoice-detail-fields{grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);gap:6px 8px;margin:8px 0 0;font-size:12px;align-items:center}
+  .invoice-detail-fields{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0;font-size:12px}
   .campus-tag{padding:2px 6px}
   .invoice-detail-actions{align-items:center;flex-direction:row;margin-top:10px;gap:12px}
   .invoice-edit-actions,.invoice-output-actions{gap:7px}
