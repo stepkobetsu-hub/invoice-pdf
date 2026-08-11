@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore legacy invoice bulk-action design and behavior
-        run: python scripts/restore_legacy_bulk_actions.py
+      - name: Fix empty partner support response
+        run: python scripts/fix_empty_partner_support.py
       - name: Verify syntax
         run: |
           git diff --check
           node --check assets/app.js
-      - name: Commit restored legacy bulk actions
+      - name: Commit partner dropdown recovery
         run: |
           git config user.name "stepkobetsu-hub"
           git config user.email "stepkobetsu@gmail.com"
-          git add index.html assets/app.js assets/styles.css
-          git commit -m "Restore legacy invoice bulk actions"
+          git add index.html assets/app.js
+          git commit -m "Recover partner dropdown from empty support response"
           git push origin HEAD:main
-# run-20260811-legacy-bulk-actions
+# run-20260811-partner-empty-recovery
