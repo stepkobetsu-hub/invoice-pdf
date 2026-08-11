@@ -65,6 +65,31 @@ async function serveAppRequest(request, env, url) {
     return appJson(request, env, { ok: true, data: { ...data, user: auth.user.name || auth.user.email || "接続済み" } });
   }
 
+  if (request.method === "POST" && url.pathname === "/api/app/apps-script") {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    const action = String(payload.value.action || "");
+    if (!APP_SCRIPT_ACTIONS.has(action)) return appJson(request, env, { ok: false, error: "APP_SCRIPT_ACTION_NOT_ALLOWED" }, 400);
+    if (!env.INVOICE_API_URL) return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
+    const authorization = request.headers.get("authorization") || "";
+    const sessionToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    let upstream;
+    try {
+      upstream = await fetch(env.INVOICE_API_URL, {
+        method: "POST",
+        headers: { "content-type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action, payload: payload.value.payload || {}, systemPortalSessionToken: sessionToken }),
+        redirect: "follow",
+      });
+    } catch (_error) {
+      return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
+    }
+    let result;
+    try { result = await upstream.json(); } catch (_error) { result = null; }
+    if (!upstream.ok || !result?.ok) return appJson(request, env, { ok: false, error: String(result?.error || "INVOICE_API_INVALID_RESPONSE") }, upstream.ok ? 400 : 502);
+    return appJson(request, env, result);
+  }
+
   if (request.method === "POST" && url.pathname === "/api/app/invoices") {
     const payload = await readJson(request);
     if (!payload.ok) return withAppCors(payload.response, request, env);
@@ -455,31 +480,6 @@ async function serveAdminRequest(request, env, ctx, url) {
 
   if (request.method === "POST" && url.pathname === "/api/admin/deliveries") {
     return createDelivery(request, env, url);
-  }
-
-  if (request.method === "POST" && url.pathname === "/api/app/apps-script") {
-    const payload = await readJson(request);
-    if (!payload.ok) return withAppCors(payload.response, request, env);
-    const action = String(payload.value.action || "");
-    if (!APP_SCRIPT_ACTIONS.has(action)) return appJson(request, env, { ok: false, error: "APP_SCRIPT_ACTION_NOT_ALLOWED" }, 400);
-    if (!env.INVOICE_API_URL) return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
-    const authorization = request.headers.get("authorization") || "";
-    const sessionToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
-    let upstream;
-    try {
-      upstream = await fetch(env.INVOICE_API_URL, {
-        method: "POST",
-        headers: { "content-type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, payload: payload.value.payload || {}, systemPortalSessionToken: sessionToken }),
-        redirect: "follow",
-      });
-    } catch (_error) {
-      return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
-    }
-    let result;
-    try { result = await upstream.json(); } catch (_error) { result = null; }
-    if (!upstream.ok || !result?.ok) return appJson(request, env, { ok: false, error: String(result?.error || "INVOICE_API_INVALID_RESPONSE") }, upstream.ok ? 400 : 502);
-    return appJson(request, env, result);
   }
 
   if (request.method === "POST" && url.pathname === "/api/admin/deliveries/batch") {
