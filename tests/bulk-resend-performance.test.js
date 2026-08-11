@@ -33,6 +33,7 @@ assert.match(app, /Brevoの実際の配信状況を確認しています/, 'mail
 assert.match(source, /sort=desc&email='\+encodeURIComponent\(recipient\)/, 'delivery diagnostics can use the explicitly approved recipient lookup');
 assert.match(source, /smtp\/emails\?limit=100&sort=desc&email=/, 'delivery diagnostics use Brevo transactional logs for a specific recipient');
 assert.match(source, /senders\/domains\/'\+encodeURIComponent\(senderDomain\)/, 'delivery diagnostics verify the configured sender domain');
+assert.match(source, /UrlFetchApp\.fetchAll\(requests\)/, 'independent Brevo diagnostics run in parallel to stay within the proxy timeout');
 assert.match(app, /invoice\.dlStatus==='URLアクセス済み'\?'<span class="status accessed">開封<\/span>'/, 'invoice cards show a reliable opened-link badge');
 
 console.log('bulk resend performance checks passed');
