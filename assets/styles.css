@@ -142,3 +142,13 @@
 
 .brand-home{border:0;background:transparent;padding:0;margin:0;text-align:left;cursor:pointer;color:inherit;font:inherit}
 .brand-home:hover{opacity:.9}
+
+/* 請求書一覧チェックボックス復元 */
+.invoice-bulk-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 10px;padding:8px 10px;background:#fff;border:1px solid #e4e7ec;border-radius:10px}
+.invoice-bulk-toolbar #invoiceSelectedCount{font-weight:700;color:#475467;margin-right:auto}
+.invoice-select-all{display:flex;align-items:center;gap:6px;font-weight:700;cursor:pointer}
+.invoice-list-row{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:stretch;border-bottom:1px solid #eef0f3}
+.invoice-list-row.active{background:#f6f9ff}
+.invoice-list-check{display:flex;align-items:flex-start;justify-content:center;padding-top:18px;cursor:pointer}
+.invoice-list-check input{width:18px;height:18px}
+.invoice-list-row .invoice-list-item{border-bottom:0;width:100%}
