@@ -268,7 +268,8 @@ function enqueueReceiptSend_(payload,requestAuth){
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('メールアドレスが未登録または不正です。');
   const deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)),queue=sheet_(STEP.SHEETS.QUEUE),queueTable=table_(queue);
   if(queueTable.rows.some(item=>String(item.values[queueTable.map['請求書番号']])===key&&['送信待ち','送信中'].includes(item.values[queueTable.map['状態']])))throw new Error('既に送信キューへ登録されています。');
-  if(payload.resend)invalidateByInvoice_(key);
+  // A resend gets its own delivery token. Keep previously delivered links valid
+  // until they expire or an operator explicitly disables/deletes the document.
   const settings=settings_(),now=new Date(),expires=new Date(now.getTime()+Number(settings.validDays||180)*86400000),deliveryId=Utilities.getUuid(),queueId=Utilities.getUuid();
   const cloud=createCloudflareDelivery_({deliveryId:deliveryId,invoiceNumber:key,recipientEmail:email,ccEmail:row.values[receipts.map['CCメールアドレス']],expiresAt:expires,createdBy:activeEmail_()||requestAuth.name||'apps-script'});
   const subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）').replace(/請求書/g,'領収書');
@@ -316,9 +317,7 @@ function enqueueSend_(payload, requestAuth) {
       if (queued.some(q => String(q.values[queueMap['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[queueMap['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
       return {number:number,inv:inv,email:String(email),cc:String(inv.values[invoices.map['CCメールアドレス']]||''),deliveryId:Utilities.getUuid(),queueId:Utilities.getUuid()};
     });
-    const replaceExisting=payload.resend&&payload.newToken!==false;
-    const clouds=createCloudflareDeliveriesBatch_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})),replaceExisting);
-    if(replaceExisting)markInvoicesInvalidated_(numbers,deliverySheet,deliveries);
+    const clouds=createCloudflareDeliveriesBatch_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})),false);
     const results=[],deliveryRows=[],queueRows=[],logRows=[],subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
     entries.forEach((entry,index)=>{
       const number=entry.number,inv=entry.inv,deliveryId=entry.deliveryId,queueId=entry.queueId,cloud=clouds[index];
