@@ -212,6 +212,9 @@ async function main(){
   assert.match(styles,/\.invoice-detail-actions\{align-items:center;flex-direction:row;margin-top:10px/);
   assert.match(styles,/\.invoice-detail-actions \.button,\.invoice-detail-actions summary\.button\{[^}]*height:38px;[^}]*white-space:nowrap\}/);
   assert.match(styles,/\.invoice-list-statuses \.payment-pill\.paid\{font-size:11px\}/);
+  assert.match(styles,/\.pdf-render-host\{[^}]*height:auto;[^}]*overflow:visible/);
+  assert.match(styles,/\.invoice-inline-preview:has\(\.invoice-page\+\.invoice-page\)::before\{content:'複数ページあります/);
+  assert.match(styles,/\.invoice-inline-preview \.invoice-page\+\.invoice-page\{margin-top:28px\}/);
   console.log('ui tests passed');
 }
 
