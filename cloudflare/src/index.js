@@ -242,7 +242,7 @@ function invoiceRowToClient(row) {
     memo: row.memo || "", tags: row.tags || "", paymentStatus: row.payment_status || "未入金",
     paymentDate: row.payment_date || "", paymentAmount: row.payment_amount == null ? "" : Number(row.payment_amount), paymentMemo: row.payment_memo || "",
     bank: row.bank || "", note: row.note || "", subtotal: Number(row.subtotal || 0), tax: Number(row.tax || 0), total: Number(row.total || 0),
-    email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.status === "ready" && row.r2_object_key ? "PDF作成済み" : "未作成",
+    email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.r2_object_key ? "PDF作成済み" : "未作成",
     pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
     sendStatus: delivery.sendStatus, sentAt: row.delivery_updated_at || "", dlStatus: delivery.dlStatus,
     downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
