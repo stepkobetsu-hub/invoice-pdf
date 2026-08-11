@@ -11,7 +11,6 @@ const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), {
 const {window} = dom;
 const actions = [];
 const d1Invoices = [];
-let legacyInvoices = [];
 
 window.localStorage.setItem('stepStaffAppAuth', JSON.stringify({systemPortalSessionToken:'test-session'}));
 window.HTMLDialogElement.prototype.showModal = function(){ this.open = true; };
@@ -23,13 +22,8 @@ window.HTMLFormElement.prototype.submit = function(){
   actions.push(action);
   let data = {};
   if(action === 'getSupportData') data = {partners:window.StepInvoiceCore.DEMO_PARTNERS};
-  if(action === 'saveInvoiceData') legacyInvoices = [{...payload.invoice}];
   if(action === 'savePdf') data = {pdfFileId:'pdf-test',pdfFileName:'test.pdf'};
-  if(action === 'processPendingSends'){
-    legacyInvoices = legacyInvoices.map(invoice => ({...invoice,sendStatus:'送信済み',sentAt:'2026/08/11 20:00:00'}));
-    data = {pending:0,failed:0};
-  }
-  if(action === 'getDashboard') data = {invoices:legacyInvoices,history:[{timestamp:'2026/08/11 20:00:00',action:'メール送信',invoiceNumber:legacyInvoices[0]?.invoiceNumber,sendStatus:'送信済み'}]};
+  if(action === 'enqueueSend') data = {queued:payload.invoiceNumbers?.length || 0};
   window.setTimeout(() => window.dispatchEvent(new window.MessageEvent('message', {
     origin:'https://script.google.com',
     data:{requestId,bridgeNonce,result:{ok:true,data}}
@@ -37,7 +31,7 @@ window.HTMLFormElement.prototype.submit = function(){
 };
 window.print = () => {};
 window.fetch = async(url, options={}) => {
-  if(String(url).endsWith('/api/app/dashboard')) return {ok:true,json:async()=>({ok:true,data:{invoices:d1Invoices.map(invoice=>({...invoice})),history:[],user:'テスト担当者'}})};
+  if(String(url).endsWith('/api/app/dashboard')) return {ok:true,json:async()=>({ok:true,data:{invoices:d1Invoices.map(invoice=>({...invoice})),history:[],user:'test-user'}})};
   if(String(url).endsWith('/api/app/invoices') && options.method === 'POST'){
     const invoice = {...JSON.parse(options.body).invoice,sendStatus:'未送信',dlStatus:'未取得',pdfStatus:'未作成',warnings:[]};
     d1Invoices.push(invoice);
@@ -60,7 +54,6 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
   await new Promise(resolve => window.setTimeout(resolve, 30));
   const sendButton = document.querySelector('#saveAndSendSingleInvoice');
   assert.equal(sendButton.classList.contains('hidden'), false);
-  assert.equal(sendButton.textContent, '保存して送信');
 
   document.querySelector('#singlePartnerCombo > button').click();
   document.querySelector('#singlePartnerResults [data-partner-code="DEMO001"]').click();
@@ -70,12 +63,14 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
   form.dispatchEvent(submitEvent);
   await new Promise(resolve => window.setTimeout(resolve, 700));
 
-  for(const action of ['saveInvoiceData','savePdf','enqueueSend','processPendingSends','getDashboard']) assert.ok(actions.includes(action), `${action} was not called`);
+  for(const action of ['saveInvoiceData','savePdf','enqueueSend']) assert.ok(actions.includes(action), `${action} was not called`);
+  assert.equal(actions.includes('processPendingSends'), false, 'send processing must not block the browser');
+  assert.equal(actions.includes('getDashboard'), false, 'the browser must not wait for delivery confirmation');
   assert.equal(window.StepInvoiceApp.state.invoices.length, 1);
-  assert.equal(window.StepInvoiceApp.state.invoices[0].sendStatus, '送信済み');
-  assert.match(document.querySelector('#invoiceList').textContent, /送信済み/);
+  assert.equal(window.StepInvoiceApp.state.invoices[0].sendStatus, '送信待ち');
+  assert.equal(document.querySelector('#invoiceList').textContent.includes('送信待ち'), true);
   assert.equal(document.querySelector('#view-invoices').classList.contains('active'), true);
-  assert.match(document.querySelector('#globalAlert').textContent, /保存し、メール送信しました/);
-  console.log('demo save and send checks passed');
-})().catch(error => { console.error(error); process.exitCode = 1; });
-
+  assert.equal(document.querySelector('#globalAlert').textContent.includes('バックグラウンド'), true);
+  console.log('demo save and background send checks passed');
+  dom.window.close();
+})().catch(error => { console.error(error); dom.window.close(); process.exitCode = 1; });

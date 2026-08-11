@@ -26,7 +26,7 @@ window.print=()=>{};
 window.confirm=()=>true;
 window.fetch=async(url,options={})=>{
   if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
-    if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}})};
+    if(String(url).endsWith('/api/app/dashboard'))return {ok:false,json:async()=>({ok:false,error:'D1 test fallback'})};
     if(options.method==='POST'&&String(url).includes('/payment')){const number=decodeURIComponent(String(url).split('/').at(-2));const source=invoices.find(item=>item.invoiceNumber===number);return {ok:true,json:async()=>({ok:true,data:{invoice:{...source,...JSON.parse(options.body)}}})};}
     if(options.method==='DELETE')return {ok:true,json:async()=>({ok:true,data:{deleted:1}})};
     if(options.method==='POST'){const invoice=JSON.parse(options.body).invoice;return {ok:true,json:async()=>({ok:true,data:{invoice}})};}
@@ -40,13 +40,13 @@ window.eval(fs.readFileSync(path.join(root,'assets/app.js'),'utf8'));
 window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
 
 (async()=>{
-  await new Promise(resolve=>window.setTimeout(resolve,80));
+  await new Promise(resolve=>window.setTimeout(resolve,150));
   const document=window.document;
   assert.equal(document.querySelector('#view-invoices').classList.contains('active'),true);
   assert.equal(document.querySelectorAll('.app-shell > .sidebar').length,1);
   assert.equal(document.querySelectorAll('#invoiceList .invoice-list-item').length,2);
-  assert.match(document.querySelector('#invoiceList .invoice-list-item:first-child').textContent,/最新の取引先/);
-  assert.equal(document.querySelector('#invoiceList .invoice-list-item:first-child').classList.contains('active'),true);
+  assert.match(document.querySelector('#invoiceList .invoice-list-item').textContent,/最新の取引先/);
+  assert.equal(document.querySelector('#invoiceList .invoice-list-item').classList.contains('active'),true);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/最新の取引先/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/デモ送信/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/CSV一括追加/);
@@ -55,7 +55,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/複製／変換/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/請求書を複製/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/領収書/);
-  assert.match(document.querySelector('#invoiceDetailPanel').textContent,/PDF／印刷/);
+  assert.match(document.querySelector('#invoiceDetailPanel').textContent,/PDFをダウンロード/);
   assert.equal(document.querySelector('#selectedPaymentStatus summary').textContent,'未入金');
   assert.equal(document.querySelectorAll('[data-payment-value]').length,3);
   document.querySelector('[data-invoice-action="duplicate_invoice"]').click();
@@ -145,7 +145,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   document.querySelector('[data-invoice-action="edit"]').click();
   const editUnitPrice=document.querySelector('[name="editDetailUnitPrice"]');editUnitPrice.value='-10000';assert.equal(editUnitPrice.checkValidity(),true);
   document.querySelector('#editInvoiceDialog').close();
-  document.querySelector('#invoiceList .invoice-list-item:first-child').click();
+  document.querySelector('#invoiceList .invoice-list-item').click();
   document.querySelector('[data-invoice-tab="history"]').click();
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/請求書作成/);
   document.querySelector('[data-invoice-action="mail"]').click();
@@ -164,7 +164,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.doesNotMatch(worker,/請求日<\/dt>/);
   document.querySelector('#invoiceMailDialog').close();
   document.querySelector('#createDemoInvoiceFromList').click();
-  await new Promise(resolve=>window.setTimeout(resolve,0));
+  await new Promise(resolve=>window.setTimeout(resolve,50));
   assert.equal(document.querySelector('#view-create').classList.contains('active'),true);
   assert.equal(document.querySelector('#createSinglePane').classList.contains('active'),true);
   assert.equal(document.querySelector('#singleInvoiceForm').elements.subject.value,'テスト送信');

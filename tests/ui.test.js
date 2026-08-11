@@ -18,7 +18,7 @@ window.HTMLFormElement.prototype.submit=function(){
   const requestId=value('requestId'),bridgeNonce=value('bridgeNonce'),action=value('action');
   submittedStaffToken=value('systemPortalSessionToken');
   if(!requestId)return;
-  const data=action==='getDashboard'?{invoices:[],history:[]}:{count:1};
+  const data=action==='getDashboard'?{invoices:[],history:[]}:action==='getSupportData'?{partners:window.StepInvoiceCore.DEMO_PARTNERS}:{count:1};
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
 };
 window.print=()=>{};
@@ -56,7 +56,7 @@ async function main(){
   const invoiceDate=document.querySelector('[name="invoiceDate"]').value;
   const dueDate=document.querySelector('[name="dueDate"]').value;
   assert.equal((new Date(`${dueDate}T00:00:00`)-new Date(`${invoiceDate}T00:00:00`))/86400000,21);
-  document.querySelector('#previewSingleInvoice').click();
+  document.querySelector('#saveSingleInvoice').click();
   assert.equal(document.querySelector('#previewDialog').open,false);
   assert.match(document.querySelector('#globalAlert').textContent,/取引先/);
   assert.match(document.querySelector('#globalAlert').textContent,/明細1の品目/);
@@ -65,10 +65,10 @@ async function main(){
   assert.match(document.querySelector('#singleSaveStatus').textContent,/入力が必要な項目/);
   assert.equal(document.querySelector('#singleSaveStatus').classList.contains('error'),true);
   const saveButton=document.querySelector('#singleInvoiceForm button[type="submit"]');
-  assert.equal(saveButton.textContent,'保存して発行リストへ追加');
+  assert.equal(saveButton.textContent,'保存');
   assert.equal(document.querySelector('#singleInvoiceForm').noValidate,true);
   assert.equal(saveButton.id,'saveSingleInvoice');
-  assert.ok(document.querySelector('#previewSingleInvoice').compareDocumentPosition(saveButton)&window.Node.DOCUMENT_POSITION_FOLLOWING);
+  assert.ok(document.querySelector('#singleInvoiceLivePreview .invoice-page'));
   assert.equal(document.querySelector('#confirmPdf'),null);
 
   const firstDetailName=document.querySelector('[name="detailName"]');
@@ -87,7 +87,6 @@ async function main(){
   assert.match(window.localStorage.getItem('stepInvoiceSingleDraft'),/-10000/);
   addedDetail.querySelector('.remove-detail').click();
 
-  document.querySelector('#loadDemoPartners').click();
   await new Promise(resolve=>window.setTimeout(resolve,0));
   assert.equal(document.querySelectorAll('#partnerTable tbody tr').length,4);
   document.querySelector('#singlePartnerCombo > button').click();
@@ -112,25 +111,16 @@ async function main(){
   assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/ダミー取引先1/);
   assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/202608501/);
   assert.match(document.querySelector('#singleInvoiceLivePreview').textContent,/27,500/);
-  document.querySelector('#previewSingleInvoice').click();
-  assert.equal(document.querySelector('#previewDialog').open,true);
-  assert.equal(document.querySelectorAll('#previewDialog #printPreview').length,1);
-  assert.equal(document.querySelectorAll('#previewDialog #downloadPreview').length,1);
-  assert.equal(document.querySelector('#printPreview').textContent,'プレビューを印刷');
-  assert.equal(document.querySelector('#downloadPreview').textContent,'プレビューPDFを保存');
-  assert.match(document.querySelector('#invoicePage').textContent,/プレビュー/);
-  assert.equal(document.querySelector('#invoicePage .preview-watermark').textContent,'プレビュー');
-  assert.match(document.querySelector('#invoicePage').getAttribute('style'),/--detail-count:1/);
+  assert.match(document.querySelector('#singleInvoicePreviewPage').getAttribute('style'),/--detail-count:1/);
   const twoLineHtml=window.StepInvoicePdf.pageHtml({...window.StepInvoiceCore.buildManualInvoice({invoiceNumber:'202608999',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-30'},[{name:'授業料',unitPrice:25000,quantity:1,taxRate:10},{name:'分譲経費',unitPrice:2500,quantity:1,taxRate:10}],window.StepInvoiceCore.DEMO_PARTNERS[0])});
   assert.match(twoLineHtml,/--detail-count:2/);
   assert.match(twoLineHtml,/愛知県春日井市大留町1丁目23-2/);
   assert.doesNotMatch(twoLineHtml,/preview-watermark/);
   assert.match(window.StepInvoicePdf.pageHtml(window.StepInvoiceCore.buildManualInvoice({invoiceNumber:'202608998',subject:'2026年8月分',invoiceDate:'2026-08-09',dueDate:'2026-08-30'},[{name:'授業料',unitPrice:7000,quantity:1,taxRate:10}],window.StepInvoiceCore.DEMO_PARTNERS[0]),{preview:true}),/preview-watermark/);
-  document.querySelector('#previewDialog').close();
   form.dispatchEvent(new window.Event('submit',{bubbles:true,cancelable:true}));
   await new Promise(resolve=>window.setTimeout(resolve,20));
-  assert.match(document.querySelector('#createTable tbody').textContent,/202608501/);
-  assert.match(document.querySelector('#createTable tbody').textContent,/ダミー取引先1/);
+  assert.match(document.querySelector('#invoiceList').textContent,/202608501/);
+  assert.match(document.querySelector('#invoiceList').textContent,/ダミー取引先1/);
 
   document.querySelector('#openPartnerForm').click();
   const partnerForm=document.querySelector('#partnerForm');
