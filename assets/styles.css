@@ -191,7 +191,7 @@
   .invoice-detail-title-row h2{font-size:18px}
   .invoice-detail-title-row>div:first-child{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px}
   .invoice-detail-meta,.invoice-payment-meta{margin:0}
-  .invoice-detail-fields{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0;font-size:12px}
+  .invoice-detail-fields{display:flex;align-items:center;flex:1 0 100%;flex-wrap:wrap;gap:4px 8px;margin:0;font-size:12px}
   .campus-tag{padding:2px 6px}
   .invoice-detail-actions{align-items:center;flex-direction:row;margin-top:10px;gap:12px}
   .invoice-edit-actions,.invoice-output-actions{gap:7px}
