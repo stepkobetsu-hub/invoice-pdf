@@ -295,10 +295,10 @@ function enqueueSend_(payload, requestAuth) {
       const email = inv.values[invoices.map['メールアドレス']]; if (!email) throw new Error(`${number}: メールアドレス未登録です。`);
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`${number}: メールアドレス形式不正です。`);
       if (queued.some(q => String(q.values[queueMap['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[queueMap['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
-      if (payload.resend && payload.newToken !== false) invalidateByInvoice_(number);
       return {number:number,inv:inv,email:String(email),cc:String(inv.values[invoices.map['CCメールアドレス']]||''),deliveryId:Utilities.getUuid(),queueId:Utilities.getUuid()};
     });
     const clouds=createCloudflareDeliveriesParallel_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})));
+    if(payload.resend&&payload.newToken!==false)invalidateByInvoicesBulk_(numbers,deliverySheet,deliveries);
     const results=[],deliveryRows=[],queueRows=[],logRows=[],subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
     entries.forEach((entry,index)=>{
       const number=entry.number,inv=entry.inv,deliveryId=entry.deliveryId,queueId=entry.queueId,cloud=clouds[index];
@@ -442,6 +442,24 @@ function assertHourlyLimit_(settings) {
 
 function disableDelivery_(invoiceNumber, requestAuth) { requirePermission_('配信停止', requestAuth); const count=invalidateByInvoice_(String(invoiceNumber)); log_('URL無効化',invoiceNumber,'','','成功',''); return {disabled:count}; }
 function invalidateByInvoice_(invoiceNumber) { const sh=sheet_(STEP.SHEETS.DELIVERIES), t=table_(sh), now=new Date(); let n=0;t.rows.forEach(r=>{if(String(r.values[t.map['請求書番号']])===invoiceNumber&&!r.values[t.map['無効化日時']]){const deliveryId=String(r.values[t.map['配信ID']]||'');if(deliveryId)cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/revoke','post',{});updateRow_(sh,r.rowNumber,t.map,{'無効化日時':now,'現在状態':'無効化','更新日時':now});n++;}});return n; }
+
+function invalidateByInvoicesBulk_(invoiceNumbers,deliverySheet,deliveryTable){
+  const wanted=new Set((invoiceNumbers||[]).map(String));
+  if(!wanted.size)return 0;
+  const sh=deliverySheet||sheet_(STEP.SHEETS.DELIVERIES),table=deliveryTable||table_(sh),map=table.map;
+  const active=table.rows.filter(row=>wanted.has(String(row.values[map['請求書番号']]))&&!row.values[map['無効化日時']]);
+  if(!active.length)return 0;
+  const config=cloudflareConfig_(),requests=active.map(row=>({
+    url:config.url+'/api/admin/deliveries/'+encodeURIComponent(String(row.values[map['配信ID']]||''))+'/revoke',
+    method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+config.key},payload:'{}',muteHttpExceptions:true
+  }));
+  const responses=UrlFetchApp.fetchAll(requests);
+  responses.forEach((response,index)=>{if(response.getResponseCode()<200||response.getResponseCode()>=300)throw new Error('旧配信URLの無効化に失敗しました: '+String(active[index].values[map['請求書番号']]||''));});
+  const now=new Date();
+  active.forEach(row=>mutateRow_(row,map,{'無効化日時':now,'現在状態':'無効化','更新日時':now}));
+  flushTableRows_(sh,table);
+  return active.length;
+}
 
 function validateToken_(token, recordAccess) {
   if (!token || token.length < 30) throw new Error('このダウンロードURLはご利用いただけません。');
