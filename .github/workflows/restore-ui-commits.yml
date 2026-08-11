@@ -1,0 +1,23 @@
+name: Restore requested UI commits
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/restore-ui-commits.yml']
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore UI commits only
+        run: |
+          git config user.name "stepkobetsu-hub"
+          git config user.email "stepkobetsu@gmail.com"
+          git cherry-pick 9d1169ee3c4d90dd087468e97341116537462fcd
+          git cherry-pick 91cccbda9375ef31d518903ed3170f7061edb194
+          git cherry-pick 5595341f86099cddaf18aaa36dadfd681d3b8ebb
+          git cherry-pick 3a3423bed553fda75a85718092bf1aa7d6178ed2
+          git push origin HEAD:main
