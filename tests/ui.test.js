@@ -201,7 +201,7 @@ async function main(){
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
-  assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}'));
+  assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));
   assert.match(styles,/\.invoice-page \.bank-box\{[\s\S]*?min-height:92px;[\s\S]*?max-height:92px;/);
   assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
   assert.match(styles,/@media\(min-width:851px\)\{[\s\S]*?\.invoice-list-pane\{display:flex;flex-direction:column\}[\s\S]*?\.invoice-list\{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto\}/);
@@ -215,6 +215,9 @@ async function main(){
   assert.match(styles,/\.pdf-render-host\{[^}]*height:auto;[^}]*overflow:visible/);
   assert.match(styles,/\.invoice-inline-preview:has\(\.invoice-page\+\.invoice-page\)::before\{content:'複数ページあります/);
   assert.match(styles,/\.invoice-inline-preview \.invoice-page\+\.invoice-page\{margin-top:28px\}/);
+  assert.match(styles,/\.invoice-page \.detail tbody tr:nth-child\(even\) td\{background:#f6f8fb!important\}/);
+  assert.match(styles,/\.invoice-page \.page-number\{left:0;top:auto;bottom:26px;width:100%;text-align:center\}/);
+  assert.match(styles,/\.invoice-continuation-page \.detail\{top:72px\}/);
   console.log('ui tests passed');
 }
 

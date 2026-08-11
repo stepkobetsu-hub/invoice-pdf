@@ -39,23 +39,30 @@ const invoice = {
 const host = window.document.createElement('div');
 host.innerHTML = window.StepInvoicePdf.pageHtml(invoice);
 const pages = host.querySelectorAll('.invoice-page');
-assert.equal(pages.length, 3);
+assert.equal(pages.length, 2);
 assert.match(pages[0].textContent, /明細1/);
-assert.match(pages[0].textContent, /明細8/);
-assert.doesNotMatch(pages[0].textContent, /明細9/);
-assert.match(pages[1].textContent, /明細9/);
+assert.match(pages[0].textContent, /明細15/);
+assert.doesNotMatch(pages[0].textContent, /明細16/);
 assert.match(pages[1].textContent, /明細16/);
-assert.match(pages[2].textContent, /明細17/);
+assert.match(pages[1].textContent, /明細17/);
+assert.equal(pages[1].querySelectorAll('.customer,.customer-postal,.customer-address,.issuer').length, 0);
+assert.match(pages[1].textContent, /請求明細（続き）/);
 assert.equal(host.querySelectorAll('.totals').length, 1);
-assert.match(pages[0].textContent, /1 \/ 3/);
-assert.match(pages[1].textContent, /2 \/ 3/);
-assert.match(pages[2].textContent, /3 \/ 3/);
+assert.match(pages[0].textContent, /1 \/ 2/);
+assert.match(pages[1].textContent, /2 \/ 2/);
 
 const singlePageHost = window.document.createElement('div');
-singlePageHost.innerHTML = window.StepInvoicePdf.pageHtml({ ...invoice, details: invoice.details.slice(0, 8) });
+singlePageHost.innerHTML = window.StepInvoicePdf.pageHtml({ ...invoice, details: invoice.details.slice(0, 5) });
 assert.equal(singlePageHost.querySelectorAll('.invoice-page').length, 1);
 assert.equal(singlePageHost.querySelectorAll('.totals').length, 1);
 assert.match(singlePageHost.textContent, /1 \/ 1/);
+
+const thirteenDetailHost = window.document.createElement('div');
+thirteenDetailHost.innerHTML = window.StepInvoicePdf.pageHtml({ ...invoice, details: invoice.details.slice(0, 13) });
+assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page').length, 2);
+assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[0].querySelectorAll('tbody tr').length, 13);
+assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[1].querySelectorAll('.customer,.issuer').length, 0);
+assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[1].querySelectorAll('.totals').length, 1);
 
 let addPageCount = 0;
 let addImageCount = 0;
@@ -70,8 +77,8 @@ window.jspdf = {
 
 window.StepInvoicePdf.toBlob(host).then(blob => {
   assert.equal(blob.type, 'application/pdf');
-  assert.equal(addPageCount, 2);
-  assert.equal(addImageCount, 3);
+  assert.equal(addPageCount, 1);
+  assert.equal(addImageCount, 2);
   console.log('invoice PDF pagination tests passed');
 }).catch(error => {
   console.error(error);

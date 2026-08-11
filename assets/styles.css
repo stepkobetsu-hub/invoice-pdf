@@ -7,13 +7,13 @@
 .invoice-page{--detail-count:1}
 .invoice-page .issuer{left:520px;width:250px;font-size:14px;line-height:18px;white-space:normal}
 .invoice-page .detail td{padding:5px}
-.invoice-page .tax-title{top:calc(569px + var(--detail-count) * 28px)}
-.invoice-page .tax-table{top:calc(585px + var(--detail-count) * 28px)}
-.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}
-.invoice-page .bank-title{top:calc(655px + var(--detail-count) * 28px)}
-.invoice-page .bank-box{top:calc(675px + var(--detail-count) * 28px)}
-.invoice-page .note-title{top:calc(779px + var(--detail-count) * 28px)}
-.invoice-page .note-box{top:calc(799px + var(--detail-count) * 28px)}
+.invoice-page .tax-title{top:calc(569px + var(--detail-count) * 34px)}
+.invoice-page .tax-table{top:calc(585px + var(--detail-count) * 34px)}
+.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}
+.invoice-page .bank-title{top:calc(655px + var(--detail-count) * 34px)}
+.invoice-page .bank-box{top:calc(675px + var(--detail-count) * 34px)}
+.invoice-page .note-title{top:calc(779px + var(--detail-count) * 34px)}
+.invoice-page .note-box{top:calc(799px + var(--detail-count) * 34px)}
 
 /* 振込先・備考は複数行でもPDFの枠内に収める。 */
 .invoice-page .section-box{
@@ -31,13 +31,23 @@
   min-height:92px;
   max-height:92px;
 }
-.invoice-page .note-title{top:calc(779px + var(--detail-count) * 28px)}
+.invoice-page .note-title{top:calc(779px + var(--detail-count) * 34px)}
 .invoice-page .note-box{
-  top:calc(799px + var(--detail-count) * 28px);
+  top:calc(799px + var(--detail-count) * 34px);
   min-height:80px;
   max-height:80px;
 }
-.invoice-page .page-number{top:1106px}
+.invoice-page .detail tbody tr:nth-child(even) td{background:#f6f8fb!important}
+.invoice-page .page-number{left:0;top:auto;bottom:26px;width:100%;text-align:center}
+.invoice-continuation-page .continuation-title{left:31px;top:30px;font-size:20px;font-weight:700}
+.invoice-continuation-page .detail{top:72px}
+.invoice-continuation-page .tax-title{top:calc(122px + var(--detail-count) * 34px)}
+.invoice-continuation-page .tax-table{top:calc(138px + var(--detail-count) * 34px)}
+.invoice-continuation-page .totals{top:calc(122px + var(--detail-count) * 34px)}
+.invoice-continuation-page .bank-title{top:calc(235px + var(--detail-count) * 34px)}
+.invoice-continuation-page .bank-box{top:calc(255px + var(--detail-count) * 34px)}
+.invoice-continuation-page .note-title{top:calc(359px + var(--detail-count) * 34px)}
+.invoice-continuation-page .note-box{top:calc(379px + var(--detail-count) * 34px)}
 .field-label-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mini-link{border:0;background:transparent;color:var(--blue);font-size:11px;font-weight:700;padding:0;cursor:pointer;text-decoration:underline}
 .individual-detail-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
