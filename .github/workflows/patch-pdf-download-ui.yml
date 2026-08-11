@@ -1,0 +1,25 @@
+name: Patch PDF download UI
+on:
+  push:
+    branches: [main]
+    paths: ['scripts/patch_pdf_download_ui.py']
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply PDF dialog and DL status patch
+        run: python scripts/patch_pdf_download_ui.py
+      - name: Verify
+        run: |
+          git diff --check
+          npm test
+      - name: Commit
+        run: |
+          git config user.name "stepkobetsu-hub"
+          git config user.email "stepkobetsu@gmail.com"
+          git add index.html assets/app.js
+          git commit -m "Simplify PDF download dialog and mark downloads"
+          git push origin HEAD:main
