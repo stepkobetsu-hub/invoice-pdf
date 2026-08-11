@@ -54,7 +54,6 @@ def replace_or_insert(src, name, anchor):
         raise SystemExit(f'anchor not found for {name}: {anchor}')
     return src[:anchor_pos] + block + '\n\n' + src[anchor_pos:]
 
-# Queue schema required by Brevo batch tracking.
 cur = re.sub(
     r"QUEUE_HEADERS: \[[^\n]+\]",
     "QUEUE_HEADERS: ['キューID','配信ID','請求書番号','テストモード','再送','新規トークン','状態','試行回数','登録日時','開始日時','完了日時','エラー','バッチID','メール事業者ID']",
@@ -62,7 +61,6 @@ cur = re.sub(
     count=1,
 )
 
-# Restore the batch-capable implementations from the known-good PR17 snapshot.
 for name, anchor in [
     ('processSendQueue', 'function importPartners_('),
     ('enqueueSend_', 'function releasePreparedSend_('),
@@ -77,7 +75,6 @@ for name, anchor in [
 ]:
     cur = replace_or_insert(cur, name, anchor)
 
-# Restore API route for batch progress if missing.
 if 'getSendBatchStatus:' not in cur:
     cur = cur.replace(
         "processPendingSends: () => processPendingSends_(requestAuth)",
@@ -85,16 +82,12 @@ if 'getSendBatchStatus:' not in cur:
         1,
     )
 
-# Do NOT restore the old production approval lock.
 cur = re.sub(
     r"\n\s*if \(!testMode && PropertiesService\.getScriptProperties\(\)\.getProperty\('PRODUCTION_SEND_APPROVED'\) !== 'true'\) throw new Error\('[^']*'\);",
     '',
     cur,
 )
 
-# Do NOT auto-sandbox large batches. Sandbox is allowed only for an explicitly
-# requested test batch when BREVO_SANDBOX_MODE=true. Normal production sends
-# always go to the real partner addresses.
 old = "const batchId=String(prepared[0].queueRow.values[queueTable.map['バッチID']]||Utilities.getUuid()),sandboxConfigured=String(properties.getProperty('BREVO_SANDBOX_MODE')||'').toLowerCase()==='true',largeTest=prepared.length>10&&prepared.every(item=>String(item.queueRow.values[queueTable.map['テストモード']])==='true'||item.queueRow.values[queueTable.map['テストモード']]===true),allowLargeTest=String(properties.getProperty('BREVO_ALLOW_LARGE_TEST_DELIVERY')||'').toLowerCase()==='true',sandbox=sandboxConfigured||(largeTest&&!allowLargeTest);"
 new = "const batchId=String(prepared[0].queueRow.values[queueTable.map['バッチID']]||Utilities.getUuid()),sandboxConfigured=String(properties.getProperty('BREVO_SANDBOX_MODE')||'').toLowerCase()==='true',allTest=prepared.every(item=>String(item.queueRow.values[queueTable.map['テストモード']])==='true'||item.queueRow.values[queueTable.map['テストモード']]===true),sandbox=sandboxConfigured&&allTest;"
 if old in cur:
@@ -102,10 +95,8 @@ if old in cur:
 else:
     cur = re.sub(r"const batchId=String\(prepared\[0\].*?;\n  const requestBody=", new + "\n  const requestBody=", cur, count=1, flags=re.S)
 
-# Keep setup aligned with normal production operation.
 cur = cur.replace("PRODUCTION_SEND_APPROVED:'false'", "PRODUCTION_SEND_APPROVED:'true'")
 
-# Guards.
 required = [
     'processBrevoQueueBatch_', 'buildBrevoBatchPayload_', 'getSendBatchStatus_',
     'createCloudflareDeliveriesParallel_', "UrlFetchApp.fetch('https://api.brevo.com/v3/smtp/email'"
