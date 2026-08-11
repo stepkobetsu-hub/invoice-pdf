@@ -247,7 +247,10 @@
     state.resendSubmitting=true;
     let groups=state.pendingResend;const button=$('#confirmResend');button.disabled=true;button.textContent='PDFを準備しています…';
     try{
-      await ensurePdfsForSend([...groups.unsent,...groups.resend]);groups=classifyQueueSelection(groups.selected);button.textContent='再送を受け付けています…';
+      // 再送分は既にApps Script側に保存済みのPDFを再利用する。
+      // D1側のpdfStatusが遅れている場合でも100件を再生成しないよう、
+      // PDF準備は今回が初回送信となる請求書だけに限定する。
+      await ensurePdfsForSend(groups.unsent);groups=classifyQueueSelection(groups.selected);button.textContent='再送を受け付けています…';
       if(groups.unsent.length)await api('enqueueSend',{invoiceNumbers:groups.unsent.map(x=>x.invoiceNumber),testMode:false,resend:false,newToken:true});
       if(groups.resend.length)await api('enqueueSend',{invoiceNumbers:groups.resend.map(x=>x.invoiceNumber),testMode:false,resend:true,newToken:true});
       markSendQueued([...groups.unsent,...groups.resend]);$('#resendDialog').close();alert(`${groups.unsent.length+groups.resend.length}件の送信を受け付けました。バックグラウンドで順次送信されます。`,'success');state.pendingResend=null;setTimeout(()=>refreshAll(false),65000);

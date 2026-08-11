@@ -5,12 +5,14 @@ const path = require('node:path');
 const source = fs.readFileSync(path.resolve(__dirname, '../apps-script/Code.gs'), 'utf8');
 const app = fs.readFileSync(path.resolve(__dirname, '../assets/app.js'), 'utf8');
 const enqueue = source.match(/function enqueueSend_\([\s\S]*?\r?\n}\r?\n\r?\nfunction releasePreparedSend_/)[0];
-const bulkInvalidate = source.match(/function invalidateByInvoicesBulk_\([\s\S]*?\r?\n}\r?\n/)[0];
+const bulkInvalidate = source.match(/function markInvoicesInvalidated_\([\s\S]*?\r?\n}\r?\n/)[0];
 
 assert.doesNotMatch(enqueue, /numbers\.map\([\s\S]*?invalidateByInvoice_\(/, '100件の再送で旧URLを1件ずつ無効化してはいけない');
-assert.match(enqueue, /createCloudflareDeliveriesParallel_\([\s\S]*?invalidateByInvoicesBulk_\(numbers,deliverySheet,deliveries\)/, '新URLの一括作成後に旧URLを一括無効化する');
-assert.match(bulkInvalidate, /UrlFetchApp\.fetchAll\(requests\)/, 'Cloudflareの無効化は並列実行する');
-assert.match(bulkInvalidate, /flushTableRows_\(sh,table\)/, '配信履歴の更新は一括書込みする');
+assert.match(enqueue, /createCloudflareDeliveriesBatch_\([\s\S]*?markInvoicesInvalidated_\(numbers,deliverySheet,deliveries\)/, 'Cloudflare側の一括APIで新URL作成と旧URL無効化を行う');
+assert.doesNotMatch(bulkInvalidate, /UrlFetchApp/, 'Apps Script側で旧URLを1件ずつ無効化してはいけない');
+assert.match(bulkInvalidate, /getRangeList\(ranges\)\.setValue/, '配信履歴の無効化はRangeListで一括書込みする');
 assert.match(app, /\['未送信','無効化','送信失敗'\]\.includes/, '途中失敗で無効化された請求書を再び送信可能にする');
+assert.match(app, /await ensurePdfsForSend\(groups\.unsent\);groups=classifyQueueSelection\(groups\.selected\)/, '再送済み請求書のPDFをブラウザで再生成してはいけない');
+assert.doesNotMatch(app, /ensurePdfsForSend\(\[\.\.\.groups\.unsent,\.\.\.groups\.resend\]\)/, '100件再送で全PDFを再生成してはいけない');
 
 console.log('bulk resend performance checks passed');

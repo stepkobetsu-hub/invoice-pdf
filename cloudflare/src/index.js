@@ -451,6 +451,10 @@ async function serveAdminRequest(request, env, ctx, url) {
     return createDelivery(request, env, url);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/admin/deliveries/batch") {
+    return createDeliveryBatch(request, env, url);
+  }
+
   if (request.method === "POST" && url.pathname === "/api/admin/deliveries/status") {
     return deliveryStatuses(request, env);
   }
@@ -607,6 +611,43 @@ async function createDelivery(request, env, url) {
       expires_at=excluded.expires_at, status='pending', revoked_at=NULL, updated_at=excluded.updated_at
   `).bind(deliveryId, invoice.invoice_id, String(input.recipientEmail || ""), String(input.ccEmail || ""), tokenHash, now, expiresAt, String(input.createdBy || "apps-script")).run();
   return json({ ok: true, deliveryId, expiresAt, downloadUrl: `${url.origin}/d/${token}` });
+}
+
+async function createDeliveryBatch(request, env, url) {
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
+  const inputs = Array.isArray(payload.value.items) ? payload.value.items.slice(0, 100) : [];
+  if (!inputs.length) return json({ ok: false, error: "NO_DELIVERIES" }, 400);
+  const invoiceNumbers = [...new Set(inputs.map(item => String(item.invoiceNumber || "").trim()).filter(Boolean))];
+  if (invoiceNumbers.length !== inputs.length) return json({ ok: false, error: "INVALID_OR_DUPLICATE_INVOICE_NUMBER" }, 400);
+  const placeholders = invoiceNumbers.map(() => "?").join(",");
+  const invoiceRows = await env.DB.prepare(`SELECT invoice_id, invoice_number FROM invoices WHERE invoice_number IN (${placeholders})`).bind(...invoiceNumbers).all();
+  const invoiceByNumber = new Map((invoiceRows.results || []).map(row => [String(row.invoice_number), String(row.invoice_id)]));
+  const missing = invoiceNumbers.filter(number => !invoiceByNumber.has(number));
+  if (missing.length) return json({ ok: false, error: "INVOICE_NOT_FOUND", invoiceNumbers: missing }, 404);
+  const now = new Date().toISOString();
+  const prepared = await Promise.all(inputs.map(async input => {
+    const invoiceNumber = String(input.invoiceNumber || "").trim();
+    const deliveryId = String(input.deliveryId || crypto.randomUUID()).trim();
+    const token = createOpaqueToken();
+    const tokenHash = await hashOpaqueToken(token);
+    const expiresAt = validFutureDate(input.expiresAt) || new Date(Date.now() + positiveInt(env.PARENT_LINK_TTL_DAYS, 180) * 86400000).toISOString();
+    return { input, invoiceNumber, invoiceId: invoiceByNumber.get(invoiceNumber), deliveryId, token, tokenHash, expiresAt };
+  }));
+  const statements = [];
+  if (payload.value.revokeExisting === true) {
+    const ids = prepared.map(item => item.invoiceId);
+    const idPlaceholders = ids.map(() => "?").join(",");
+    statements.push(env.DB.prepare(`UPDATE deliveries SET status='revoked', revoked_at=?1, updated_at=?1 WHERE invoice_id IN (${idPlaceholders}) AND status!='revoked'`).bind(now, ...ids));
+  }
+  prepared.forEach(item => statements.push(env.DB.prepare(`
+    INSERT INTO deliveries (delivery_id, invoice_id, recipient_email, cc_email, token_hash, issued_at, expires_at, status, created_by, created_at, updated_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'pending', ?8, ?6, ?6)
+    ON CONFLICT(delivery_id) DO UPDATE SET token_hash=excluded.token_hash, issued_at=excluded.issued_at,
+      expires_at=excluded.expires_at, status='pending', revoked_at=NULL, updated_at=excluded.updated_at
+  `).bind(item.deliveryId, item.invoiceId, String(item.input.recipientEmail || ""), String(item.input.ccEmail || ""), item.tokenHash, now, item.expiresAt, String(item.input.createdBy || "apps-script"))));
+  await env.DB.batch(statements);
+  return json({ ok: true, items: prepared.map(item => ({ deliveryId: item.deliveryId, invoiceNumber: item.invoiceNumber, expiresAt: item.expiresAt, downloadUrl: `${url.origin}/d/${item.token}` })) });
 }
 
 async function rotateDelivery(request, env, url, deliveryId) {

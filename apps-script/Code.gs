@@ -297,8 +297,9 @@ function enqueueSend_(payload, requestAuth) {
       if (queued.some(q => String(q.values[queueMap['請求書番号']]) === number && ['送信待ち','送信中'].includes(q.values[queueMap['状態']]))) throw new Error(`${number}: 既に送信キューへ登録されています。`);
       return {number:number,inv:inv,email:String(email),cc:String(inv.values[invoices.map['CCメールアドレス']]||''),deliveryId:Utilities.getUuid(),queueId:Utilities.getUuid()};
     });
-    const clouds=createCloudflareDeliveriesParallel_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})));
-    if(payload.resend&&payload.newToken!==false)invalidateByInvoicesBulk_(numbers,deliverySheet,deliveries);
+    const replaceExisting=payload.resend&&payload.newToken!==false;
+    const clouds=createCloudflareDeliveriesBatch_(entries.map(entry=>({deliveryId:entry.deliveryId,invoiceNumber:entry.number,recipientEmail:entry.email,ccEmail:entry.cc,expiresAt:expires,createdBy:createdBy})),replaceExisting);
+    if(replaceExisting)markInvoicesInvalidated_(numbers,deliverySheet,deliveries);
     const results=[],deliveryRows=[],queueRows=[],logRows=[],subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
     entries.forEach((entry,index)=>{
       const number=entry.number,inv=entry.inv,deliveryId=entry.deliveryId,queueId=entry.queueId,cloud=clouds[index];
@@ -443,21 +444,19 @@ function assertHourlyLimit_(settings) {
 function disableDelivery_(invoiceNumber, requestAuth) { requirePermission_('配信停止', requestAuth); const count=invalidateByInvoice_(String(invoiceNumber)); log_('URL無効化',invoiceNumber,'','','成功',''); return {disabled:count}; }
 function invalidateByInvoice_(invoiceNumber) { const sh=sheet_(STEP.SHEETS.DELIVERIES), t=table_(sh), now=new Date(); let n=0;t.rows.forEach(r=>{if(String(r.values[t.map['請求書番号']])===invoiceNumber&&!r.values[t.map['無効化日時']]){const deliveryId=String(r.values[t.map['配信ID']]||'');if(deliveryId)cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/revoke','post',{});updateRow_(sh,r.rowNumber,t.map,{'無効化日時':now,'現在状態':'無効化','更新日時':now});n++;}});return n; }
 
-function invalidateByInvoicesBulk_(invoiceNumbers,deliverySheet,deliveryTable){
+function markInvoicesInvalidated_(invoiceNumbers,deliverySheet,deliveryTable){
   const wanted=new Set((invoiceNumbers||[]).map(String));
   if(!wanted.size)return 0;
   const sh=deliverySheet||sheet_(STEP.SHEETS.DELIVERIES),table=deliveryTable||table_(sh),map=table.map;
   const active=table.rows.filter(row=>wanted.has(String(row.values[map['請求書番号']]))&&!row.values[map['無効化日時']]);
   if(!active.length)return 0;
-  const config=cloudflareConfig_(),requests=active.map(row=>({
-    url:config.url+'/api/admin/deliveries/'+encodeURIComponent(String(row.values[map['配信ID']]||''))+'/revoke',
-    method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+config.key},payload:'{}',muteHttpExceptions:true
-  }));
-  const responses=UrlFetchApp.fetchAll(requests);
-  responses.forEach((response,index)=>{if(response.getResponseCode()<200||response.getResponseCode()>=300)throw new Error('旧配信URLの無効化に失敗しました: '+String(active[index].values[map['請求書番号']]||''));});
   const now=new Date();
   active.forEach(row=>mutateRow_(row,map,{'無効化日時':now,'現在状態':'無効化','更新日時':now}));
-  flushTableRows_(sh,table);
+  const columnName=index=>{let n=index,name='';while(n>0){n-=1;name=String.fromCharCode(65+n%26)+name;n=Math.floor(n/26);}return name;};
+  [['無効化日時',now],['現在状態','無効化'],['更新日時',now]].forEach(([key,value])=>{
+    const ranges=active.map(row=>columnName(map[key]+1)+row.rowNumber);
+    if(ranges.length)sh.getRangeList(ranges).setValue(value);
+  });
   return active.length;
 }
 
@@ -567,6 +566,7 @@ function migrateInvoiceDataToCloudflare(){
 }
 function createCloudflareDelivery_(values){return cloudflareAdminFetch_('/api/admin/deliveries','post',{deliveryId:String(values.deliveryId||''),invoiceNumber:String(values.invoiceNumber||''),recipientEmail:String(values.recipientEmail||''),ccEmail:String(values.ccEmail||''),expiresAt:new Date(values.expiresAt).toISOString(),createdBy:String(values.createdBy||'apps-script')});}
 function createCloudflareDeliveriesParallel_(values){const c=cloudflareConfig_(),requests=(values||[]).map(value=>({url:c.url+'/api/admin/deliveries',method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.key},payload:JSON.stringify({deliveryId:String(value.deliveryId||''),invoiceNumber:String(value.invoiceNumber||''),recipientEmail:String(value.recipientEmail||''),ccEmail:String(value.ccEmail||''),expiresAt:new Date(value.expiresAt).toISOString(),createdBy:String(value.createdBy||'apps-script')}),muteHttpExceptions:true})),responses=UrlFetchApp.fetchAll(requests);return responses.map((response,index)=>{let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('Cloudflareから正しい応答を受信できませんでした: '+String(values[index].invoiceNumber||''));}if(response.getResponseCode()<200||response.getResponseCode()>=300||!result.ok)throw new Error('Cloudflare連携に失敗しました: '+String(result.error||response.getResponseCode()));return result;});}
+function createCloudflareDeliveriesBatch_(values,revokeExisting){const c=cloudflareConfig_(),response=UrlFetchApp.fetch(c.url+'/api/admin/deliveries/batch',{method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+c.key},payload:JSON.stringify({items:(values||[]).map(value=>({deliveryId:String(value.deliveryId||''),invoiceNumber:String(value.invoiceNumber||''),recipientEmail:String(value.recipientEmail||''),ccEmail:String(value.ccEmail||''),expiresAt:new Date(value.expiresAt).toISOString(),createdBy:String(value.createdBy||'apps-script')})),revokeExisting:revokeExisting===true}),muteHttpExceptions:true});let result;try{result=JSON.parse(response.getContentText());}catch(_){throw new Error('Cloudflareから正しい一括応答を受信できませんでした。');}if(response.getResponseCode()<200||response.getResponseCode()>=300||!result.ok||!Array.isArray(result.items))throw new Error('Cloudflare一括連携に失敗しました: '+String(result.error||response.getResponseCode()));return result.items;}
 
 function rotateCloudflareDelivery_(deliveryId,expiresAt){return cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/rotate','post',{expiresAt:new Date(expiresAt).toISOString()});}
 function syncCloudflareStatuses_(){try{const sh=sheet_(STEP.SHEETS.DELIVERIES),t=table_(sh),rows=t.rows.slice(-100),ids=rows.map(r=>String(r.values[t.map['配信ID']]||'')).filter(Boolean);if(!ids.length)return;const result=cloudflareAdminFetch_('/api/admin/deliveries/status','post',{deliveryIds:ids}),byId={};(result.items||[]).forEach(item=>byId[String(item.delivery_id)]=item);rows.forEach(r=>{const item=byId[String(r.values[t.map['配信ID']]||'')];if(!item)return;const changes={'更新日時':new Date()};if(item.status==='downloaded'){changes['現在状態']='DL済';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['初回ダウンロード日時']=item.downloaded_at?new Date(item.downloaded_at):r.values[t.map['初回ダウンロード日時']];changes['アクセス回数']=Number(item.open_count||0);changes['ダウンロード回数']=Number(item.download_count||0);}else if(item.status==='opened'){changes['現在状態']='URLアクセス済み';changes['初回アクセス日時']=item.first_opened_at?new Date(item.first_opened_at):r.values[t.map['初回アクセス日時']];changes['最終アクセス日時']=item.last_opened_at?new Date(item.last_opened_at):r.values[t.map['最終アクセス日時']];changes['アクセス回数']=Number(item.open_count||0);}else if(item.status==='revoked'||item.revoked_at){changes['現在状態']='無効化';changes['無効化日時']=item.revoked_at?new Date(item.revoked_at):new Date();}else if(item.expires_at&&new Date(item.expires_at).getTime()<Date.now()){changes['現在状態']='期限切れ';}else{return;}updateRow_(sh,r.rowNumber,t.map,changes);});}catch(err){console.warn('Cloudflare状態同期を保留: '+safeError_(err));}}
