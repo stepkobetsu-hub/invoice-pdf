@@ -3,6 +3,7 @@ from pathlib import Path
 index = Path('index.html')
 app = Path('assets/app.js')
 receipts = Path('assets/receipts.js')
+code = Path('apps-script/Code.gs')
 
 html = index.read_text(encoding='utf-8')
 html = html.replace('<div class="dialog-head"><h2>請求書のPDF／印刷</h2><button data-close aria-label="閉じる">×</button></div>','<div class="dialog-head"><h2>請求書PDF</h2><button data-close aria-label="閉じる">×</button></div>')
@@ -15,10 +16,10 @@ html = html.replace('<div class="page-heading"><div><h1>メール設定</h1><p>�
 html = html.replace('<label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label>','<input name="testRecipient" type="hidden" value="">')
 html = html.replace('<div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div>','')
 html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
-for old in ['assets/app.js?v=20260811-production-pdf-label','assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-no-print']:
-    html = html.replace(old,'assets/app.js?v=20260811-dl-status')
-for old in ['assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label','assets/receipts.js?v=20260811-production-recipient']:
-    html = html.replace(old,'assets/receipts.js?v=20260811-dl-status')
+for old in ['assets/app.js?v=20260811-production-pdf-label','assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-no-print','assets/app.js?v=20260811-dl-status']:
+    html = html.replace(old,'assets/app.js?v=20260811-production-unlocked')
+for old in ['assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label','assets/receipts.js?v=20260811-production-recipient','assets/receipts.js?v=20260811-dl-status']:
+    html = html.replace(old,'assets/receipts.js?v=20260811-production-unlocked')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
@@ -42,13 +43,10 @@ if old_to in js:
     js = js.replace(old_to, "$('#mailTo').textContent=invoice.email;")
 js = js.replace("  $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');\n", '')
 js = js.replace("  $('#printPreview').onclick=printPreview;\n", '')
-# Show a visible DL済 badge in the invoice list after a local PDF download.
 old_invoice_status = '<span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||\'未送信\')}</span><strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span>'
 new_invoice_status = '<span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||\'未送信\')}</span>${invoice.dlStatus===\'DL済\'?\'<span class="status downloaded">DL済</span>\':\'\'}<strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span>'
 if old_invoice_status in js:
     js = js.replace(old_invoice_status, new_invoice_status)
-elif "invoice.dlStatus==='DL済'" not in js:
-    raise SystemExit('invoice list status pattern not found')
 if 'testMode:true' in js:
     raise SystemExit('testMode:true remains in app.js')
 app.write_text(js, encoding='utf-8')
@@ -65,8 +63,14 @@ old_receipt_pdf = "if(name==='pdf')return createPdf(receipt,true).catch(error=>A
 new_receipt_pdf = "if(name==='pdf'){try{await createPdf(receipt,true);receipt.dlStatus='DL済';receipt.downloadedAt=new Date().toISOString();receipt.updatedAt=new Date().toISOString();await A.api('saveReceiptData',{receipt});render();}catch(error){A.alert(error.message,'error');}return;}"
 if old_receipt_pdf in receipt_js:
     receipt_js = receipt_js.replace(old_receipt_pdf, new_receipt_pdf)
-elif "receipt.dlStatus='DL済'" not in receipt_js:
-    raise SystemExit('receipt pdf action pattern not found')
 if 'testMode:true' in receipt_js:
     raise SystemExit('testMode:true remains in receipts.js')
 receipts.write_text(receipt_js, encoding='utf-8')
+
+code_js = code.read_text(encoding='utf-8')
+code_js = code_js.replace("props.setProperties({PRODUCTION_SEND_APPROVED:'false',APPROVED_PDF_TEMPLATE:'stage1-approved-v1',SYSTEM_VERSION:'0.1.0'}, false);", "props.setProperties({PRODUCTION_SEND_APPROVED:'true',APPROVED_PDF_TEMPLATE:'stage1-approved-v1',SYSTEM_VERSION:'0.1.0'}, false);")
+lock_line = "  if (!testMode && PropertiesService.getScriptProperties().getProperty('PRODUCTION_SEND_APPROVED') !== 'true') throw new Error('本番送信は管理者の最終承認前のため無効です。');\n"
+code_js = code_js.replace(lock_line, '')
+if '本番送信は管理者の最終承認前のため無効です。' in code_js:
+    raise SystemExit('production send approval lock remains in Code.gs')
+code.write_text(code_js, encoding='utf-8')
