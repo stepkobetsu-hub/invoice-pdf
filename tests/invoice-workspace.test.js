@@ -10,13 +10,14 @@ const dom = new JSDOM(fs.readFileSync(path.join(root, 'index.html'), 'utf8'), {
 });
 const {window} = dom;
 window.localStorage.setItem('stepStaffAppAuth', JSON.stringify({systemPortalSessionToken:'test-session'}));
+window.localStorage.setItem('stepInvoiceSingleDraft', JSON.stringify({values:{partnerCode:'DEMO001',subject:'入力途中の件名'},details:[{name:'入力途中',unitPrice:1000,quantity:1,taxRate:10}]}));
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 window.HTMLDialogElement.prototype.close=function(){this.open=false;};
 window.HTMLFormElement.prototype.submit=function(){
   const value=name=>this.querySelector(`[name="${name}"]`)?.value||'';
   const action=value('action'),requestId=value('requestId'),bridgeNonce=value('bridgeNonce');
   const invoices=[
-    {invoiceNumber:'202608102',partnerName:'最新の取引先',honorific:'様',subject:'2026年9月分',invoiceDate:'2026/08/10',dueDate:'2026/08/31',createdAt:'2026/08/10',updatedAt:'2026/08/10 12:30:00',memo:'中2',tags:'神領',paymentStatus:'未入金',subtotal:10000,tax:1000,total:11000,email:'new@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'夏期講習',unitPrice:10000,quantity:1,amount:10000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'未送信',dlStatus:'未取得',warnings:[]},
+    {invoiceNumber:'202608102',customerCode:'DEMO001',partnerName:'最新の取引先',honorific:'様',subject:'2026年9月分',invoiceDate:'2026/08/10',dueDate:'2026/08/31',createdAt:'2026/08/10',updatedAt:'2026/08/10 12:30:00',memo:'中2',tags:'神領',paymentStatus:'未入金',subtotal:10000,tax:1000,total:11000,email:'new@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'夏期講習',unitPrice:10000,quantity:1,amount:10000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'未送信',dlStatus:'未取得',warnings:[]},
     {invoiceNumber:'202608101',partnerName:'以前の取引先',honorific:'様',subject:'2026年8月分',invoiceDate:'2026/08/09',dueDate:'2026/08/30',createdAt:'2026/08/09',updatedAt:'2026/08/09 11:00:00',memo:'中1',tags:'大手',paymentStatus:'入金済',paymentDate:'2026/08/10',paymentAmount:9900,paymentMemo:'振込手数料差引',subtotal:9000,tax:900,total:9900,email:'old@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'授業料',unitPrice:9000,quantity:1,amount:9000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'送信済み',dlStatus:'未アクセス',warnings:[]}
   ];
   const data=action==='getDashboard'?{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}:{ok:true};
@@ -51,6 +52,9 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(document.querySelector('.invoice-detail-column').textContent,/デモ送信/);
   assert.equal(document.body.textContent.includes('テスト送信モード'),false);
   assert.equal(document.querySelector('[name="testRecipient"]'),null);
+  assert.equal(document.querySelector('#singlePartner').value,'');
+  assert.equal(document.querySelector('#singlePartnerSearch').value,'');
+  assert.equal(document.querySelector('#singleInvoiceForm [name="subject"]').value,'入力途中の件名');
   assert.match(document.querySelector('.invoice-detail-column').textContent,/CSV一括追加/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/請求書を作成/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/編集/);
@@ -63,6 +67,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   document.querySelector('[data-invoice-action="duplicate_invoice"]').click();
   assert.equal(document.querySelector('#documentEditorDialog').open,true);
   assert.match(document.querySelector('#documentEditorTitle').textContent,/請求書を複製/);
+  assert.equal(document.querySelector('#documentEditorForm [name="customerCode"]').value,'DEMO001');
   assert.match(document.querySelector('#documentEditorPreview').textContent,/請求書/);
   assert.ok(document.querySelector('#documentPartnerSearch'));
   document.querySelector('#documentEditorDialog').close();
@@ -70,7 +75,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.equal(document.querySelector('#documentEditorDialog').open,true);
   assert.match(document.querySelector('#documentEditorTitle').textContent,/請求書から領収書を作成/);
   assert.match(document.querySelector('[name="documentNumber"]').value,/^\d{9}$/);
-  assert.match(document.querySelector('[name="subject"]').value,/^2026年[89]月分$/);
+  assert.match(document.querySelector('#documentEditorForm [name="subject"]').value,/^2026年[89]月分$/);
   assert.match(document.querySelector('#documentEditorPreview').textContent,/領収書/);
   document.querySelector('#documentEditorDialog').close();
   Object.assign(window.StepInvoiceApp.state.partners.at(-1),{'学年':'中3','教室':'大手'});
