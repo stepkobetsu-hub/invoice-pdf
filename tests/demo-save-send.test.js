@@ -59,6 +59,15 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
   assert.equal(document.querySelector('#saveAndSendSingleInvoice').classList.contains('hidden'), true);
 
   document.querySelector('#createDemoInvoiceFromList').click();
+  const immediateForm = document.querySelector('#singleInvoiceForm');
+  const immediateRows = [...document.querySelectorAll('#singleDetailBody tr')].map(row => [
+    row.querySelector('[name="detailName"]').value,
+    row.querySelector('[name="detailUnitPrice"]').value
+  ]);
+  assert.equal(immediateForm.elements.partnerCode.value, '');
+  assert.deepEqual(immediateRows, [['テスト', '100'], ['テスト割引', '-100']]);
+  assert.equal(document.querySelector('#singleTotal').textContent, '0円');
+  assert.equal(document.querySelector('#saveAndSendSingleInvoice').classList.contains('hidden'), false);
   await new Promise(resolve => window.setTimeout(resolve, 30));
   const sendButton = document.querySelector('#saveAndSendSingleInvoice');
   assert.equal(sendButton.classList.contains('hidden'), false);
