@@ -31,6 +31,8 @@ assert.ok(manifest.oauthScopes.includes('https://www.googleapis.com/auth/script.
 assert.match(source, /getDeliveryDiagnostics: \(\) => getDeliveryDiagnostics_\(payload\.invoiceNumber, requestAuth\)/, 'delivery diagnostics require the normal staff-authenticated route');
 assert.match(app, /Brevoの実際の配信状況を確認しています/, 'mail dialog distinguishes provider acceptance from delivery');
 assert.match(source, /sort=desc&email='\+encodeURIComponent\(recipient\)/, 'delivery diagnostics can use the explicitly approved recipient lookup');
+assert.match(source, /smtp\/emails\?limit=100&sort=desc&email=/, 'delivery diagnostics use Brevo transactional logs for a specific recipient');
+assert.match(source, /senders\/domains\/'\+encodeURIComponent\(senderDomain\)/, 'delivery diagnostics verify the configured sender domain');
 assert.match(app, /invoice\.dlStatus==='URLアクセス済み'\?'<span class="status accessed">開封<\/span>'/, 'invoice cards show a reliable opened-link badge');
 
 console.log('bulk resend performance checks passed');
