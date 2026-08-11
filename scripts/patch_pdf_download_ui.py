@@ -10,9 +10,12 @@ html = html.replace('<div class="dialog-actions"><button data-close class="butto
 html = html.replace('<span id="modeBadge" class="badge warning">テスト送信モード</span>','<span id="modeBadge" class="badge">通常送信</span>')
 html = html.replace('<div class="page-heading"><div><h1>メール設定</h1><p>本番送信は管理者の最終承認まで有効化できません。</p></div></div>','<div class="page-heading"><div><h1>メール設定</h1><p>請求書の送信元・返信先・本文などを設定します。</p></div></div>')
 html = html.replace('<label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label>','<input name="testRecipient" type="hidden" value="">')
-html = html.replace('assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-production-mail-ui')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-production-mail-ui')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-production-mail-ui')
+html = html.replace('<div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div>','')
+html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
+html = html.replace('assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-production-mail-clean')
+html = html.replace('assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-production-mail-clean')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-production-mail-clean')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-production-mail-clean')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
@@ -33,6 +36,7 @@ js = js.replace('testMode:true', 'testMode:false')
 old_to = "$('#mailTo').textContent=settings.testRecipient?`${settings.testRecipient}（テスト送信先／本来の宛先：${invoice.email}）`:invoice.email;"
 if old_to in js:
     js = js.replace(old_to, "$('#mailTo').textContent=invoice.email;")
+js = js.replace("  $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');\n", '')
 if 'testMode:true' in js:
     raise SystemExit('testMode:true remains in app.js')
 app.write_text(js, encoding='utf-8')
