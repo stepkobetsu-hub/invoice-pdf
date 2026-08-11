@@ -22,6 +22,7 @@
   if(savedSettings.receiptPurpose===undefined)savedSettings.receiptPurpose='授業料等として';
   if(savedSettings.receiptDefaultNote===undefined)savedSettings.receiptDefaultNote=savedSettings.defaultNote||'個別指導ステップ（運営：株式会社エデュクレスト）';
   const state={partners:[...new Map([...C.DEMO_PARTNERS,...savedPartners].map(p=>[p['顧客コード'],p])).values()],invoices:[],importInvoices:[],receipts:[],history:[],preview:null,selected:new Set(),createSelected:new Set(),selectedInvoiceNumber:'',invoiceDetailTab:'preview',invoiceFilters:{dateField:'createdAt',from:defaultInvoicePeriod.from,to:defaultInvoicePeriod.to,query:''},invoiceVisibleLimit:100,pendingResend:null,pendingDisable:null,pendingPaymentInvoice:null,pendingDeletePartnerCode:null,pendingDeleteInvoiceNumber:null,resendSubmitting:false,editingPartnerCode:null,studentCandidate:null,postalRequest:0,dashboardLoaded:false,supportLoaded:false,settings:savedSettings};
+  const pendingTransferId=new URLSearchParams(location.search).get('transfer')||'';
   const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const plusDays=(dateValue,days)=>{const [year,month,day]=String(dateValue).split('-').map(Number),date=new Date(year,month-1,day);date.setDate(date.getDate()+days);return localIso(date);};
@@ -31,7 +32,7 @@
   function hideOperationOverlay(){operationOverlayCount=Math.max(0,operationOverlayCount-1);if(operationOverlayCount)return;const overlay=$('#operationOverlay');if(!overlay)return;overlay.classList.add('hidden');overlay.setAttribute('aria-busy','false');}
   function forceHideOperationOverlay(){operationOverlayCount=0;const overlay=$('#operationOverlay');if(!overlay)return;overlay.classList.add('hidden');overlay.setAttribute('aria-busy','false');}
   function activateStep(index){$$('#createSteps li').forEach((el,i)=>{el.classList.toggle('active',i===index);el.classList.toggle('done',i<index);});}
-  function showView(name){const view=VIEWS.has(name)?name:'invoices';$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${view}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(location.hash!==`#${view}`)history.replaceState(null,'',`#${view}`);if(view==='invoices')renderInvoices();if(view==='receipts')window.StepReceipts?.render();}
+  function showView(name){const view=VIEWS.has(name)?name:'invoices';$$('.view').forEach(x=>x.classList.remove('active'));$(`#view-${view}`).classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(location.hash!==`#${view}`)history.replaceState(null,'',`${location.pathname}${location.search}#${view}`);if(view==='invoices')renderInvoices();if(view==='receipts')window.StepReceipts?.render();}
   function initialViewForNavigation(navigationType,hash=location.hash){
     const requested=String(hash||'').replace(/^#/,'');
     return ['reload','back_forward'].includes(String(navigationType||''))&&VIEWS.has(requested)?requested:'invoices';
@@ -101,7 +102,44 @@
   function cards(values){return Object.entries(values).map(([label,value])=>`<div class="summary-card"><strong>${esc(value)}</strong><span>${esc(label)}</span></div>`).join('');}
   function prepareImportInvoices(items){const assigned=[],reserved=new Set(state.invoices.map(invoice=>String(invoice.invoiceNumber||'')));return items.map(item=>{const originalInvoiceNumber=String(item.invoiceNumber||'');let invoiceNumber=originalInvoiceNumber;if(!invoiceNumber||reserved.has(invoiceNumber))invoiceNumber=C.nextInvoiceNumber(item.invoiceDate,[...state.invoices,...assigned]);reserved.add(invoiceNumber);const prepared={...item,invoiceNumber,originalInvoiceNumber};assigned.push(prepared);return prepared;});}
   function reconcile(){state.importInvoices=C.matchPartners(state.importInvoices,state.partners);renderCreate();}
-  async function onInvoiceCsv(file){try{const decoded=await C.decodeCsvFile(file),parsed=C.parseInvoiceRows(C.parseCsv(decoded.text));state.importInvoices=prepareImportInvoices(parsed);state.createSelected=new Set(state.importInvoices.map((_,index)=>index));activateStep(1);reconcile();$('#invoiceImportSummary').innerHTML=cards({'読込件数':state.importInvoices.length,'文字コード':decoded.encoding,'新しい請求書番号':state.importInvoices.filter(x=>x.originalInvoiceNumber!==x.invoiceNumber).length,'10円丸め調整':state.importInvoices.filter(x=>x.roundingAdjusted).length,'照合済み':state.importInvoices.filter(x=>x.partner).length});$('#invoiceImportSummary').classList.remove('hidden');activateStep(2);alert(`${state.importInvoices.length}件を読み込みました。新しい請求書として保存します。`,'success');await saveImportedInvoicesToList();}catch(e){alert(e.message,'error');}}
+  function validateTransfer(transfer,parsed){
+    if(!/^[0-9a-f-]{36}$/i.test(pendingTransferId)||transfer.transferId!==pendingTransferId)throw new Error('受け渡しIDが一致しません。');
+    if(!/^\d{4}-\d{2}$/.test(transfer.billingPeriod))throw new Error('対象年月が不正です。');
+    const createdAt=Date.parse(transfer.createdAt),age=Date.now()-createdAt;
+    if(!Number.isFinite(createdAt)||age<(-5*60*1000)||age>(30*60*1000))throw new Error('作成日時が古いか不正です。請求管理システムからやり直してください。');
+    if(Number(transfer.itemCount)!==parsed.length)throw new Error('受け渡し件数とCSV件数が一致しません。');
+    const [year,month]=transfer.billingPeriod.split('-').map(Number);
+    const mismatched=parsed.filter(invoice=>{const match=String(invoice.subject||'').match(/(\d{4})年\s*(\d{1,2})月分/);return !match||Number(match[1])!==year||Number(match[2])!==month;});
+    if(mismatched.length)throw new Error('CSVの対象年月が受け渡し情報と一致しません。');
+  }
+  async function importInvoiceCsvText(text,encoding,transfer=null){
+    const parsed=C.parseInvoiceRows(C.parseCsv(text));
+    if(transfer)validateTransfer(transfer,parsed);
+    state.importInvoices=prepareImportInvoices(parsed);state.createSelected=new Set(state.importInvoices.map((_,index)=>index));activateStep(1);reconcile();
+    const summary={'読込件数':state.importInvoices.length,'文字コード':encoding,'新しい請求書番号':state.importInvoices.filter(x=>x.originalInvoiceNumber!==x.invoiceNumber).length,'10円丸め調整':state.importInvoices.filter(x=>x.roundingAdjusted).length,'照合済み':state.importInvoices.filter(x=>x.partner).length};
+    if(transfer)summary['受取元']='請求管理システム';
+    $('#invoiceImportSummary').innerHTML=cards(summary);$('#invoiceImportSummary').classList.remove('hidden');activateStep(2);alert(`${state.importInvoices.length}件を読み込みました。新しい請求書として保存します。`,'success');await saveImportedInvoicesToList();
+    return parsed.length;
+  }
+  async function onInvoiceCsv(file){try{const decoded=await C.decodeCsvFile(file);await importInvoiceCsvText(decoded.text,decoded.encoding);}catch(e){alert(e.message,'error');}}
+  async function receiveInvoiceTransfer(){
+    if(!pendingTransferId)return;
+    if(!/^[0-9a-f-]{36}$/i.test(pendingTransferId)){alert('受け渡しIDが不正です。','error');return;}
+    try{
+      showOperationOverlay('請求管理システムからCSVを受け取っています…');
+      const transfer=await cloudApi(`/api/app/transfers/${encodeURIComponent(pendingTransferId)}`,{timeoutMs:30000});
+      history.replaceState(null,'',`${location.pathname}${location.hash||'#invoices'}`);
+      showView('create');setCreateMethod('csv');
+      const count=await importInvoiceCsvText(transfer.csv,'UTF-8',transfer);
+      if(state.importInvoices.length)throw new Error('自動取込の一部を保存できませんでした。画面のエラー内容を確認してください。');
+      const [year,month]=transfer.billingPeriod.split('-').map(Number),notice=$('#transferNotice');
+      notice.textContent=`${year}年${month}月分・${count}件を請求管理システムから受け取りました`;
+      notice.classList.remove('hidden');
+    }catch(error){
+      const message=String(error.message||error);
+      alert(message.includes('TRANSFER_NOT_FOUND_OR_CONSUMED')?'この受け渡しデータは取込済み、期限切れ、または存在しません。':message,'error');
+    }finally{hideOperationOverlay();}
+  }
   async function onPartnerCsv(file){try{const decoded=await C.decodeCsvFile(file);state.partners=C.parsePartners(C.parseCsv(decoded.text));persistPartners();renderPartners();renderPartnerOptions();reconcile();await safeApi('importPartners',{partners:state.partners});alert(`${state.partners.length}件の取引先を読み込みました（${decoded.encoding}）。`,'success');}catch(e){alert(e.message,'error');}}
   function openPartnerForm(code=''){const form=$('#partnerForm'),partner=state.partners.find(item=>String(item['顧客コード'])===String(code));form.reset();state.editingPartnerCode=partner?String(partner['顧客コード']):null;$('#partnerDialogTitle').textContent=partner?'取引先を編集':'取引先を個別入力';$('#savePartnerButton').textContent=partner?'変更を保存':'取引先マスタへ登録';form.elements.customerCode.readOnly=!!partner;if(partner){form.elements.customerCode.value=partner['顧客コード'];form.elements.name.value=partner['名称'];form.elements.kana.value=partner['名称(カナ)'];form.elements.honorific.value=partner['敬称']||'様';form.elements.postal.value=partner['郵便番号'];form.elements.prefecture.value=partner['都道府県'];form.elements.address1.value=partner['住所1'];form.elements.address2.value=partner['住所2'];form.elements.phone.value=partner['電話番号'];form.elements.email.value=partner['メールアドレス'];form.elements.cc.value=partner['CCメールアドレス'];form.elements.grade.value=partner['学年']||'';form.elements.campus.value=C.partnerDocumentDefaults(partner).tags;form.elements.memo.value=partner['メモ'];}else form.elements.prefecture.value='愛知県';$('#postalLookupStatus').textContent='7桁入力すると住所を自動入力します。';$('#partnerDialog').showModal();}
   function goToPartnerCreate(){showView('partners');openPartnerForm();}
@@ -322,5 +360,5 @@
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
   const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();
   const initialOverlayWatchdog=setTimeout(forceHideOperationOverlay,15000);
-  Promise.resolve(initialLoad).finally(()=>{clearTimeout(initialOverlayWatchdog);hideOperationOverlay();});
+  Promise.resolve(initialLoad).then(receiveInvoiceTransfer).finally(()=>{clearTimeout(initialOverlayWatchdog);hideOperationOverlay();});
 })();

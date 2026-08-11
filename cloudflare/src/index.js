@@ -18,6 +18,10 @@ export default {
           : html(servicePausedPage(), 503);
       }
 
+      if (request.method === "POST" && url.pathname === "/api/transfers") {
+        return await createInvoiceTransfer(request, env);
+      }
+
       if (url.pathname.startsWith("/api/app/")) {
         return await serveAppRequest(request, env, url);
       }
@@ -63,6 +67,11 @@ async function serveAppRequest(request, env, url) {
   if (request.method === "GET" && url.pathname === "/api/app/dashboard") {
     const data = await loadInvoiceDashboard(env);
     return appJson(request, env, { ok: true, data: { ...data, user: auth.user.name || auth.user.email || "接続済み" } });
+  }
+
+  const transferMatch = url.pathname.match(/^\/api\/app\/transfers\/([0-9a-f-]{36})$/i);
+  if (request.method === "GET" && transferMatch) {
+    return await consumeInvoiceTransfer(request, env, transferMatch[1]);
   }
 
   if (request.method === "POST" && url.pathname === "/api/app/apps-script") {
@@ -127,6 +136,71 @@ async function serveAppRequest(request, env, url) {
   }
 
   return appJson(request, env, { ok: false, error: "APP_ROUTE_NOT_FOUND" }, 404);
+}
+
+async function createInvoiceTransfer(request, env) {
+  const authorization = request.headers.get("authorization") || "";
+  const suppliedSecret = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!env.TRANSFER_INGEST_SECRET || !(await secretsMatch(suppliedSecret, env.TRANSFER_INGEST_SECRET))) {
+    return json({ ok: false, error: "TRANSFER_AUTH_FAILED" }, 401);
+  }
+
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
+  const billingPeriod = String(payload.value.billingPeriod || "").trim();
+  const createdAt = String(payload.value.createdAt || "").trim();
+  const itemCount = Number(payload.value.itemCount);
+  const csvText = String(payload.value.csv || "");
+  const createdTime = Date.parse(createdAt);
+  const now = Date.now();
+  if (!/^\d{4}-\d{2}$/.test(billingPeriod)) return json({ ok: false, error: "INVALID_BILLING_PERIOD" }, 400);
+  if (!Number.isFinite(createdTime) || Math.abs(now - createdTime) > 10 * 60 * 1000) return json({ ok: false, error: "INVALID_CREATED_AT" }, 400);
+  if (!Number.isInteger(itemCount) || itemCount < 1 || itemCount > 5000) return json({ ok: false, error: "INVALID_ITEM_COUNT" }, 400);
+  if (!csvText || csvText.length > 10 * 1024 * 1024) return json({ ok: false, error: "INVALID_CSV" }, 400);
+
+  const transferId = crypto.randomUUID();
+  const expiresAt = new Date(now + 30 * 60 * 1000).toISOString();
+  await env.DB.prepare(`
+    INSERT INTO invoice_transfers (transfer_id, billing_period, created_at, item_count, csv_text, expires_at, consumed_at)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL)
+  `).bind(transferId, billingPeriod, createdAt, itemCount, csvText, expiresAt).run();
+  return json({ ok: true, transferId, billingPeriod, createdAt, itemCount, expiresAt }, 201);
+}
+
+async function consumeInvoiceTransfer(request, env, transferId) {
+  const now = new Date().toISOString();
+  const claimed = await env.DB.prepare(`
+    UPDATE invoice_transfers
+    SET consumed_at=?1
+    WHERE transfer_id=?2 AND consumed_at IS NULL AND expires_at>?1
+  `).bind(now, transferId).run();
+  if (Number(claimed.meta?.changes || 0) !== 1) {
+    return appJson(request, env, { ok: false, error: "TRANSFER_NOT_FOUND_OR_CONSUMED" }, 410);
+  }
+  const row = await env.DB.prepare(`
+    SELECT transfer_id, billing_period, created_at, item_count, csv_text
+    FROM invoice_transfers WHERE transfer_id=?1 AND consumed_at=?2
+  `).bind(transferId, now).first();
+  if (!row) return appJson(request, env, { ok: false, error: "TRANSFER_NOT_FOUND_OR_CONSUMED" }, 410);
+  return appJson(request, env, { ok: true, data: {
+    transferId: row.transfer_id,
+    billingPeriod: row.billing_period,
+    createdAt: row.created_at,
+    itemCount: row.item_count,
+    csv: row.csv_text,
+  } });
+}
+
+async function secretsMatch(left, right) {
+  const encoder = new TextEncoder();
+  const [leftHash, rightHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(String(left || ""))),
+    crypto.subtle.digest("SHA-256", encoder.encode(String(right || ""))),
+  ]);
+  const a = new Uint8Array(leftHash), b = new Uint8Array(rightHash);
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
 }
 
 function isAllowedAppOrigin(request, env) {
