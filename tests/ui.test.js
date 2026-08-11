@@ -192,7 +192,7 @@ async function main(){
   assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 28px)}'));
   assert.match(styles,/\.invoice-page \.bank-box\{[\s\S]*?min-height:92px;[\s\S]*?max-height:92px;/);
   assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
-  assert.match(styles,/@media\(min-width:851px\)\{[\s\S]*?\.invoice-list-pane\{display:flex;flex-direction:column\}[\s\S]*?\.invoice-list\{flex:1;min-height:0;max-height:none\}/);
+  assert.match(styles,/@media\(min-width:851px\)\{[\s\S]*?\.invoice-list-pane\{display:flex;flex-direction:column\}[\s\S]*?\.invoice-list\{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto\}/);
   console.log('ui tests passed');
 }
 

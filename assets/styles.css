@@ -173,9 +173,9 @@
 .invoice-bulk-menu-items button:hover{background:#f2f6fb}
 .invoice-bulk-menu-items button.danger{color:#c62828}
 
-/* 2026-08-12: use the full workspace height for the document list */
+/* 2026-08-12: show about eight document cards, then scroll the list */
 @media(min-width:851px){
   .invoice-list-pane{display:flex;flex-direction:column}
   .invoice-list-head{flex:0 0 48px}
-  .invoice-list{flex:1;min-height:0;max-height:none}
+  .invoice-list{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto}
 }
