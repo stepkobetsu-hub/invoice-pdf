@@ -73,35 +73,21 @@
   async function openNewSingleInvoice(){showView('create');await setCreateMethod('single');resetSingleForm();}
   function applyPartnerDocumentDefaults(form,partner){if(!form||!partner)return;const defaults=C.partnerDocumentDefaults(partner);form.elements.memo.value=defaults.memo;form.elements.tags.value=defaults.tags;}
   async function api(action,payload={}){
-    const url=state.settings.apiUrl;if(!url)throw new Error('基本設定でApps ScriptデプロイURLを設定してください。');
     const savingInvoice=action==='saveInvoiceData';if(savingInvoice)showOperationOverlay('保存中');
-    let staffAuth=null;try{staffAuth=JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null');}catch(_){}
-    const requestId=`step-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const bridgeNonce=[...crypto.getRandomValues(new Uint32Array(4))].map(x=>x.toString(16).padStart(8,'0')).join('');
-    const frame=document.createElement('iframe');frame.name=requestId;frame.hidden=true;document.body.appendChild(frame);
-    const form=document.createElement('form');form.method='POST';form.action=url;form.target=requestId;form.hidden=true;
-    const staffSession=staffAuth?.systemPortalSessionToken||'';
-    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:staffSession?'':state.settings.adminApiKey||'',systemPortalSessionToken:staffSession};
-    Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);});
-    document.body.appendChild(form);
-    return new Promise((resolve,reject)=>{
-      const cleanup=()=>{window.removeEventListener('message',onMessage);clearTimeout(timer);form.remove();frame.remove();if(savingInvoice)hideOperationOverlay();};
-      const onMessage=event=>{let host='';try{host=new URL(event.origin).hostname;}catch(_){}const trustedOrigin=event.origin==='https://script.google.com'||host.endsWith('.googleusercontent.com')||(event.origin==='null'&&event.data?.bridgeNonce===bridgeNonce);if(!trustedOrigin||!event.data||event.data.requestId!==requestId||event.data.bridgeNonce!==bridgeNonce)return;cleanup();const data=event.data.result;if(!data?.ok){const message=String(data?.error||'APIエラー');return reject(new Error(message));}resolve(data.data);};
-      const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?20000:45000;
-      const timer=setTimeout(()=>{cleanup();reject(new Error(`Apps Script APIが${Math.round(timeoutMs/1000)}秒以内に応答しませんでした。入力内容はこの端末に退避しています。`));},timeoutMs);
-      window.addEventListener('message',onMessage);form.submit();
-    });
+    const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?20000:45000;
+    try{return await cloudApi('/api/app/apps-script',{method:'POST',body:{action,payload},timeoutMs});}
+    finally{if(savingInvoice)hideOperationOverlay();}
   }
   function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
-  async function cloudApi(path,{method='GET',body}={}){
+  async function cloudApi(path,{method='GET',body,timeoutMs=15000}={}){
     const token=staffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
       const response=await fetch(`${DEFAULT_CLOUDFLARE_API_URL}${path}`,{method,headers:{Authorization:`Bearer ${token}`,...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined,signal:controller.signal});
       let result=null;try{result=await response.json();}catch(_){}
       if(!response.ok||!result?.ok){const code=String(result?.error||response.status);throw new Error(code==='STAFF_LOGIN_REQUIRED'?'ログイン情報を確認できませんでした。スタッフ用アプリで明示的にログアウトしていない場合は、再読込してもう一度お試しください。':`請求書データの通信に失敗しました：${code}`);}
       return result.data;
-    }catch(error){if(error?.name==='AbortError')throw new Error('Cloudflare D1が15秒以内に応答しませんでした。');throw error;}finally{clearTimeout(timer);}
+    }catch(error){if(error?.name==='AbortError')throw new Error(`通信が${Math.round(timeoutMs/1000)}秒以内に応答しませんでした。`);throw error;}finally{clearTimeout(timer);}
   }
   const d1Date=value=>{const match=String(value||'').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);return match?`${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`:'';};
   async function saveInvoiceToD1(invoice,{createOnly=false}={}){const normalized={...invoice,invoiceDate:d1Date(invoice.invoiceDate||invoice.issueDate),dueDate:d1Date(invoice.dueDate)};if(invoice.paymentDate)normalized.paymentDate=d1Date(invoice.paymentDate);const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized,createOnly}});return data.invoice;}

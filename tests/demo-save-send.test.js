@@ -31,6 +31,13 @@ window.HTMLFormElement.prototype.submit = function(){
 };
 window.print = () => {};
 window.fetch = async(url, options={}) => {
+  if(String(url).endsWith('/api/app/apps-script')){
+    const request=JSON.parse(options.body),action=request.action,payload=request.payload||{};actions.push(action);let data={};
+    if(action === 'getSupportData') data = {partners:window.StepInvoiceCore.DEMO_PARTNERS};
+    if(action === 'savePdf') data = {pdfFileId:'pdf-test',pdfFileName:'test.pdf'};
+    if(action === 'enqueueSend') data = {queued:payload.invoiceNumbers?.length || 0};
+    return {ok:true,json:async()=>({ok:true,data})};
+  }
   if(String(url).endsWith('/api/app/dashboard')) return {ok:true,json:async()=>({ok:true,data:{invoices:d1Invoices.map(invoice=>({...invoice})),history:[],user:'test-user'}})};
   if(String(url).endsWith('/api/app/invoices') && options.method === 'POST'){
     const invoice = {...JSON.parse(options.body).invoice,sendStatus:'未送信',dlStatus:'未取得',pdfStatus:'未作成',warnings:[]};

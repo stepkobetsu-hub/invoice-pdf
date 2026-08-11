@@ -23,5 +23,7 @@ assert.match(app, /if\(!alreadyPrepared\)\{[\s\S]*?await ensurePdfsForSend\(\[in
 const refreshAll = app.match(/async function refreshAll\([\s\S]*?\r?\n  async function saveForm/)[0];
 assert.doesNotMatch(refreshAll, /await refreshSupportData\(\)/, 'dashboard display does not wait for support data');
 assert.match(app, /initialOverlayWatchdog=setTimeout\(forceHideOperationOverlay,15000\)/, 'initial overlay has a watchdog');
+assert.match(app, /cloudApi\('\/api\/app\/apps-script',\{method:'POST',body:\{action,payload\},timeoutMs\}\)/, 'Apps Script calls use the authenticated API proxy');
+assert.doesNotMatch(app, /document\.createElement\('iframe'\)/, 'Apps Script calls do not depend on a hidden iframe response');
 
 console.log('bulk resend performance checks passed');

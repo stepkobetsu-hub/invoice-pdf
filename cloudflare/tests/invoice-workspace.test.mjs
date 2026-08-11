@@ -10,6 +10,8 @@ for (const column of ["partner_name", "payment_status", "payment_date", "payment
 }
 assert.match(source, /\/api\/app\/dashboard/);
 assert.match(source, /pdfStatus: row\.r2_object_key \? "PDF作成済み" : "未作成"/, "an existing R2 PDF is ready regardless of invoice lifecycle status");
+assert.match(source, /url\.pathname === "\/api\/app\/apps-script"/, "authenticated app clients can call the Apps Script proxy");
+assert.match(source, /APP_SCRIPT_ACTIONS\.has\(action\)/, "Apps Script proxy actions are allowlisted");
 assert.match(source, /\/api\/app\/invoices/);
 assert.match(source, /\/api\/admin\/migrations\/invoices/);
 assert.match(source, /authorization/);

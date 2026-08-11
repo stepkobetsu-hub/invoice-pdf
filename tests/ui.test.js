@@ -24,6 +24,11 @@ window.HTMLFormElement.prototype.submit=function(){
 window.print=()=>{};
 window.fetch=async(url,options={})=>{
   if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
+    submittedStaffToken=String(options.headers?.Authorization||'').replace(/^Bearer\s+/,'');
+    if(String(url).endsWith('/api/app/apps-script')){
+      const request=JSON.parse(options.body),data=request.action==='getDashboard'?{invoices:[],history:[]}:request.action==='getSupportData'?{partners:window.StepInvoiceCore.DEMO_PARTNERS}:{count:1};
+      return {ok:true,json:async()=>({ok:true,data})};
+    }
     if(String(url).endsWith('/api/app/dashboard'))return {ok:true,json:async()=>({ok:true,data:{invoices:[],history:[],user:'テスト担当者'}})};
     if(String(url).endsWith('/api/app/invoices')){const invoice=JSON.parse(options.body).invoice;return {ok:true,json:async()=>({ok:true,data:{invoice:{...invoice,details:invoice.details||[],sendStatus:'未送信',dlStatus:'未取得',pdfStatus:'未作成',warnings:[]}}})};}
   }

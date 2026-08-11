@@ -19,6 +19,7 @@
     "EMERGENCY_STOP": "false",
     "APP_ORIGIN": "https://stepkobetsu-hub.github.io",
     "STAFF_AUTH_API_URL": "https://script.google.com/macros/s/AKfycbypkUc0MqZ07E7pZRglNPeRM56WbCcuWaLpRzi9bVFcPklHDxaaLC7GfzG6ozTGCbEX/exec",
+    "INVOICE_API_URL": "https://script.google.com/macros/s/AKfycbwo1DdSQ2eUVVU35v1TqermHTgIEsT1u4U-M_67KfA50VelbHsh28W_pec56OlyBkxqaw/exec",
     "PARENT_LINK_TTL_DAYS": "180",
     "PDF_DOWNLOAD_MAX_TOTAL": "20",
     "PDF_DOWNLOAD_MAX_DAILY": "10",

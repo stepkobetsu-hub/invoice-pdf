@@ -13,13 +13,13 @@ window.localStorage.setItem('stepStaffAppAuth', JSON.stringify({systemPortalSess
 window.localStorage.setItem('stepInvoiceSingleDraft', JSON.stringify({values:{partnerCode:'DEMO001',subject:'入力途中の件名'},details:[{name:'入力途中',unitPrice:1000,quantity:1,taxRate:10}]}));
 window.HTMLDialogElement.prototype.showModal=function(){this.open=true;};
 window.HTMLDialogElement.prototype.close=function(){this.open=false;};
+const invoices=[
+    {invoiceNumber:'202608102',customerCode:'DEMO001',partnerName:'最新の取引先',honorific:'様',subject:'2026年9月分',invoiceDate:'2026/08/10',dueDate:'2026/08/31',createdAt:'2026/08/10',updatedAt:'2026/08/10 12:30:00',memo:'中2',tags:'神領',paymentStatus:'未入金',subtotal:10000,tax:1000,total:11000,email:'new@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'夏期講習',unitPrice:10000,quantity:1,amount:10000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'未送信',dlStatus:'未取得',warnings:[]},
+    {invoiceNumber:'202608101',partnerName:'以前の取引先',honorific:'様',subject:'2026年8月分',invoiceDate:'2026/08/09',dueDate:'2026/08/30',createdAt:'2026/08/09',updatedAt:'2026/08/09 11:00:00',memo:'中1',tags:'大手',paymentStatus:'入金済',paymentDate:'2026/08/10',paymentAmount:9900,paymentMemo:'振込手数料差引',subtotal:9000,tax:900,total:9900,email:'old@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'授業料',unitPrice:9000,quantity:1,amount:9000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'送信済み',dlStatus:'未アクセス',warnings:[]}
+];
 window.HTMLFormElement.prototype.submit=function(){
   const value=name=>this.querySelector(`[name="${name}"]`)?.value||'';
   const action=value('action'),requestId=value('requestId'),bridgeNonce=value('bridgeNonce');
-  const invoices=[
-    {invoiceNumber:'202608102',customerCode:'DEMO001',partnerName:'最新の取引先',honorific:'様',subject:'2026年9月分',invoiceDate:'2026/08/10',dueDate:'2026/08/31',createdAt:'2026/08/10',updatedAt:'2026/08/10 12:30:00',memo:'中2',tags:'神領',paymentStatus:'未入金',subtotal:10000,tax:1000,total:11000,email:'new@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'夏期講習',unitPrice:10000,quantity:1,amount:10000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'未送信',dlStatus:'未取得',warnings:[]},
-    {invoiceNumber:'202608101',partnerName:'以前の取引先',honorific:'様',subject:'2026年8月分',invoiceDate:'2026/08/09',dueDate:'2026/08/30',createdAt:'2026/08/09',updatedAt:'2026/08/09 11:00:00',memo:'中1',tags:'大手',paymentStatus:'入金済',paymentDate:'2026/08/10',paymentAmount:9900,paymentMemo:'振込手数料差引',subtotal:9000,tax:900,total:9900,email:'old@example.com',cc:'',postal:'487-0024',prefecture:'愛知県',address1:'春日井市大留町1丁目23-2',address2:'',details:[{name:'授業料',unitPrice:9000,quantity:1,amount:9000,taxRate:'10%'}],pdfStatus:'PDF作成済み',sendStatus:'送信済み',dlStatus:'未アクセス',warnings:[]}
-  ];
   const data=action==='getDashboard'?{user:'テスト担当者',invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}:{ok:true};
   window.setTimeout(()=>window.dispatchEvent(new window.MessageEvent('message',{origin:'https://script.google.com',data:{requestId,bridgeNonce,result:{ok:true,data}}})),0);
 };
@@ -27,6 +27,10 @@ window.print=()=>{};
 window.confirm=()=>true;
 window.fetch=async(url,options={})=>{
   if(String(url).includes('step-invoice-api.stepkobetsu.workers.dev')){
+    if(String(url).endsWith('/api/app/apps-script')){
+      const request=JSON.parse(options.body),data=request.action==='getDashboard'?{invoices,history:[{timestamp:'2026/08/10 10:00:00',action:'請求書作成',invoiceNumber:'202608102',sendStatus:'未送信',urlStatus:'',result:'正常'}]}:request.action==='getSupportData'?{partners:window.StepInvoiceCore.DEMO_PARTNERS}:{ok:true};
+      return {ok:true,json:async()=>({ok:true,data})};
+    }
     if(String(url).endsWith('/api/app/dashboard'))return {ok:false,json:async()=>({ok:false,error:'D1 test fallback'})};
     if(options.method==='POST'&&String(url).includes('/payment')){const number=decodeURIComponent(String(url).split('/').at(-2));const source=invoices.find(item=>item.invoiceNumber===number);return {ok:true,json:async()=>({ok:true,data:{invoice:{...source,...JSON.parse(options.body)}}})};}
     if(options.method==='DELETE')return {ok:true,json:async()=>({ok:true,data:{deleted:1}})};
