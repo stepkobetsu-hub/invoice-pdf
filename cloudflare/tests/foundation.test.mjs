@@ -5,6 +5,7 @@ import { hashOpaqueToken, isOpaqueToken } from "../src/core/token.js";
 const source = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
 const migration = readFileSync(new URL("../migrations/0001_initial.sql", import.meta.url), "utf8");
 const commonMigration = readFileSync(new URL("../migrations/0002_step_common_foundation.sql", import.meta.url), "utf8");
+const transferMigration = readFileSync(new URL("../migrations/0005_invoice_transfers.sql", import.meta.url), "utf8");
 const config = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
 
 assert.equal(config.name, "step-invoice-api");
@@ -52,6 +53,12 @@ assert.doesNotMatch(source, /<dt>請求日<\/dt>/);
 for (const table of ["system_modules", "managed_files", "access_tokens", "audit_events"]) {
   assert.match(commonMigration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\s*\\(`));
 }
+
+assert.match(transferMigration,/CREATE TABLE invoice_transfers/);
+assert.match(transferMigration,/transfer_id TEXT PRIMARY KEY/);
+assert.match(transferMigration,/consumed_at TEXT/);
+assert.match(source,/POST" && url\.pathname === "\/api\/transfers"/);
+assert.match(source,/TRANSFER_NOT_FOUND_OR_CONSUMED/);
 
 const validToken = "a".repeat(43);
 assert.equal(isOpaqueToken(validToken), true);
