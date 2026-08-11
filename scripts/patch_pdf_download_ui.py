@@ -2,6 +2,7 @@ from pathlib import Path
 
 index = Path('index.html')
 app = Path('assets/app.js')
+receipts = Path('assets/receipts.js')
 
 html = index.read_text(encoding='utf-8')
 html = html.replace('<div class="dialog-head"><h2>請求書のPDF／印刷</h2><button data-close aria-label="閉じる">×</button></div>','<div class="dialog-head"><h2>請求書PDF</h2><button data-close aria-label="閉じる">×</button></div>')
@@ -12,11 +13,9 @@ html = html.replace('<div class="page-heading"><div><h1>メール設定</h1><p>�
 html = html.replace('<label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label>','<input name="testRecipient" type="hidden" value="">')
 html = html.replace('<div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div>','')
 html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
-html = html.replace('assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-pdf-label')
-html = html.replace('assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-production-pdf-label')
-html = html.replace('assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-production-pdf-label')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-production-pdf-label')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-production-pdf-label')
+for old in ['assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-pdf-partner-refresh2']:
+    html = html.replace(old,'assets/app.js?v=20260811-production-pdf-label')
+html = html.replace('assets/receipts.js?v=20260810-settings-combobox','assets/receipts.js?v=20260811-pdf-download-label')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
@@ -42,3 +41,7 @@ js = js.replace("  $('#sendTest').onclick=()=>alert('請求書を1件選択し�
 if 'testMode:true' in js:
     raise SystemExit('testMode:true remains in app.js')
 app.write_text(js, encoding='utf-8')
+
+receipt_js = receipts.read_text(encoding='utf-8')
+receipt_js = receipt_js.replace('data-receipt-action="pdf">PDF／印刷</button>', 'data-receipt-action="pdf">PDFをダウンロード</button>')
+receipts.write_text(receipt_js, encoding='utf-8')
