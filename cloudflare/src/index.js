@@ -103,12 +103,13 @@ async function serveAppRequest(request, env, url) {
     const payload = await readJson(request);
     if (!payload.ok) return withAppCors(payload.response, request, env);
     try {
-      const requestedNumber = String(payload.value.invoice?.invoiceNumber || "").trim();
+      let invoiceInput = payload.value.invoice || {};
+      const requestedNumber = String(invoiceInput.invoiceNumber || "").trim();
       if (payload.value.createOnly === true) {
         const existing = await env.DB.prepare("SELECT invoice_number FROM invoices WHERE invoice_number=?1 LIMIT 1").bind(requestedNumber).first();
-        if (existing) throw new Error("同じ請求書番号が既にあります。別の番号を入力してください。");
+        if (existing) invoiceInput = await assignAvailableInvoiceNumber(env, invoiceInput);
       }
-      const invoice = await saveInvoiceRecord(env, payload.value.invoice || {}, auth.user, "保存");
+      const invoice = await saveInvoiceRecord(env, invoiceInput, auth.user, "保存");
       return appJson(request, env, { ok: true, data: { invoice } });
     } catch (error) {
       return appJson(request, env, { ok: false, error: String(error.message || "INVALID_INVOICE") }, 400);
@@ -346,6 +347,32 @@ function invoiceRowToClient(row) {
     pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
     sendStatus: delivery.sendStatus, sentAt: row.delivery_updated_at || "", dlStatus: delivery.dlStatus,
     downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
+  };
+}
+
+function nextMonthlyInvoiceNumber(dateValue, invoiceNumbers = []) {
+  const match = String(dateValue || "").match(/^(\d{4})-(\d{2})/);
+  if (!match) throw new Error("請求日を入力してください。");
+  const prefix = `${match[1]}${match[2]}`;
+  const max = invoiceNumbers.reduce((current, value) => {
+    const number = String(value?.invoice_number ?? value ?? "").trim();
+    const numberMatch = number.match(new RegExp(`^${prefix}(\\d+)$`));
+    return numberMatch ? Math.max(current, Number(numberMatch[1])) : current;
+  }, 0);
+  return `${prefix}${String(max + 1).padStart(3, "0")}`;
+}
+
+async function assignAvailableInvoiceNumber(env, rawInvoice) {
+  const invoiceDate = String(rawInvoice.invoiceDate || rawInvoice.issueDate || "").trim();
+  const match = invoiceDate.match(/^(\d{4})-(\d{2})/);
+  if (!match) throw new Error("請求日を入力してください。");
+  const prefix = `${match[1]}${match[2]}`;
+  const rows = await env.DB.prepare(
+    "SELECT invoice_number FROM invoices WHERE invoice_number LIKE ?1",
+  ).bind(`${prefix}%`).all();
+  return {
+    ...rawInvoice,
+    invoiceNumber: nextMonthlyInvoiceNumber(invoiceDate, rows.results || []),
   };
 }
 
@@ -1106,4 +1133,4 @@ function escapeHtml(value) {
   })[char]);
 }
 
-export const __test = { normalizeInvoice, deliveryState, positiveTaxRate };
+export const __test = { normalizeInvoice, deliveryState, positiveTaxRate, nextMonthlyInvoiceNumber };

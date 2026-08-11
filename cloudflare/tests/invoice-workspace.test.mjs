@@ -20,7 +20,7 @@ assert.match(source, /\/api\/app\/invoices/);
 assert.match(source, /\/api\/admin\/migrations\/invoices/);
 assert.match(source, /authorization/);
 assert.match(source, /payload\.value\.createOnly === true/);
-assert.match(source, /同じ請求書番号が既にあります/);
+assert.match(source, /assignAvailableInvoiceNumber/);
 assert.match(source, /if \(!\/\^\\d\+\$\/\.test\(invoiceNumber\)\)/);
 assert.match(source, /APP_ORIGIN/);
 
@@ -35,6 +35,9 @@ const invoice = __test.normalizeInvoice({
 assert.equal(invoice.details[1].unitPrice, -100);
 assert.equal(invoice.details[0].taxRate, 0.1);
 assert.equal(__test.positiveTaxRate("10%"), 0.1);
+assert.equal(__test.nextMonthlyInvoiceNumber("2026-08-12", []), "202608001");
+assert.equal(__test.nextMonthlyInvoiceNumber("2026-08-12", ["202608001", "202608007", "202609999"]), "202608008");
+assert.equal(__test.nextMonthlyInvoiceNumber("2026-09-01", [{ invoice_number: "202609002" }, { invoice_number: "202608999" }]), "202609003");
 assert.deepEqual(__test.deliveryState("downloaded"), { sendStatus: "送信済み", dlStatus: "DL済" });
 
 console.log("Cloudflare invoice workspace checks passed.");
