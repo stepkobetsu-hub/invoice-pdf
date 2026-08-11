@@ -7,9 +7,8 @@ html = index.read_text(encoding='utf-8')
 html = html.replace('<div class="dialog-head"><h2>請求書のPDF／印刷</h2><button data-close aria-label="閉じる">×</button></div>','<div class="dialog-head"><h2>請求書PDF</h2><button data-close aria-label="閉じる">×</button></div>')
 html = html.replace('<div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p><p>PDFを端末へ保存するか、印刷画面を開きます。</p></div>','<div class="dialog-message"><p><strong id="pdfInvoiceTarget"></strong></p></div>')
 html = html.replace('<div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printSelectedInvoice" class="button secondary preview-output-button">印刷</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>','<div class="dialog-actions"><button data-close class="button secondary">閉じる</button><button id="downloadSelectedInvoice" class="button primary preview-output-button">PDFをダウンロード</button></div>')
-html = html.replace('assets/app.js?v=20260811-ui-restored','assets/app.js?v=20260811-pdf-partner-refresh2')
-html = html.replace('assets/app.js?v=20260811-pdf-download','assets/app.js?v=20260811-pdf-partner-refresh2')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh','assets/app.js?v=20260811-pdf-partner-refresh2')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-real-recipient')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-real-recipient')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
@@ -26,4 +25,17 @@ if old_handler in js:
     js = js.replace(old_handler, new_handler)
 elif "$('#downloadSelectedInvoice').onclick=async()=>" not in js:
     raise SystemExit('download handler pattern not found')
+
+# Normal invoice send / resend must use the email stored in partner master.
+count = js.count('testMode:true')
+if count < 4:
+    raise SystemExit(f'expected at least 4 normal-send testMode:true occurrences, found {count}')
+js = js.replace('testMode:true', 'testMode:false')
+# Do not visually substitute a configured test recipient in the normal invoice send confirmation.
+old_to = "$('#mailTo').textContent=settings.testRecipient?`${settings.testRecipient}（テスト送信先／本来の宛先：${invoice.email}）`:invoice.email;"
+if old_to in js:
+    js = js.replace(old_to, "$('#mailTo').textContent=invoice.email;")
+
+if 'testMode:true' in js:
+    raise SystemExit('testMode:true remains in app.js')
 app.write_text(js, encoding='utf-8')
