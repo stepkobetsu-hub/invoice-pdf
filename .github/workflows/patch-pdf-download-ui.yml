@@ -12,17 +12,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install dependencies
         run: npm ci
-      - name: Apply PDF dialog and partner refresh patch
+      - name: Apply invoice production fixes
         run: python scripts/patch_pdf_download_ui.py
       - name: Verify syntax
         run: |
           git diff --check
           node --check assets/app.js
           node --check assets/receipts.js
+          node --check apps-script/Code.gs
       - name: Commit
         run: |
           git config user.name "stepkobetsu-hub"
           git config user.email "stepkobetsu@gmail.com"
-          git add index.html assets/app.js assets/receipts.js
-          git commit -m "Align invoice and receipt production sending"
+          git add index.html assets/app.js assets/receipts.js apps-script/Code.gs
+          git commit -m "Remove remaining production send lock and align invoice UI"
           git push origin HEAD:main
