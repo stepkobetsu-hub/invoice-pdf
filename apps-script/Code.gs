@@ -438,6 +438,7 @@ function getDeliveryDiagnostics_(invoiceNumber,requestAuth){
   const sentValue=delivery.values[deliveryTable.map['送信日時']],sentAt=sentValue instanceof Date?sentValue.toISOString():String(sentValue||'');
   const settings=settings_(),senderEmail=String(settings.senderEmail||'invoice@step-edu.net'),senderDomain=senderEmail.split('@')[1]||'';
   const result={invoiceNumber:invoiceNumber,deliveryId:deliveryId,recipient:recipient,providerMessageId:providerMessageId,queueStatus:queueRow?String(queueRow.values[queueTable.map['状態']]||''):'',sentAt:sentAt,senderEmail:senderEmail,events:[],matchedBy:''};
+  if(result.queueStatus&&result.queueStatus!=='完了')return Object.assign(result,{providerError:'QUEUE_'+result.queueStatus});
   const apiKey=String(PropertiesService.getScriptProperties().getProperty('BREVO_API_KEY')||'');
   if(!apiKey)return Object.assign(result,{providerError:'BREVO_API_KEY_MISSING'});
   try{
