@@ -282,7 +282,6 @@
   $('#createSelectAll').onchange=event=>{state.createSelected=event.currentTarget.checked?new Set(state.invoices.map((_,index)=>index)):new Set();renderCreate();};
   $$('[data-remove-create-rows]').forEach(button=>button.onclick=removeSelectedCreateRows);
   $('#downloadPreview').onclick=()=>state.preview&&createPdf(state.preview,{save:true,preview:true}).catch(e=>alert(e.message,'error'));
-  $('#printPreview').onclick=printPreview;
   $('#confirmInvoiceMail').onclick=confirmInvoiceMail;
   $('#paymentDateForm').onsubmit=savePaymentDate;
   bindDetailNumber($('#paymentAmountInput'),updatePaymentDifferenceMemo);

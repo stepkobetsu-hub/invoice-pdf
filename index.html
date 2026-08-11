@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260811-production-pdf-label" defer></script>
+  <script src="assets/app.js?v=20260811-no-print" defer></script>
   <script src="assets/receipts.js?v=20260811-pdf-download-label" defer></script>
 </head>
 <body>
@@ -43,7 +43,7 @@
       <div id="globalAlert" class="alert hidden" role="alert"></div>
 
       <section id="view-create" class="view">
-        <div class="page-heading"><div><h1>請求書作成</h1><p>CSV一括作成または個別入力で請求書を作成します。PDFはプレビュー、印刷、保存、送信時に自動作成されます。</p></div></div>
+        <div class="page-heading"><div><h1>請求書作成</h1><p>CSV一括作成または個別入力で請求書を作成します。PDFはプレビュー、保存、送信時に自動作成されます。</p></div></div>
         <div class="create-methods" role="tablist" aria-label="請求書の作成方法">
           <button class="create-method active" type="button" data-create-method="csv" role="tab" aria-selected="true">CSVで一括作成</button>
           <button class="create-method" type="button" data-create-method="single" role="tab" aria-selected="false">1件ずつ個別作成</button>
@@ -170,7 +170,7 @@
     </main>
   </div>
 
-  <dialog id="previewDialog" class="preview-dialog"><div class="dialog-head"><h2>請求書プレビュー</h2><button data-close aria-label="閉じる">×</button></div><div id="invoicePreviewHost"></div><div class="dialog-actions preview-dialog-actions"><button data-close class="button secondary">閉じる</button><button id="printPreview" class="button secondary preview-output-button" type="button">プレビューを印刷</button><button id="downloadPreview" class="button primary preview-output-button" type="button">プレビューPDFを保存</button></div></dialog>
+  <dialog id="previewDialog" class="preview-dialog"><div class="dialog-head"><h2>請求書プレビュー</h2><button data-close aria-label="閉じる">×</button></div><div id="invoicePreviewHost"></div><div class="dialog-actions preview-dialog-actions"><button data-close class="button secondary">閉じる</button><button id="downloadPreview" class="button primary preview-output-button" type="button">プレビューPDFを保存</button></div></dialog>
   <dialog id="partnerDialog" class="partner-dialog">
     <form id="partnerForm">
       <div class="dialog-head"><h2 id="partnerDialogTitle">取引先を個別入力</h2><button data-close type="button" aria-label="閉じる">×</button></div>
