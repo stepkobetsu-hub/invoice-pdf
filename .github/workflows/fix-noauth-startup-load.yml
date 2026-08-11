@@ -21,8 +21,12 @@ jobs:
           p.write_text(s.replace(old,new,1))
           h=Path('index.html')
           t=h.read_text()
-          import re
-          t=re.sub(r'assets/app\\.js\\?v=[^"\\']+', 'assets/app.js?v=20260811-noauth-d1-load', t)
+          old_script='assets/app.js?v=20260811-startup-auto-auth'
+          if old_script in t:
+              t=t.replace(old_script,'assets/app.js?v=20260811-noauth-d1-load',1)
+          else:
+              import re
+              t=re.sub(r"assets/app\.js\?v=[^\"']+",'assets/app.js?v=20260811-noauth-d1-load',t,count=1)
           h.write_text(t)
       - run: node --check assets/app.js
       - shell: bash
