@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260812-invoice-number-fix" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260812-invoice-number-fix" defer></script>
+  <script src="assets/app.js?v=20260812-normal-send-fix" defer></script>
   <script src="assets/receipts.js?v=20260811-duplicate-partner" defer></script>
 </head>
 <body>
@@ -162,7 +162,7 @@
       <section id="view-mail" class="view">
         <div class="page-heading"><div><h1>メール設定</h1><p>請求書の送信元・返信先・本文などを設定します。</p></div></div>
         <form id="mailForm" class="form-grid panel">
-          <label>送信者表示名<input name="senderName" value="個別指導ステップ【請求書】"></label><label>送信元メール<input name="senderEmail" value="invoice@step-edu.net"></label><label>返信先<input name="replyTo" value="stepkobetsu@gmail.com"></label><label>管理者CC<input name="adminCc" value="stepkobetsu@gmail.com"></label><label>BCC<input name="bcc"></label><label>有効日数<input name="validDays" type="number" min="1" value="180"></label><label>1時間あたり送信上限<input name="hourlyLimit" type="number" min="1" value="50"></label><label>1回の処理件数<input name="batchSize" type="number" min="1" max="20" value="5"></label><input name="testRecipient" type="hidden" value=""><label>再送時の旧URL<select name="invalidateOld"><option value="true" selected>無効化</option><option value="false">併用</option></select></label><label class="span-2">件名<input name="subject" value="【請求書】送付のご案内（個別指導ステップから）"></label><label class="span-2">本文<textarea name="body" rows="17">{{取引先名}} {{敬称}}
+          <label>送信者表示名<input name="senderName" value="個別指導ステップ【請求書】"></label><label>送信元メール<input name="senderEmail" value="invoice@step-edu.net"></label><label>返信先<input name="replyTo" value="stepkobetsu@gmail.com"></label><label>管理者CC<input name="adminCc" value="stepkobetsu@gmail.com"></label><label>BCC<input name="bcc"></label><label>有効日数<input name="validDays" type="number" min="1" value="180"></label><label>1時間あたり送信上限<input name="hourlyLimit" type="number" min="1" value="50"></label><label>1回の処理件数<input name="batchSize" type="number" min="1" max="20" value="5"></label><label>再送時の旧URL<select name="invalidateOld"><option value="true" selected>無効化</option><option value="false">併用</option></select></label><label class="span-2">件名<input name="subject" value="【請求書】送付のご案内（個別指導ステップから）"></label><label class="span-2">本文<textarea name="body" rows="17">{{取引先名}} {{敬称}}
 
 お世話になっております。
 次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。
@@ -245,7 +245,6 @@
   <dialog id="invoiceMailDialog" class="invoice-mail-dialog">
     <div class="dialog-head"><h2>請求書メールの確認</h2><button data-close aria-label="閉じる">×</button></div>
     <div class="invoice-mail-body">
-      <div class="test-banner">テスト送信モード — 送信先を確認してから実行してください</div>
       <dl class="mail-review-grid"><div><dt>請求書番号</dt><dd id="mailInvoiceNumber"></dd></div><div><dt>TO</dt><dd id="mailTo"></dd></div><div><dt>CC</dt><dd id="mailCc"></dd></div><div><dt>送信者名</dt><dd id="mailSender"></dd></div><div><dt>返信先</dt><dd id="mailReplyTo"></dd></div></dl>
       <label class="mail-review-field">件名<input id="mailSubject" readonly></label>
       <label class="mail-review-field">本文<textarea id="mailBody" rows="15" readonly></textarea></label>
@@ -311,7 +310,6 @@
   <dialog id="receiptMailDialog" class="invoice-mail-dialog">
     <div class="dialog-head"><h2>領収書メールの確認</h2><button data-receipt-mail-close type="button" aria-label="閉じる">×</button></div>
     <div class="invoice-mail-body">
-      <div class="test-banner">テスト送信モード — 送信先を確認してから実行してください</div>
       <dl class="mail-review-grid"><div><dt>領収書番号</dt><dd id="mailReceiptNumber"></dd></div><div><dt>TO</dt><dd id="receiptMailTo"></dd></div><div><dt>CC</dt><dd id="receiptMailCc"></dd></div><div><dt>送信者名</dt><dd id="receiptMailSender"></dd></div><div><dt>返信先</dt><dd id="receiptMailReplyTo"></dd></div></dl>
       <label class="mail-review-field">件名<input id="receiptMailSubject" readonly></label>
       <label class="mail-review-field">本文<textarea id="receiptMailBody" rows="13" readonly></textarea></label>

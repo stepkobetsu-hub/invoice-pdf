@@ -54,8 +54,6 @@ function doPost(e) {
       updatePaymentStatus: () => updatePaymentStatus_(payload.invoiceNumber, payload.paymentStatus, payload.paymentDate, payload.paymentAmount, payload.paymentMemo, requestAuth), deleteInvoice: () => deleteInvoice_(payload.invoiceNumber, requestAuth),
       saveReceiptData: () => saveReceiptData_(payload.receipt || {}, requestAuth), saveReceiptPdf: () => saveReceiptPdf_(payload.receipt || {}, payload.pdfBase64 || '', requestAuth), deleteReceipt: () => deleteReceipt_(payload.receiptNumber, requestAuth), enqueueReceiptSend: () => enqueueReceiptSend_(payload, requestAuth),
       enqueueSend: () => enqueueSend_(payload, requestAuth),
-      prepareSend: () => enqueueSend_(Object.assign({}, payload, {preflight:true}), requestAuth),
-      releasePreparedSend: () => releasePreparedSend_(payload.deliveryId, requestAuth),
       disableDelivery: () => disableDelivery_(payload.invoiceNumber, requestAuth), saveSettings: () => saveSettings_(payload, requestAuth),
       recoverQueue: () => recoverStuckQueue_(requestAuth),
       processPendingSends: () => processPendingSends_(requestAuth),
@@ -258,7 +256,28 @@ function saveReceiptData_(receipt,requestAuth){
 
 function saveReceiptPdf_(receipt,pdfBase64,requestAuth){requirePermission_('PDF作成',requestAuth);ensureReceiptSheets_();if(!pdfBase64)throw new Error('PDFデータがありません。');saveReceiptData_(receipt,requestAuth);const result=cloudflareAdminFetch_('/api/admin/invoices','post',{documentType:'receipt',receipt:Object.assign({},receipt,{documentType:'receipt'}),pdfBase64:pdfBase64}),sh=sheet_(STEP.SHEETS.RECEIPTS),t=table_(sh),row=t.rows.find(item=>String(item.values[t.map['領収書番号']])===String(receipt.receiptNumber)),fileName=result.fileName||safeFileName_(`${receipt.receiptNumber}_${receipt.partnerName}${receipt.honorific||'様'}_領収書.pdf`);if(row)updateRow_(sh,row.rowNumber,t.map,{'PDF状態':'PDF作成済み','PDFファイルID':result.invoiceId,'PDFファイル名':fileName,'更新日時':new Date()});log_('領収書PDF作成','R'+receipt.receiptNumber,receipt.customerCode,'','成功','');return {pdfFileId:result.invoiceId,pdfFileName:fileName,storage:'Cloudflare R2'};}
 
-function enqueueReceiptSend_(payload,requestAuth){requirePermission_(payload.resend?'再送':'メール送信',requestAuth);ensureReceiptSheets_();const number=String(payload.receiptNumber||''),key='R'+number,receipts=table_(sheet_(STEP.SHEETS.RECEIPTS)),row=receipts.rows.find(item=>String(item.values[receipts.map['領収書番号']])===number);if(!row)throw new Error('領収書が見つかりません。');if(row.values[receipts.map['PDF状態']]!=='PDF作成済み')throw new Error('領収書PDFが未作成です。');const email=String(row.values[receipts.map['メールアドレス']]||'');if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('メールアドレスが未登録または不正です。');const deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)),queue=sheet_(STEP.SHEETS.QUEUE),queueTable=table_(queue);if(queueTable.rows.some(item=>String(item.values[queueTable.map['請求書番号']])===key&&['送信待ち','送信中'].includes(item.values[queueTable.map['状態']])))throw new Error('既に送信キューへ登録されています。');if(payload.resend)invalidateByInvoice_(key);const settings=settings_(),now=new Date(),expires=new Date(now.getTime()+Number(settings.validDays||180)*86400000),deliveryId=Utilities.getUuid(),queueId=Utilities.getUuid(),testMode=payload.testMode!==false,cloud=createCloudflareDelivery_({deliveryId:deliveryId,invoiceNumber:key,recipientEmail:email,ccEmail:row.values[receipts.map['CCメールアドレス']],expiresAt:expires,createdBy:activeEmail_()||requestAuth.name||'apps-script'}),subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）').replace(/請求書/g,'領収書');sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,key,row.values[receipts.map['顧客コード']],row.values[receipts.map['宛名']],email,row.values[receipts.map['CCメールアドレス']],subject,'','送信待ち','','Cloudflare管理',now,expires,'','','',0,0,'送信待ち',row.values[receipts.map['PDFファイルID']],row.values[receipts.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);cacheDownloadUrlForQueue_(deliveryId,cloud.downloadUrl);queue.appendRow([queueId,deliveryId,key,testMode,payload.resend===true,true,'送信待ち',0,now,'','','']);log_(payload.resend?'領収書再送':'領収書メール送信',key,row.values[receipts.map['顧客コード']],deliveryId,'キュー登録','');installQueueTrigger_();return {queued:1,deliveryId:deliveryId};}
+function enqueueReceiptSend_(payload,requestAuth){
+  requirePermission_(payload.resend?'再送':'メール送信',requestAuth);
+  ensureReceiptSheets_();
+  const number=String(payload.receiptNumber||''),key='R'+number,receipts=table_(sheet_(STEP.SHEETS.RECEIPTS));
+  const row=receipts.rows.find(item=>String(item.values[receipts.map['領収書番号']])===number);
+  if(!row)throw new Error('領収書が見つかりません。');
+  if(row.values[receipts.map['PDF状態']]!=='PDF作成済み')throw new Error('領収書PDFが未作成です。');
+  const email=String(row.values[receipts.map['メールアドレス']]||'');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('メールアドレスが未登録または不正です。');
+  const deliveries=table_(sheet_(STEP.SHEETS.DELIVERIES)),queue=sheet_(STEP.SHEETS.QUEUE),queueTable=table_(queue);
+  if(queueTable.rows.some(item=>String(item.values[queueTable.map['請求書番号']])===key&&['送信待ち','送信中'].includes(item.values[queueTable.map['状態']])))throw new Error('既に送信キューへ登録されています。');
+  if(payload.resend)invalidateByInvoice_(key);
+  const settings=settings_(),now=new Date(),expires=new Date(now.getTime()+Number(settings.validDays||180)*86400000),deliveryId=Utilities.getUuid(),queueId=Utilities.getUuid();
+  const cloud=createCloudflareDelivery_({deliveryId:deliveryId,invoiceNumber:key,recipientEmail:email,ccEmail:row.values[receipts.map['CCメールアドレス']],expiresAt:expires,createdBy:activeEmail_()||requestAuth.name||'apps-script'});
+  const subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）').replace(/請求書/g,'領収書');
+  sheet_(STEP.SHEETS.DELIVERIES).appendRow([deliveryId,key,row.values[receipts.map['顧客コード']],row.values[receipts.map['宛名']],email,row.values[receipts.map['CCメールアドレス']],subject,'','送信待ち','','Cloudflare管理',now,expires,'','','',0,0,'送信待ち',row.values[receipts.map['PDFファイルID']],row.values[receipts.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',activeEmail_(),now,now]);
+  cacheDownloadUrlForQueue_(deliveryId,cloud.downloadUrl);
+  queue.appendRow([queueId,deliveryId,key,false,payload.resend===true,true,'送信待ち',0,now,'','','']);
+  log_(payload.resend?'領収書再送':'領収書メール送信',key,row.values[receipts.map['顧客コード']],deliveryId,'キュー登録','');
+  installQueueTrigger_();
+  return {queued:1,deliveryId:deliveryId};
+}
 
 function replaceReceiptDetails_(number,details){const sh=sheet_(STEP.SHEETS.RECEIPT_DETAILS),t=table_(sh),replacement=(details||[]).map((item,index)=>[String(number),index+1,item.name||'',Number(item.unitPrice||0),Number(item.quantity||0),item.unit||'',Number(item.amount||0),item.taxRate||'']);replaceDetailRows_(sh,t.rows.filter(row=>String(row.values[t.map['領収書番号']])===String(number)).map(row=>row.rowNumber),replacement,STEP.RECEIPT_DETAIL_HEADERS.length);}
 
@@ -279,7 +298,6 @@ function receiptItems_(){
 
 function enqueueSend_(payload, requestAuth) {
   requirePermission_(payload.resend ? '再送' : 'メール送信', requestAuth);
-  const testMode = payload.testMode !== false;
   const numbers = [...new Set((payload.invoiceNumbers || []).map(String))]; if (!numbers.length) throw new Error('請求書が選択されていません。');
   if(numbers.length>100)throw new Error('一括送信は100件までです。');
   ensureQueueColumns_();
@@ -303,48 +321,26 @@ function enqueueSend_(payload, requestAuth) {
     const results=[],deliveryRows=[],queueRows=[],logRows=[],subject=String(settings.subject||'【請求書】送付のご案内（個別指導ステップから）');
     entries.forEach((entry,index)=>{
       const number=entry.number,inv=entry.inv,deliveryId=entry.deliveryId,queueId=entry.queueId,cloud=clouds[index];
-      const prepared = payload.preflight === true, initialStatus = prepared ? '送信前確認' : '送信待ち';
+      const initialStatus = '送信待ち';
       deliveryRows.push([deliveryId,number,inv.values[invoices.map['顧客コード']],inv.values[invoices.map['宛名']],entry.email,entry.cc,subject,'',initialStatus,'','Cloudflare管理',now,expires,'','','',0,0,initialStatus,inv.values[invoices.map['PDFファイルID']],inv.values[invoices.map['PDFファイル名']],payload.resend?1:0,payload.resend?now:'','',createdBy,now,now]);
-      queueRows.push([queueId,deliveryId,number,testMode,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','',batchId,'']);
+      queueRows.push([queueId,deliveryId,number,false,payload.resend===true,payload.newToken!==false,initialStatus,0,now,'','','',batchId,'']);
       cacheDownloadUrlForQueue_(deliveryId,cloud.downloadUrl);
-      results.push({invoiceNumber:number,deliveryId:deliveryId,queueId:queueId,preflightUrl:prepared?cloud.downloadUrl:''});
+      results.push({invoiceNumber:number,deliveryId:deliveryId,queueId:queueId});
       logRows.push([now,activeEmail_(),payload.resend?'再送':'メール送信',number,inv.values[invoices.map['顧客コード']],deliveryId,'キュー登録','','','']);
     });
     if(deliveryRows.length)deliverySheet.getRange(deliverySheet.getLastRow()+1,1,deliveryRows.length,STEP.DELIVERY_HEADERS.length).setValues(deliveryRows);
     if(queueRows.length)queue.getRange(queue.getLastRow()+1,1,queueRows.length,STEP.QUEUE_HEADERS.length).setValues(queueRows);
     if(logRows.length){const logSheet=sheet_(STEP.SHEETS.LOGS);logSheet.getRange(logSheet.getLastRow()+1,1,logRows.length,STEP.LOG_HEADERS.length).setValues(logRows);}
-    response={queued:results.length,items:results,testMode,batchId:batchId};
+    response={queued:results.length,items:results,batchId:batchId};
   } finally { lock.releaseLock(); }
   installQueueTrigger_();
   return response;
 }
 
-function releasePreparedSend_(deliveryId, requestAuth) {
-  requirePermission_('メール送信', requestAuth);
-  const id=String(deliveryId||''); if(!id) throw new Error('配信IDがありません。');
-  const queueSheet=sheet_(STEP.SHEETS.QUEUE), queue=table_(queueSheet);
-  const q=queue.rows.find(r=>String(r.values[queue.map['配信ID']])===id); if(!q) throw new Error('送信前確認キューがありません。');
-  if(q.values[queue.map['状態']]!=='送信前確認') throw new Error('送信前確認中のキューではありません。');
-  const delivery=findDeliveryById_(id); if(!delivery) throw new Error('配信履歴がありません。');
-  const d=delivery.values,m=delivery.map,settings=settings_();
-  if(String(q.values[queue.map['テストモード']])!=='true'&&q.values[queue.map['テストモード']]!==true) throw new Error('本番送信はこの確認処理では解除できません。');
-  if(String(settings.testRecipient||'').toLowerCase()!==String(d[m['送信先メールアドレス']]||'').toLowerCase()) throw new Error('テスト送信先が請求書の送信先と一致しません。');
-  if(d[m['無効化日時']]) throw new Error('このURLは既に無効です。');
-  if(new Date(d[m['トークン有効期限']]).getTime()<Date.now()) throw new Error('このURLは期限切れです。');
-  const now=new Date();
-  updateRow_(queueSheet,q.rowNumber,queue.map,{'状態':'送信待ち','開始日時':'','完了日時':'','エラー':''});
-  updateDeliveryById_(id,{'送信状態':'送信待ち','送信エラー':'','初回アクセス日時':'','初回ダウンロード日時':'','最終アクセス日時':'','アクセス回数':0,'ダウンロード回数':0,'現在状態':'送信待ち','更新日時':now});
-  log_('送信前URL確認',d[m['請求書番号']],d[m['顧客コード']],id,'成功','');
-  installQueueTrigger_();
-  processSendQueue();
-  return {released:true,invoiceNumber:d[m['請求書番号']]};
-}
-
 function sendOne_(queueValues, queueMap, settings) {
   const deliveryId=queueValues[queueMap['配信ID']], delivery=findDeliveryById_(deliveryId); if(!delivery) throw new Error('配信履歴がありません。');
   const d=delivery.values,m=delivery.map;
-  const testMode=String(queueValues[queueMap['テストモード']])==='true'||queueValues[queueMap['テストモード']]===true;
-  const recipient=testMode?settings.testRecipient:d[m['送信先メールアドレス']]; if(!recipient) throw new Error(testMode?'テスト送信先未登録':'メールアドレス未登録');
+  const recipient=d[m['送信先メールアドレス']]; if(!recipient) throw new Error('メールアドレス未登録');
   let url=takeCachedDownloadUrl_(deliveryId);
   if(!url)url=rotateCloudflareDelivery_(deliveryId,d[m['トークン有効期限']]).downloadUrl;
   if(!/^https:\/\//.test(url)||/script\.google\.com|drive\.google\.com/i.test(url))throw new Error('Cloudflare配信URLを発行できませんでした。');
@@ -353,9 +349,8 @@ function sendOne_(queueValues, queueMap, settings) {
   const values={'取引先名':d[m['宛名']],'敬称':invoice.敬称||'様','顧客コード':d[m['顧客コード']],'対象年月':invoice.対象年月||'','請求書番号':displayNumber,'請求金額':Number(invoice.請求金額||0).toLocaleString('ja-JP')+'円','支払期限':invoice.支払期限||'','有効日数':settings.validDays||180,'有効期限':formatDate_(d[m['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
   let subject=merge_(settings.subject||d[m['メール件名']],values), body=merge_(settings.body||defaultMailBody_(),values);
   if(isReceipt){subject=subject.replace(/請求書/g,'領収書');body=body.replace(/次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。/,'領収書を送付いたしますので、ご確認ください。').replace(/請求書/g,'領収書');}
-  if(testMode){subject='【テスト】'+subject;body=`これはテスト送信です。\n本来の送信先: ${d[m['送信先メールアドレス']]}\n\n`+body;}
   const options={name:isReceipt?String(settings.senderName||'個別指導ステップ【請求書】').replace(/請求書/g,'領収書'):settings.senderName||'個別指導ステップ【請求書】',replyTo:settings.replyTo||'stepkobetsu@gmail.com'};
-  const cc=[testMode?'':d[m['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).join(','); if(cc)options.cc=cc;if(settings.bcc)options.bcc=settings.bcc;
+  const cc=[d[m['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).join(','); if(cc)options.cc=cc;if(settings.bcc)options.bcc=settings.bcc;
   assertHourlyLimit_(settings);
   MailApp.sendEmail(recipient,subject,body,options);
   clearCachedDownloadUrl_(deliveryId);
@@ -382,22 +377,20 @@ function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedA
     const d=deliveryRow.values,dm=deliveryTable.map,number=String(d[dm['請求書番号']]||''),isReceipt=number.startsWith('R');
     const sourceRow=isReceipt?receiptByNumber[number]:invoiceByNumber[number];
     if(!sourceRow)throw new Error('請求書データがありません: '+number);
-    const source=objectRow_(sourceRow.values,isReceipt?receiptTable.map:invoiceTable.map),testMode=String(q[qm['テストモード']])==='true'||q[qm['テストモード']]===true;
-    const recipient=testMode?settings.testRecipient:d[dm['送信先メールアドレス']];
+    const source=objectRow_(sourceRow.values,isReceipt?receiptTable.map:invoiceTable.map),recipient=d[dm['送信先メールアドレス']];
     if(!recipient||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(recipient)))throw new Error(number+': メールアドレスが未登録または不正です。');
     let url=takeCachedDownloadUrl_(deliveryId);if(!url)url=rotateCloudflareDelivery_(deliveryId,d[dm['トークン有効期限']]).downloadUrl;
     if(!/^https:\/\//.test(url)||/script\.google\.com|drive\.google\.com/i.test(url))throw new Error(number+': Cloudflare配信URLを発行できませんでした。');
     const displayNumber=isReceipt?number.slice(1):number,values={'取引先名':d[dm['宛名']],'敬称':source['敬称']||'様','顧客コード':d[dm['顧客コード']],'対象年月':source[isReceipt?'件名':'対象年月']||'','請求書番号':displayNumber,'請求金額':Number(source[isReceipt?'合計金額':'請求金額']||0).toLocaleString('ja-JP')+'円','支払期限':source['支払期限']||'','有効日数':settings.validDays||180,'有効期限':formatDate_(d[dm['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
     let subject=merge_(settings.subject||d[dm['メール件名']],values),body=merge_(settings.body||defaultMailBody_(),values);
     if(isReceipt){subject=subject.replace(/請求書/g,'領収書');body=body.replace(/次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。/,'領収書を送付いたしますので、ご確認ください。').replace(/請求書/g,'領収書');}
-    if(testMode){subject='【テスト】'+subject;body='これはテスト送信です。\n本来の送信先: '+d[dm['送信先メールアドレス']]+'\n\n'+body;}
     const version={to:[{email:String(recipient),name:String(d[dm['宛名']]||'')}],subject:subject,htmlContent:'<!doctype html><html><body style="font-family:sans-serif;white-space:pre-wrap">'+htmlEscape_(body).replace(/\n/g,'<br>')+'</body></html>'};
-    const cc=[testMode?'':d[dm['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).map(email=>({email:String(email)}));if(cc.length)version.cc=cc;
+    const cc=[d[dm['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).map(email=>({email:String(email)}));if(cc.length)version.cc=cc;
     prepared.push({queueRow:queueRow,deliveryRow:deliveryRow,sourceRow:sourceRow,isReceipt:isReceipt,deliveryId:deliveryId,number:number,version:version});
     mutateRow_(queueRow,queueTable.map,{'状態':'送信中','開始日時':startedAt,'試行回数':Number(q[qm['試行回数']]||0)+1,'エラー':''});
   });
   flushTableRows_(queueSheet,queueTable);
-  const batchId=String(prepared[0].queueRow.values[queueTable.map['バッチID']]||Utilities.getUuid()),sandboxConfigured=String(properties.getProperty('BREVO_SANDBOX_MODE')||'').toLowerCase()==='true',allTest=prepared.every(item=>String(item.queueRow.values[queueTable.map['テストモード']])==='true'||item.queueRow.values[queueTable.map['テストモード']]===true),sandbox=sandboxConfigured&&allTest;
+  const batchId=String(prepared[0].queueRow.values[queueTable.map['バッチID']]||Utilities.getUuid()),sandbox=false;
   const requestBody=buildBrevoBatchPayload_(prepared,settings,batchId,sandbox);
   try{
     const response=UrlFetchApp.fetch('https://api.brevo.com/v3/smtp/email',{method:'post',contentType:'application/json',headers:{'api-key':apiKey,accept:'application/json'},payload:JSON.stringify(requestBody),muteHttpExceptions:true}),code=response.getResponseCode();

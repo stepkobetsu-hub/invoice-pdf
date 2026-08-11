@@ -49,6 +49,8 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.equal(document.querySelector('#invoiceList .invoice-list-item').classList.contains('active'),true);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/最新の取引先/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/デモ送信/);
+  assert.equal(document.body.textContent.includes('テスト送信モード'),false);
+  assert.equal(document.querySelector('[name="testRecipient"]'),null);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/CSV一括追加/);
   assert.match(document.querySelector('.invoice-detail-column').textContent,/請求書を作成/);
   assert.match(document.querySelector('#invoiceDetailPanel').textContent,/編集/);
