@@ -12,14 +12,16 @@ html = html.replace('<div class="page-heading"><div><h1>メール設定</h1><p>�
 html = html.replace('<label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label>','<input name="testRecipient" type="hidden" value="">')
 html = html.replace('<div class="span-2 test-banner">テスト送信モード — 実際の取引先には送信されません</div>','')
 html = html.replace('<button id="sendTest" class="button secondary" type="button">テスト送信</button>','')
-html = html.replace('assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-production-mail-clean')
-html = html.replace('assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-production-mail-clean')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-production-mail-clean')
-html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-production-mail-clean')
+html = html.replace('assets/app.js?v=20260811-production-mail-clean','assets/app.js?v=20260811-production-pdf-label')
+html = html.replace('assets/app.js?v=20260811-production-mail-ui','assets/app.js?v=20260811-production-pdf-label')
+html = html.replace('assets/app.js?v=20260811-real-recipient','assets/app.js?v=20260811-production-pdf-label')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh22','assets/app.js?v=20260811-production-pdf-label')
+html = html.replace('assets/app.js?v=20260811-pdf-partner-refresh2','assets/app.js?v=20260811-production-pdf-label')
 index.write_text(html, encoding='utf-8')
 
 js = app.read_text(encoding='utf-8')
 js = js.replace("a.download=`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}${preview?'_プレビュー':''}.pdf`;", "a.download=`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}.pdf`;")
+js = js.replace('data-invoice-action="pdf">PDF／印刷</button>', 'data-invoice-action="pdf">PDFをダウンロード</button>')
 old_prepare = "async function prepareSingleInvoice(){setSingleDefaults();if(state.dashboardLoaded){updateSingleLivePreview();return;}try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
 new_prepare = "async function prepareSingleInvoice(){setSingleDefaults();await refreshSupportData();if(state.dashboardLoaded){renderPartnerOptions();updateSingleLivePreview();return;}try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();renderPartnerOptions();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
 if old_prepare in js:
