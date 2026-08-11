@@ -402,6 +402,7 @@ button,input,select,textarea{font-family:inherit}
 .invoice-list-item:hover{background:#f3f7ff}
 .invoice-list-name{color:#1f2937;font-weight:800}
 .invoice-list-subject{color:#64748b}
+.invoice-list-subject .invoice-app-downloaded{display:inline-flex;margin-left:6px;padding:1px 4px;font-size:9px;line-height:1.2;vertical-align:middle}
 .invoice-list-meta{color:#7c8a9d}
 .invoice-list-amount{color:#172033}
 .invoice-list-empty{margin:8px;padding:48px 18px;border:1px dashed #d9e1ec;border-radius:10px;background:#fff}

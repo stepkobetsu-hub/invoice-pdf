@@ -102,7 +102,7 @@
   }
   const d1Date=value=>{const match=String(value||'').trim().match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})$/);return match?`${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`:'';};
   async function saveInvoiceToD1(invoice,{createOnly=false}={}){const normalized={...invoice,invoiceDate:d1Date(invoice.invoiceDate||invoice.issueDate),dueDate:d1Date(invoice.dueDate)};if(invoice.paymentDate)normalized.paymentDate=d1Date(invoice.paymentDate);const data=await cloudApi('/api/app/invoices',{method:'POST',body:{invoice:normalized,createOnly}});return data.invoice;}
-  const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
+  const statusClass=s=>({'未送信':'unsent','送信待ち':'unsent','送信中':'sending','送信済み':'sent','再送済み':'sent','送信失敗':'failed','URLアクセス済み':'accessed','PDF表示済み':'accessed','DL済':'downloaded','期限切れ':'expired','無効化':'disabled'}[s]||'unsent');
   const displayDlStatus=s=>{
     const status=String(s||'');
     if(['送信済み','再送済み'].includes(status))return '未アクセス';
@@ -194,7 +194,11 @@
   const paymentClass=status=>status==='入金済'?'paid':status==='未設定'?'unset':'unpaid';
   const inputDate=value=>{const match=String(value||'').match(/^(\d{4})[\/-](\d{1,2})[\/-](\d{1,2})/);return match?`${match[1]}-${match[2].padStart(2,'0')}-${match[3].padStart(2,'0')}`:'';};
   const invoiceForOutput=invoice=>({...invoice,bank:invoice.bank||state.settings.defaultBank||'',note:invoice.note||state.settings.defaultNote||'個別指導ステップ（運営：株式会社エデュクレスト）'});
-  const isDeliveredInvoice=invoice=>C.isSentStatus(invoice.sendStatus)||['URLアクセス済み','DL済'].includes(String(invoice.dlStatus||''));
+  const isDeliveredInvoice=invoice=>C.isSentStatus(invoice.sendStatus)||['URLアクセス済み','PDF表示済み'].includes(String(invoice.dlStatus||''));
+  function invoiceOpenBadge(invoice){
+    const level=invoice.pdfViewedAt||invoice.downloadedAt||invoice.dlStatus==='PDF表示済み'?3:invoice.urlOpenedAt||invoice.dlStatus==='URLアクセス済み'?2:invoice.emailOpenedAt?1:0;
+    return level?`<span class="status accessed">開封${level===1?'':level}</span>`:'';
+  }
   const normalizeSearch=value=>String(value??'').normalize('NFKC').toLocaleLowerCase('ja').replace(/[\s　]+/g,'');
   function invoiceSearchText(invoice){return normalizeSearch([invoice.invoiceNumber,invoice.customerCode,invoice.partnerName,invoice.honorific,invoice.subject,invoice.memo,invoice.tags,invoice.note,invoice.email,invoice.cc,invoice.postal,invoice.prefecture,invoice.address1,invoice.address2,invoice.paymentStatus,invoice.sendStatus,invoice.invoiceDate,invoice.dueDate,invoice.createdAt,invoice.updatedAt,...(invoice.details||[]).flatMap(detail=>[detail.name,detail.itemCode,detail.unit,detail.unitPrice,detail.quantity,detail.amount,detail.taxRate])].join(' '));}
   function filteredInvoices(){const {dateField,from,to,query}=state.invoiceFilters,needle=normalizeSearch(query);return sortedInvoices().filter(invoice=>{const date=inputDate(invoice[dateField]);if((from||to)&&!date)return false;if(from&&date<from)return false;if(to&&date>to)return false;return !needle||invoiceSearchText(invoice).includes(needle);});}
@@ -209,10 +213,9 @@
     if(!ordered.length)state.selectedInvoiceNumber='';
     $('#invoiceList').innerHTML=ordered.length?visible.map(invoice=>{
       const payment=invoice.paymentStatus||'未入金',sourceIndex=state.invoices.indexOf(invoice),checked=state.selected.has(sourceIndex);
-      const emailOpened=invoice.emailOpenedAt?'<span class="status accessed">開封</span>':'';
-      const urlOpened=invoice.dlStatus==='URLアクセス済み'?'<span class="status accessed">URL確認</span>':'';
-      const downloaded=invoice.dlStatus==='DL済'?'<span class="status downloaded">DL済</span>':'';
-      return `<div class="invoice-list-row ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}"><label class="invoice-list-check" title="この請求書を選択"><input type="checkbox" data-invoice-check="${sourceIndex}" ${checked?'checked':''} aria-label="${esc(invoice.partnerName||'取引先')}の請求書を選択"></label><button class="invoice-list-item ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}" type="button" data-invoice-select="${esc(invoice.invoiceNumber)}"><span class="invoice-list-meta"><span>${esc(invoice.createdAt||invoice.invoiceDate||'')}</span><span>No. ${esc(invoice.invoiceNumber)}</span></span><span class="invoice-list-name">${esc(invoice.partnerName||'取引先未設定')}</span><span class="invoice-list-subject">${esc(invoice.subject||'件名未設定')}</span><span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||'未送信')}</span>${emailOpened}${urlOpened}${downloaded}<strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span></button></div>`;
+      const opened=invoiceOpenBadge(invoice);
+      const downloaded=invoice.appDownloadedAt?'<span class="status downloaded invoice-app-downloaded">DL済</span>':'';
+      return `<div class="invoice-list-row ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}"><label class="invoice-list-check" title="この請求書を選択"><input type="checkbox" data-invoice-check="${sourceIndex}" ${checked?'checked':''} aria-label="${esc(invoice.partnerName||'取引先')}の請求書を選択"></label><button class="invoice-list-item ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}" type="button" data-invoice-select="${esc(invoice.invoiceNumber)}"><span class="invoice-list-meta"><span>${esc(invoice.createdAt||invoice.invoiceDate||'')}</span><span>No. ${esc(invoice.invoiceNumber)}</span></span><span class="invoice-list-name">${esc(invoice.partnerName||'取引先未設定')}</span><span class="invoice-list-subject">${esc(invoice.subject||'件名未設定')}${downloaded}</span><span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||'未送信')}</span>${opened}<strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span></button></div>`;
     }).join('')+(visible.length<ordered.length?'<button id="invoiceLoadMore" class="invoice-load-more" type="button">さらに読み込む⌄</button>':''):`<p class="invoice-list-empty">${state.invoices.length?'検索条件に一致する請求書がありません。':'請求書がありません。'}</p>`;
     $$('[data-invoice-select]').forEach(button=>button.onclick=()=>{state.selectedInvoiceNumber=button.dataset.invoiceSelect;renderInvoices();});
     $$('[data-invoice-check]').forEach(box=>box.onchange=()=>{const index=Number(box.dataset.invoiceCheck);if(box.checked)state.selected.add(index);else state.selected.delete(index);updateInvoiceSelectionUi(visible);});
@@ -354,7 +357,7 @@
   $('#paymentDateForm').onsubmit=savePaymentDate;
   bindDetailNumber($('#paymentAmountInput'),updatePaymentDifferenceMemo);
   bindDetailNumber($('#editInvoiceForm').elements.paymentAmount,()=>{});
-  $('#downloadSelectedInvoice').onclick=async()=>{if(!state.preview)return;const target=state.preview;try{await createPdf(target,{save:true});const index=state.invoices.findIndex(item=>String(item.invoiceNumber)===String(target.invoiceNumber));if(index>=0){const updated={...state.invoices[index],dlStatus:'DL済',downloadedAt:new Date().toISOString(),updatedAt:new Date().toISOString()};const saved=await saveInvoiceToD1(updated);state.invoices[index]=saved;state.preview=saved;renderInvoices();}$('#invoicePdfDialog').close();}catch(e){alert(e.message,'error');}};
+  $('#downloadSelectedInvoice').onclick=async()=>{if(!state.preview)return;const target=state.preview;try{await createPdf(target,{save:true});const index=state.invoices.findIndex(item=>String(item.invoiceNumber)===String(target.invoiceNumber));if(index>=0){const data=await cloudApi(`/api/app/invoices/${encodeURIComponent(target.invoiceNumber)}/downloaded`,{method:'POST'});state.invoices[index]=data.invoice;state.preview=data.invoice;renderInvoices();}$('#invoicePdfDialog').close();}catch(e){alert(e.message,'error');}};
   $('#editInvoiceForm').onsubmit=saveInvoiceEdit;
   $('#addEditInvoiceDetail').onclick=()=>addEditDetail({},true);
   $('#deleteInvoiceForm').onsubmit=deleteInvoice;
@@ -380,7 +383,7 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#loadSample').onclick=()=>{state.importInvoices=prepareImportInvoices(C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners));state.createSelected=new Set(state.importInvoices.map((_,index)=>index));renderCreate();activateStep(2);};
   $('#staffLoginLink').href=STAFF_LOGIN_URL;
-  window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox};
+  window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox,invoiceOpenBadge};
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
   const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();

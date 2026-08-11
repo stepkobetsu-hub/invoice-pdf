@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { __test } from "../src/index.js";
 
 const migration = readFileSync(new URL("../migrations/0004_invoice_workspace.sql", import.meta.url), "utf8");
+const openLevelMigration = readFileSync(new URL("../migrations/0007_invoice_open_levels.sql", import.meta.url), "utf8");
 const source = readFileSync(new URL("../src/index.js", import.meta.url), "utf8");
 
 for (const column of ["partner_name", "payment_status", "payment_date", "payment_amount", "payment_memo", "deleted_at"]) {
@@ -23,6 +24,9 @@ assert.match(source, /payload\.value\.createOnly === true/);
 assert.match(source, /assignAvailableInvoiceNumber/);
 assert.match(source, /if \(!\/\^\\d\+\$\/\.test\(invoiceNumber\)\)/);
 assert.match(source, /APP_ORIGIN/);
+assert.match(openLevelMigration, /ALTER TABLE invoices ADD COLUMN app_downloaded_at TEXT/);
+assert.match(source, /appDownloadMatch/);
+assert.match(source, /appDownloadedAt: row\.app_downloaded_at/);
 
 const invoice = __test.normalizeInvoice({
   invoiceNumber: "202608001", customerCode: "1320", partnerName: "ダミー取引先", invoiceDate: "2026-08-10",
@@ -38,6 +42,6 @@ assert.equal(__test.positiveTaxRate("10%"), 0.1);
 assert.equal(__test.nextMonthlyInvoiceNumber("2026-08-12", []), "202608001");
 assert.equal(__test.nextMonthlyInvoiceNumber("2026-08-12", ["202608001", "202608007", "202609999"]), "202608008");
 assert.equal(__test.nextMonthlyInvoiceNumber("2026-09-01", [{ invoice_number: "202609002" }, { invoice_number: "202608999" }]), "202609003");
-assert.deepEqual(__test.deliveryState("downloaded"), { sendStatus: "送信済み", dlStatus: "DL済" });
+assert.deepEqual(__test.deliveryState("downloaded"), { sendStatus: "送信済み", dlStatus: "PDF表示済み" });
 
 console.log("Cloudflare invoice workspace checks passed.");

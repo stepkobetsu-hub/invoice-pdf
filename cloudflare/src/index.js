@@ -133,6 +133,26 @@ async function serveAppRequest(request, env, url) {
     }
   }
 
+  const appDownloadMatch = url.pathname.match(/^\/api\/app\/invoices\/([^/]+)\/downloaded$/);
+  if (request.method === "POST" && appDownloadMatch) {
+    try {
+      const invoiceNumber = decodeURIComponent(appDownloadMatch[1]);
+      if (!/^\d+$/.test(invoiceNumber)) throw new Error("請求書番号が不正です。");
+      const now = new Date().toISOString();
+      const actorName = String(auth.user.name || auth.user.email || "staff").slice(0, 200);
+      const results = await env.DB.batch([
+        env.DB.prepare("UPDATE invoices SET app_downloaded_at=?1, updated_at=?1, updated_by=?2 WHERE invoice_number=?3 AND deleted_at IS NULL")
+          .bind(now, actorName, invoiceNumber),
+        operationLogStatement(env, actorName, "アプリ内PDFダウンロード", invoiceNumber, now),
+      ]);
+      if (!Number(results[0]?.meta?.changes || 0)) throw new Error("請求書が見つかりません。");
+      const invoice = await loadInvoiceByNumber(env, invoiceNumber);
+      return appJson(request, env, { ok: true, data: { invoice } });
+    } catch (error) {
+      return appJson(request, env, { ok: false, error: String(error.message || "DOWNLOAD_UPDATE_FAILED") }, 400);
+    }
+  }
+
   const deleteMatch = url.pathname.match(/^\/api\/app\/invoices\/([^/]+)$/);
   if (request.method === "DELETE" && deleteMatch) {
     const invoiceNumber = decodeURIComponent(deleteMatch[1]);
@@ -353,7 +373,9 @@ function invoiceRowToClient(row) {
     email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.r2_object_key ? "PDF作成済み" : "未作成",
     pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
     sendStatus: delivery.sendStatus, sentAt: row.delivery_updated_at || "", dlStatus: delivery.dlStatus,
-    emailOpenedAt: row.email_opened_at || "", downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
+    emailOpenedAt: row.email_opened_at || "", urlOpenedAt: row.first_opened_at || "",
+    pdfViewedAt: row.downloaded_at || "", downloadedAt: row.downloaded_at || "",
+    appDownloadedAt: row.app_downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
   };
 }
 
@@ -384,7 +406,7 @@ async function assignAvailableInvoiceNumber(env, rawInvoice) {
 }
 
 function deliveryState(status, openedAt, downloadedAt) {
-  if (downloadedAt || status === "downloaded") return { sendStatus: "送信済み", dlStatus: "DL済" };
+  if (downloadedAt || status === "downloaded") return { sendStatus: "送信済み", dlStatus: "PDF表示済み" };
   if (openedAt || status === "opened") return { sendStatus: "送信済み", dlStatus: "URLアクセス済み" };
   if (status === "sent") return { sendStatus: "送信済み", dlStatus: "未アクセス" };
   if (status === "revoked") return { sendStatus: "無効化", dlStatus: "無効化" };
@@ -509,7 +531,11 @@ async function loadInvoiceByNumber(env, invoiceNumber) {
       COALESCE(i.address2, p.address2, '') AS resolved_address2,
       COALESCE(i.email, p.email, '') AS resolved_email,
       COALESCE(i.cc_email, p.cc_email, '') AS resolved_cc_email,
-      d.status AS delivery_status, d.updated_at AS delivery_updated_at, d.first_opened_at, d.downloaded_at, d.expires_at,
+      d.status AS delivery_status, d.updated_at AS delivery_updated_at,
+      (SELECT MAX(d3.email_opened_at) FROM deliveries d3 WHERE d3.invoice_id=i.invoice_id) AS email_opened_at,
+      (SELECT MAX(d3.first_opened_at) FROM deliveries d3 WHERE d3.invoice_id=i.invoice_id) AS first_opened_at,
+      (SELECT MAX(d3.downloaded_at) FROM deliveries d3 WHERE d3.invoice_id=i.invoice_id) AS downloaded_at,
+      d.expires_at,
       it.line_number, it.service_date, it.description, it.unit_price, it.quantity, it.unit, it.amount, it.tax_rate
     FROM invoices i JOIN partners p ON p.partner_id=i.partner_id
     LEFT JOIN deliveries d ON d.delivery_id=(SELECT d2.delivery_id FROM deliveries d2 WHERE d2.invoice_id=i.invoice_id ORDER BY d2.updated_at DESC LIMIT 1)
