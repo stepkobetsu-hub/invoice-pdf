@@ -24,5 +24,31 @@
     pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,595.28,841.89,undefined,'FAST');
     return pdf.output('blob');
   }
+
+  function decorateMailButton(){
+    const button=document.querySelector('[data-invoice-action="mail"]');
+    if(!button)return;
+    const current=String(button.textContent||'').trim();
+    const resend=current.includes('再送信');
+    const label=resend?'メール再送信：':'メール送信：';
+    if(button.dataset.decoratedMailLabel===label)return;
+    button.innerHTML='<span aria-hidden="true" style="display:inline-flex;vertical-align:-0.16em;margin-right:7px">'+
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 6.5h18v11H3v-11Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m4 8 8 6 8-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>'+label;
+    button.dataset.decoratedMailLabel=label;
+    button.setAttribute('aria-label',label.replace('：',''));
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',()=>{
+      decorateMailButton();
+      const observer=new MutationObserver(decorateMailButton);
+      observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+    },{once:true});
+  }else{
+    decorateMailButton();
+    const observer=new MutationObserver(decorateMailButton);
+    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+  }
+
   global.StepInvoicePdf={pageHtml,toBlob};
 })(window);
