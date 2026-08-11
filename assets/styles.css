@@ -48,6 +48,7 @@
 .invoice-continuation-page .bank-box{top:calc(255px + var(--detail-count) * 34px)}
 .invoice-continuation-page .note-title{top:calc(359px + var(--detail-count) * 34px)}
 .invoice-continuation-page .note-box{top:calc(379px + var(--detail-count) * 34px)}
+.invoice-output-block{position:absolute;left:31px;width:733px}.invoice-summary-block{height:108px}.invoice-summary-block .tax-title{position:absolute;left:5px;top:0;font-size:14px}.invoice-summary-block .tax-table{position:absolute;left:0;top:18px;width:350px}.invoice-summary-block .totals{position:absolute;left:403px;top:0;width:330px}.invoice-text-block .section-title{position:absolute;left:0;top:0;font-size:16px}.invoice-text-block .section-box{position:absolute;left:0;top:20px;width:733px;padding:8px 11px;font-size:14px;line-height:18px;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;overflow:hidden}.invoice-bank-block{height:112px}.invoice-bank-block .section-box{height:92px;min-height:92px;max-height:92px}.invoice-note-block{height:100px}.invoice-note-block .section-box{height:80px;min-height:80px;max-height:80px}
 .field-label-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .mini-link{border:0;background:transparent;color:var(--blue);font-size:11px;font-weight:700;padding:0;cursor:pointer;text-decoration:underline}
 .individual-detail-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}

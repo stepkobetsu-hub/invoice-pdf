@@ -3,28 +3,33 @@
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function pageHtml(inv,options={}){
     const allDetails=Array.isArray(inv.details)&&inv.details.length?inv.details:[{name:'',unitPrice:0,quantity:0,amount:0}];
-    const detailPages=[];
-    if(allDetails.length<=5){
-      detailPages.push({items:allDetails,continuation:false,summary:true});
-    }else{
-      const remaining=allDetails.slice();
-      detailPages.push({items:remaining.splice(0,15),continuation:false,summary:false});
-      while(remaining.length>15){
-        const take=Math.min(25,remaining.length-15);
-        detailPages.push({items:remaining.splice(0,take),continuation:true,summary:false});
+    const detailPages=[],remaining=allDetails.slice();
+    detailPages.push({items:remaining.splice(0,15),continuation:false,blocks:[]});
+    while(remaining.length)detailPages.push({items:remaining.splice(0,25),continuation:true,blocks:[]});
+    const outputBlocks=[{name:'summary',height:108},{name:'bank',height:112},{name:'note',height:100}];
+    const pageBottom=1060,blockGap=10;
+    let blockPage=detailPages[detailPages.length-1];
+    let blockTop=(blockPage.continuation?72:487)+38+blockPage.items.length*34+12;
+    outputBlocks.forEach(block=>{
+      if(blockTop+block.height>pageBottom){
+        blockPage={items:[],continuation:true,blocks:[]};
+        detailPages.push(blockPage);
+        blockTop=60;
       }
-      detailPages.push({items:remaining,continuation:true,summary:true});
-    }
+      blockPage.blocks.push({...block,top:blockTop});
+      blockTop+=block.height+blockGap;
+    });
     const pageCount=detailPages.length;
     const watermark=options.preview===true?'<div class="preview-watermark" aria-hidden="true">プレビュー</div>':'';
     return detailPages.map((page,pageIndex)=>{
       const detailItems=page.items;
       const details=detailItems.map(d=>`<tr><td></td><td>${esc(d.name)}</td><td class="num">${Number(d.unitPrice).toLocaleString()}</td><td class="num">${Number(d.quantity).toLocaleString()}</td><td class="num">${Number(d.amount).toLocaleString()}</td></tr>`).join('');
-      const summary=page.summary?`
-      <div class="abs tax-title">税率別内訳</div><table class="tax-table"><tr><th></th><th>税抜金額</th><th>消費税額</th><th>税込金額</th></tr><tr><td>10%</td><td>${Number(inv.subtotal).toLocaleString()}</td><td>${Number(inv.tax).toLocaleString()}</td><td>${Number(inv.total).toLocaleString()}</td></tr></table>
-      <table class="totals"><tr><td>小計</td><td class="num">${Number(inv.subtotal).toLocaleString()}</td></tr><tr><td>消費税額合計</td><td class="num">${Number(inv.tax).toLocaleString()}</td></tr><tr><td>合計</td><td class="num">${Number(inv.total).toLocaleString()}</td></tr></table>
-      <div class="abs section-title bank-title">振込先</div><div class="section-box bank-box">${esc(inv.bank||'')}</div><div class="abs section-title note-title">備考</div><div class="section-box note-box">${esc(inv.note||'個別指導ステップ（運営：株式会社エデュクレスト）')}</div>`:'';
-      const header=page.continuation?'<div class="abs continuation-title">請求明細（続き）</div>':`<div class="abs invoice-title">請求書</div><div class="abs customer">${esc(inv.partnerName)} ${esc(inv.honorific||'様')}</div><div class="abs customer-postal">〒${esc(inv.postal)}</div><div class="abs customer-address">${esc(inv.prefecture)}${esc(inv.address1)}${esc(inv.address2)}</div>
+      const outputBlocks=page.blocks.map(block=>{
+        if(block.name==='summary')return `<div class="invoice-output-block invoice-summary-block" style="top:${block.top}px"><div class="tax-title">税率別内訳</div><table class="tax-table"><tr><th></th><th>税抜金額</th><th>消費税額</th><th>税込金額</th></tr><tr><td>10%</td><td>${Number(inv.subtotal).toLocaleString()}</td><td>${Number(inv.tax).toLocaleString()}</td><td>${Number(inv.total).toLocaleString()}</td></tr></table><table class="totals"><tr><td>小計</td><td class="num">${Number(inv.subtotal).toLocaleString()}</td></tr><tr><td>消費税額合計</td><td class="num">${Number(inv.tax).toLocaleString()}</td></tr><tr><td>合計</td><td class="num">${Number(inv.total).toLocaleString()}</td></tr></table></div>`;
+        if(block.name==='bank')return `<div class="invoice-output-block invoice-text-block invoice-bank-block" style="top:${block.top}px"><div class="section-title">振込先</div><div class="section-box">${esc(inv.bank||'')}</div></div>`;
+        return `<div class="invoice-output-block invoice-text-block invoice-note-block" style="top:${block.top}px"><div class="section-title">備考</div><div class="section-box">${esc(inv.note||'個別指導ステップ（運営：株式会社エデュクレスト）')}</div></div>`;
+      }).join('');
+      const header=page.continuation?`<div class="abs continuation-title">${detailItems.length?'請求明細（続き）':'請求内容（続き）'}</div>`:`<div class="abs invoice-title">請求書</div><div class="abs customer">${esc(inv.partnerName)} ${esc(inv.honorific||'様')}</div><div class="abs customer-postal">〒${esc(inv.postal)}</div><div class="abs customer-address">${esc(inv.prefecture)}${esc(inv.address1)}${esc(inv.address2)}</div>
       <img class="logo" src="assets/step-logo.png?v=20260802-logo" alt="STEP"><div class="abs issuer">個別指導ステップ<br><br>〒487-0024<br>愛知県春日井市大留町1丁目23-2<br>TEL: 0568-41-8937<br>${esc(inv.customerCode)}</div>
       <div class="abs invoice-meta">請求書番号：${esc(inv.invoiceNumber)}<br>請求日：　　${esc(inv.invoiceDate)}<br>お支払期限：${esc(inv.dueDate)}</div><div class="abs subject">件名： ${esc(inv.subject)}</div>
       <div class="amount-box"><strong>ご請求金額</strong><span>${Number(inv.total).toLocaleString()} 円</span></div>`;
@@ -32,7 +37,7 @@
       return `<div class="invoice-page${page.continuation?' invoice-continuation-page':''}"${pageIndex===0?' id="invoicePage"':''} style="--detail-count:${detailItems.length}">
       ${watermark}
       ${header}${detailTable}
-      ${summary}<div class="abs page-number">${pageIndex+1} / ${pageCount}</div>
+      ${outputBlocks}<div class="abs page-number">${pageIndex+1} / ${pageCount}</div>
     </div>`;
     }).join('');
   }

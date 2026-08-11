@@ -64,6 +64,16 @@ assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[0].querySelect
 assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[1].querySelectorAll('.customer,.issuer').length, 0);
 assert.equal(thirteenDetailHost.querySelectorAll('.invoice-page')[1].querySelectorAll('.totals').length, 1);
 
+const sixDetailHost = window.document.createElement('div');
+sixDetailHost.innerHTML = window.StepInvoicePdf.pageHtml({ ...invoice, details: invoice.details.slice(0, 6) });
+const sixDetailPages = sixDetailHost.querySelectorAll('.invoice-page');
+assert.equal(sixDetailPages.length, 2);
+assert.equal(sixDetailPages[0].querySelectorAll('.invoice-summary-block').length, 1);
+assert.equal(sixDetailPages[0].querySelectorAll('.invoice-bank-block').length, 1);
+assert.equal(sixDetailPages[0].querySelectorAll('.invoice-note-block').length, 0);
+assert.equal(sixDetailPages[1].querySelectorAll('.invoice-summary-block,.invoice-bank-block').length, 0);
+assert.equal(sixDetailPages[1].querySelectorAll('.invoice-note-block').length, 1);
+
 let addPageCount = 0;
 let addImageCount = 0;
 window.html2canvas = async () => ({ toDataURL: () => 'data:image/png;base64,AA==' });

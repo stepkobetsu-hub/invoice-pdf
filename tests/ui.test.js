@@ -219,6 +219,10 @@ async function main(){
   assert.match(styles,/\.invoice-page \.page-number\{left:0;top:auto;bottom:26px;width:100%;text-align:center\}/);
   assert.match(styles,/\.invoice-continuation-page \.detail\{top:72px\}/);
   assert.match(styles,/\.payment-pill\.unpaid,[^}]*background:#dc2626;color:#fff/);
+  assert.match(styles,/\.invoice-output-block\{position:absolute;left:31px;width:733px\}/);
+  assert.match(styles,/\.invoice-summary-block\{height:108px\}/);
+  assert.match(styles,/\.invoice-bank-block\{height:112px\}/);
+  assert.match(styles,/\.invoice-note-block\{height:100px\}/);
   console.log('ui tests passed');
 }
 
