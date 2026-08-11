@@ -215,7 +215,7 @@
   async function safeApi(action,payload){if(!state.settings.apiUrl)return null;return api(action,payload);}
   function selectedItems(){return [...state.selected].map(i=>state.invoices[i]).filter(Boolean);}
   async function ensurePdfsForSend(items){const pending=items.filter(item=>item&&item.pdfStatus!=='PDF作成済み');if(!pending.length)return 0;let completed=0;showOperationOverlay(`送信用PDFを準備しています… 0／${pending.length}件`);try{for(const inv of pending){const blob=await createPdf(inv),base64=await blobToBase64(blob),result=await api('savePdf',{invoice:inv,pdfBase64:base64});inv.pdfStatus='PDF作成済み';inv.pdfFileId=result?.pdfFileId||'';inv.pdfFileName=result?.pdfFileName||`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}.pdf`;const persisted=await saveInvoiceToD1(inv);Object.assign(inv,persisted);completed+=1;$('#operationOverlayText').textContent=`送信用PDFを準備しています… ${completed}／${pending.length}件`;}return completed;}finally{hideOperationOverlay();renderCreate();renderInvoices();}}
-  const queueableUnsent=item=>String(item?.sendStatus||'')==='未送信'&&C.validateEmail(item?.email);
+  const queueableUnsent=item=>['未送信','無効化','送信失敗'].includes(String(item?.sendStatus||''))&&C.validateEmail(item?.email);
   const queueableResend=item=>C.isSentStatus(item?.sendStatus)&&C.validateEmail(item?.email);
   function classifyQueueSelection(items){const selected=Array.isArray(items)?items:[],unsent=selected.filter(queueableUnsent),resend=selected.filter(queueableResend);return {selected,unsent,resend,blocked:selected.filter(item=>!unsent.includes(item)&&!resend.includes(item))};}
   function markSendQueued(items){items.forEach(item=>{item.sendStatus='送信待ち';item.sentAt='';});renderCreate();renderInvoices();}
