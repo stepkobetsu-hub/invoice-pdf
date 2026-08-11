@@ -434,13 +434,19 @@ function getDeliveryDiagnostics_(invoiceNumber,requestAuth){
   ensureQueueColumns_();
   const queueTable=table_(sheet_(STEP.SHEETS.QUEUE)),queueRow=queueTable.rows.filter(row=>String(row.values[queueTable.map['配信ID']]||'')===deliveryId).sort((a,b)=>b.rowNumber-a.rowNumber)[0];
   const providerMessageId=queueRow?String(queueRow.values[queueTable.map['メール事業者ID']]||''):'';
-  const result={invoiceNumber:invoiceNumber,deliveryId:deliveryId,recipient:recipient,providerMessageId:providerMessageId,queueStatus:queueRow?String(queueRow.values[queueTable.map['状態']]||''):'',events:[]};
+  const sentValue=delivery.values[deliveryTable.map['送信日時']],sentAt=sentValue instanceof Date?sentValue.toISOString():String(sentValue||'');
+  const result={invoiceNumber:invoiceNumber,deliveryId:deliveryId,recipient:recipient,providerMessageId:providerMessageId,queueStatus:queueRow?String(queueRow.values[queueTable.map['状態']]||''):'',sentAt:sentAt,events:[],matchedBy:''};
   const apiKey=String(PropertiesService.getScriptProperties().getProperty('BREVO_API_KEY')||'');
-  if(!apiKey||!providerMessageId)return Object.assign(result,{providerError:!apiKey?'BREVO_API_KEY_MISSING':'PROVIDER_MESSAGE_ID_MISSING'});
-  const url='https://api.brevo.com/v3/smtp/statistics/events?limit=50&messageId='+encodeURIComponent(providerMessageId);
-  const response=UrlFetchApp.fetch(url,{method:'get',headers:{'api-key':apiKey,accept:'application/json'},muteHttpExceptions:true});
-  let body={};try{body=JSON.parse(response.getContentText()||'{}');}catch(_){body={raw:response.getContentText().slice(0,500)};}
-  result.providerStatus=response.getResponseCode();result.events=Array.isArray(body.events)?body.events:[];if(!result.events.length)result.providerBody=body;return result;
+  if(!apiKey)return Object.assign(result,{providerError:'BREVO_API_KEY_MISSING'});
+  let body={};
+  if(providerMessageId){const url='https://api.brevo.com/v3/smtp/statistics/events?limit=50&messageId='+encodeURIComponent(providerMessageId),response=UrlFetchApp.fetch(url,{method:'get',headers:{'api-key':apiKey,accept:'application/json'},muteHttpExceptions:true});try{body=JSON.parse(response.getContentText()||'{}');}catch(_){body={raw:response.getContentText().slice(0,500)};}result.providerStatus=response.getResponseCode();result.events=Array.isArray(body.events)?body.events:[];if(result.events.length){result.matchedBy='messageId';return result;}}
+  if(!recipient){result.providerBody=body;result.providerError=providerMessageId?'EVENT_NOT_FOUND':'PROVIDER_MESSAGE_ID_MISSING';return result;}
+  const recipientUrl='https://api.brevo.com/v3/smtp/statistics/events?limit=200&days=30&sort=desc&email='+encodeURIComponent(recipient);
+  const recipientResponse=UrlFetchApp.fetch(recipientUrl,{method:'get',headers:{'api-key':apiKey,accept:'application/json'},muteHttpExceptions:true});
+  let recipientBody={};try{recipientBody=JSON.parse(recipientResponse.getContentText()||'{}');}catch(_){recipientBody={raw:recipientResponse.getContentText().slice(0,500)};}
+  const recipientEvents=Array.isArray(recipientBody.events)?recipientBody.events:[],sentMs=new Date(sentAt).getTime(),nearby=Number.isFinite(sentMs)?recipientEvents.filter(event=>{const eventMs=new Date(event.date||'').getTime();return Number.isFinite(eventMs)&&Math.abs(eventMs-sentMs)<=15*60*1000;}):[];
+  if(nearby.length){const closest=nearby.reduce((best,event)=>Math.abs(new Date(event.date).getTime()-sentMs)<Math.abs(new Date(best.date).getTime()-sentMs)?event:best),matchedId=String(closest.messageId||'');result.events=matchedId?nearby.filter(event=>String(event.messageId||'')===matchedId):[closest];result.matchedBy='recipient';}
+  result.providerStatus=recipientResponse.getResponseCode();if(!result.events.length)result.providerBody=recipientBody;return result;
 }
 
 function assertHourlyLimit_(settings) {
