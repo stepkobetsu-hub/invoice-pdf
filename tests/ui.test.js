@@ -178,12 +178,16 @@ async function main(){
   assert.match(document.querySelector('#settingsForm [name="apiUrl"]').value,/^https:\/\/script\.google\.com\/macros\/s\//);
   assert.equal(document.querySelector('#staffLoginLink').href,'https://stepkobetsu-hub.github.io/seiseki-kanri/');
   const backend=fs.readFileSync(path.join(root,'apps-script/Code.gs'),'utf8');
+  const appSource=fs.readFileSync(path.join(root,'assets/app.js'),'utf8');
   assert.match(backend,/action:'verifySystemPortal'/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS\.includes\(String\(result\.permissionLevel\)\)/);
   assert.match(backend,/processPendingSends: \(\) => processPendingSends_\(requestAuth\)/);
   assert.match(backend,/prepared\.length===1\?buildBrevoSinglePayload_/);
   assert.match(backend,/function buildBrevoSinglePayload_\(/);
+  assert.match(backend,/function ensureBrevoWebhook_\(/);
+  assert.match(backend,/providerMessageId:providerId/);
+  assert.match(backend,/email-opened/);
   assert.match(backend,/installQueueTrigger_\(\);\s*scheduleQueueRun_\(\);\s*return response/);
   assert.match(backend,/function scheduleQueueRun_\(\)/);
   assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
@@ -202,6 +206,8 @@ async function main(){
   assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
   assert.match(styles,/@media\(min-width:851px\)\{[\s\S]*?\.invoice-list-pane\{display:flex;flex-direction:column\}[\s\S]*?\.invoice-list\{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto\}/);
   assert.match(styles,/\.invoice-list-statuses \.status,\.invoice-list-statuses \.payment-pill\{padding:2px 6px;font-size:10px\}/);
+  assert.match(appSource,/emailOpenedAt\?'<span class="status accessed">開封<\/span>'/);
+  assert.match(appSource,/URL確認/);
   assert.match(styles,/\.invoice-detail-fields\{display:flex;align-items:center;flex:1 0 100%;flex-wrap:wrap;[^}]*margin:0/);
   assert.match(styles,/\.invoice-detail-actions\{align-items:center;flex-direction:row;margin-top:10px/);
   assert.match(styles,/\.invoice-detail-actions \.button,\.invoice-detail-actions summary\.button\{[^}]*height:38px;[^}]*white-space:nowrap\}/);

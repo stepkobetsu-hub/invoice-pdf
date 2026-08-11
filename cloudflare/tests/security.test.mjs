@@ -135,4 +135,16 @@ function createEnv(options = {}) {
   assert.equal((await response.json()).error, "EMAIL_SEND_DISABLED");
 }
 
+{
+  const { env } = createEnv();
+  env.ADMIN_API_KEY = "admin-test-key";
+  const response = await worker.fetch(new Request("https://example.test/api/webhooks/email-provider?token=invalid", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ event: "opened", "message-id": "test-message" }),
+  }), env);
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "WEBHOOK_AUTH_REQUIRED");
+}
+
 console.log("Cloudflare security checks passed.");

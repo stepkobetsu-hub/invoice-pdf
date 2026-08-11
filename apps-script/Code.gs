@@ -365,6 +365,7 @@ function sendOne_(queueValues, queueMap, settings) {
 function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedAt){
   const properties=PropertiesService.getScriptProperties(),apiKey=String(properties.getProperty('BREVO_API_KEY')||'');
   if(!apiKey)throw new Error('Brevo APIキーが設定されていません。');
+  try{ensureBrevoWebhook_();}catch(webhookError){console.warn('Brevo開封通知の準備を保留: '+safeError_(webhookError));}
   const deliverySheet=sheet_(STEP.SHEETS.DELIVERIES),deliveryTable=table_(deliverySheet),invoiceSheet=sheet_(STEP.SHEETS.INVOICES),invoiceTable=table_(invoiceSheet);
   ensureReceiptSheets_();
   const receiptSheet=sheet_(STEP.SHEETS.RECEIPTS),receiptTable=table_(receiptSheet),deliveryById={},invoiceByNumber={},receiptByNumber={};
@@ -406,7 +407,7 @@ function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedA
       mutateRow_(item.deliveryRow,deliveryTable.map,{'送信日時':completedAt,'送信状態':status,'送信エラー':'','現在状態':status,'更新日時':completedAt});
       mutateRow_(item.sourceRow,item.isReceipt?receiptTable.map:invoiceTable.map,item.isReceipt?{'送信状態':status,'更新日時':completedAt}:{'現在状態':status,'更新日時':completedAt});
       clearCachedDownloadUrl_(item.deliveryId);
-      cloudRequests.push({url:config.url+'/api/admin/deliveries/'+encodeURIComponent(item.deliveryId)+'/sent',method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+config.key},payload:'{}',muteHttpExceptions:true});
+      cloudRequests.push({url:config.url+'/api/admin/deliveries/'+encodeURIComponent(item.deliveryId)+'/sent',method:'post',contentType:'application/json',headers:{Authorization:'Bearer '+config.key},payload:JSON.stringify({providerMessageId:providerId}),muteHttpExceptions:true});
       logRows.push([completedAt,activeEmail_(),'メール送信',item.number,item.deliveryRow.values[deliveryTable.map['顧客コード']],item.deliveryId,sandbox?'サンドボックス成功':'成功','',JSON.stringify({provider:'brevo',batchId:batchId}).slice(0,1000),'']);
     });
     flushTableRows_(queueSheet,queueTable);flushTableRows_(deliverySheet,deliveryTable);flushTableRows_(invoiceSheet,invoiceTable);flushTableRows_(receiptSheet,receiptTable);
@@ -450,8 +451,19 @@ function getDeliveryDiagnostics_(invoiceNumber,requestAuth){
   if(result.account.relayEnabled===false){result.providerError='BREVO_RELAY_DISABLED';return result;}if(result.account.credits===0){result.providerError='BREVO_CREDITS_EXHAUSTED';return result;}
   if(!providerMessageId){result.providerError='PROVIDER_MESSAGE_ID_MISSING';return result;}
   result.providerStatus=responseByKey.message?responseByKey.message.code:0;result.events=responseByKey.message&&Array.isArray(responseByKey.message.body.events)?responseByKey.message.body.events:[];result.matchedBy=result.events.length?'messageId':'';
+  const openedEvent=result.events.find(event=>['opened','unique_opened'].includes(String(event.event||'')));
+  if(openedEvent){result.emailOpenedAt=String(openedEvent.date||openedEvent.ts_event||openedEvent.ts||new Date().toISOString());try{cloudflareAdminFetch_('/api/admin/deliveries/'+encodeURIComponent(deliveryId)+'/email-opened','post',{openedAt:result.emailOpenedAt});}catch(syncError){result.trackingSyncError=safeError_(syncError);}}
   if(!result.events.length)result.providerError='EVENT_NOT_FOUND';return result;
   }catch(error){result.providerError=safeError_(error);return result;}
+}
+
+function ensureBrevoWebhook_(){
+  const cache=CacheService.getScriptCache();if(cache.get('BREVO_WEBHOOK_READY_V1')==='1')return true;
+  const properties=PropertiesService.getScriptProperties(),apiKey=String(properties.getProperty('BREVO_API_KEY')||'');if(!apiKey)return false;
+  const config=cloudflareConfig_(),bytes=Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256,'email-open-webhook-v1:'+config.key,Utilities.Charset.UTF_8),token=bytes.map(value=>(value<0?value+256:value).toString(16).padStart(2,'0')).join(''),webhookUrl=config.url+'/api/webhooks/email-provider?token='+token,options={method:'get',headers:{'api-key':apiKey,accept:'application/json'},muteHttpExceptions:true},listResponse=UrlFetchApp.fetch('https://api.brevo.com/v3/webhooks?type=transactional',options);
+  let list={};try{list=JSON.parse(listResponse.getContentText()||'{}');}catch(_){}const hooks=Array.isArray(list.webhooks)?list.webhooks:[];
+  if(!hooks.some(hook=>String(hook.url||'')===webhookUrl)){const response=UrlFetchApp.fetch('https://api.brevo.com/v3/webhooks',{method:'post',contentType:'application/json',headers:{'api-key':apiKey,accept:'application/json'},payload:JSON.stringify({url:webhookUrl,description:'STEP invoice email tracking',events:['delivered','opened','click','hardBounce','softBounce','blocked','spam'],type:'transactional'}),muteHttpExceptions:true});if(response.getResponseCode()<200||response.getResponseCode()>=300)throw new Error('Brevo開封通知を登録できませんでした: '+response.getContentText().slice(0,300));}
+  cache.put('BREVO_WEBHOOK_READY_V1','1',21600);return true;
 }
 
 function assertHourlyLimit_(settings) {

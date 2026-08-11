@@ -76,7 +76,11 @@
   async function api(action,payload={}){
     const savingInvoice=action==='saveInvoiceData';if(savingInvoice)showOperationOverlay('保存中');
     const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?20000:45000;
-    try{return await cloudApi('/api/app/apps-script',{method:'POST',body:{action,payload},timeoutMs});}
+    try{
+      const data=await cloudApi('/api/app/apps-script',{method:'POST',body:{action,payload},timeoutMs});
+      if(action==='getDeliveryDiagnostics'&&data?.emailOpenedAt){const invoice=state.invoices.find(item=>String(item.invoiceNumber)===String(payload.invoiceNumber));if(invoice&&!invoice.emailOpenedAt){invoice.emailOpenedAt=data.emailOpenedAt;renderInvoices();}}
+      return data;
+    }
     finally{if(savingInvoice)hideOperationOverlay();}
   }
   function startBackgroundSendProcessing(){
@@ -203,7 +207,13 @@
     const ordered=filteredInvoices(),visible=ordered.slice(0,state.invoiceVisibleLimit);$('#invoiceListCount').textContent=visible.length?`1 ～ ${visible.length}件を表示`:'0件を表示';
     if(visible.length&&!visible.some(invoice=>String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)))state.selectedInvoiceNumber=String(visible[0].invoiceNumber);
     if(!ordered.length)state.selectedInvoiceNumber='';
-    $('#invoiceList').innerHTML=ordered.length?visible.map(invoice=>{const payment=invoice.paymentStatus||'未入金',sourceIndex=state.invoices.indexOf(invoice),checked=state.selected.has(sourceIndex);return `<div class="invoice-list-row ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}"><label class="invoice-list-check" title="この請求書を選択"><input type="checkbox" data-invoice-check="${sourceIndex}" ${checked?'checked':''} aria-label="${esc(invoice.partnerName||'取引先')}の請求書を選択"></label><button class="invoice-list-item ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}" type="button" data-invoice-select="${esc(invoice.invoiceNumber)}"><span class="invoice-list-meta"><span>${esc(invoice.createdAt||invoice.invoiceDate||'')}</span><span>No. ${esc(invoice.invoiceNumber)}</span></span><span class="invoice-list-name">${esc(invoice.partnerName||'取引先未設定')}</span><span class="invoice-list-subject">${esc(invoice.subject||'件名未設定')}</span><span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||'未送信')}</span>${invoice.dlStatus==='URLアクセス済み'?'<span class="status accessed">開封</span>':''}${invoice.dlStatus==='DL済'?'<span class="status downloaded">DL済</span>':''}<strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span></button></div>`;}).join('')+(visible.length<ordered.length?'<button id="invoiceLoadMore" class="invoice-load-more" type="button">さらに読み込む⌄</button>':''):`<p class="invoice-list-empty">${state.invoices.length?'検索条件に一致する請求書がありません。':'請求書がありません。'}</p>`;
+    $('#invoiceList').innerHTML=ordered.length?visible.map(invoice=>{
+      const payment=invoice.paymentStatus||'未入金',sourceIndex=state.invoices.indexOf(invoice),checked=state.selected.has(sourceIndex);
+      const emailOpened=invoice.emailOpenedAt?'<span class="status accessed">開封</span>':'';
+      const urlOpened=invoice.dlStatus==='URLアクセス済み'?'<span class="status accessed">URL確認</span>':'';
+      const downloaded=invoice.dlStatus==='DL済'?'<span class="status downloaded">DL済</span>':'';
+      return `<div class="invoice-list-row ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}"><label class="invoice-list-check" title="この請求書を選択"><input type="checkbox" data-invoice-check="${sourceIndex}" ${checked?'checked':''} aria-label="${esc(invoice.partnerName||'取引先')}の請求書を選択"></label><button class="invoice-list-item ${String(invoice.invoiceNumber)===String(state.selectedInvoiceNumber)?'active':''}" type="button" data-invoice-select="${esc(invoice.invoiceNumber)}"><span class="invoice-list-meta"><span>${esc(invoice.createdAt||invoice.invoiceDate||'')}</span><span>No. ${esc(invoice.invoiceNumber)}</span></span><span class="invoice-list-name">${esc(invoice.partnerName||'取引先未設定')}</span><span class="invoice-list-subject">${esc(invoice.subject||'件名未設定')}</span><span class="invoice-list-statuses"><span class="payment-pill ${paymentClass(payment)}">${esc(payment)}</span><span class="status ${statusClass(invoice.sendStatus)}">${esc(invoice.sendStatus||'未送信')}</span>${emailOpened}${urlOpened}${downloaded}<strong class="invoice-list-amount">${C.formatYen(invoice.total)}</strong></span></button></div>`;
+    }).join('')+(visible.length<ordered.length?'<button id="invoiceLoadMore" class="invoice-load-more" type="button">さらに読み込む⌄</button>':''):`<p class="invoice-list-empty">${state.invoices.length?'検索条件に一致する請求書がありません。':'請求書がありません。'}</p>`;
     $$('[data-invoice-select]').forEach(button=>button.onclick=()=>{state.selectedInvoiceNumber=button.dataset.invoiceSelect;renderInvoices();});
     $$('[data-invoice-check]').forEach(box=>box.onchange=()=>{const index=Number(box.dataset.invoiceCheck);if(box.checked)state.selected.add(index);else state.selected.delete(index);updateInvoiceSelectionUi(visible);});
     $('#invoiceLoadMore')?.addEventListener('click',()=>{state.invoiceVisibleLimit+=100;renderInvoices();});

@@ -22,6 +22,10 @@ export default {
         return await createInvoiceTransfer(request, env);
       }
 
+      if (request.method === "POST" && url.pathname === "/api/webhooks/email-provider") {
+        return await receiveEmailProviderWebhook(request, env, url);
+      }
+
       if (url.pathname.startsWith("/api/app/")) {
         return await serveAppRequest(request, env, url);
       }
@@ -280,7 +284,10 @@ async function loadInvoiceDashboard(env) {
       COALESCE(i.email, p.email, '') AS resolved_email,
       COALESCE(i.cc_email, p.cc_email, '') AS resolved_cc_email,
       d.delivery_id, d.status AS delivery_status, d.updated_at AS delivery_updated_at,
-      d.first_opened_at, d.downloaded_at, d.expires_at,
+      (SELECT MAX(d3.email_opened_at) FROM deliveries d3 WHERE d3.invoice_id = i.invoice_id) AS email_opened_at,
+      (SELECT MAX(d3.first_opened_at) FROM deliveries d3 WHERE d3.invoice_id = i.invoice_id) AS first_opened_at,
+      (SELECT MAX(d3.downloaded_at) FROM deliveries d3 WHERE d3.invoice_id = i.invoice_id) AS downloaded_at,
+      d.expires_at,
       it.line_number, it.service_date, it.description, it.unit_price, it.quantity, it.unit, it.amount, it.tax_rate
     FROM invoices i
     JOIN partners p ON p.partner_id = i.partner_id
@@ -346,7 +353,7 @@ function invoiceRowToClient(row) {
     email: row.resolved_email || "", cc: row.resolved_cc_email || "", pdfStatus: row.r2_object_key ? "PDF作成済み" : "未作成",
     pdfFileId: row.r2_object_key || "", pdfFileName: "", createdAt: row.created_at || "", updatedAt: row.updated_at || "",
     sendStatus: delivery.sendStatus, sentAt: row.delivery_updated_at || "", dlStatus: delivery.dlStatus,
-    downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
+    emailOpenedAt: row.email_opened_at || "", downloadedAt: row.downloaded_at || "", expiresAt: row.expires_at || "", details: [], warnings: [],
   };
 }
 
@@ -603,7 +610,12 @@ async function serveAdminRequest(request, env, ctx, url) {
 
   const sentMatch = url.pathname.match(/^\/api\/admin\/deliveries\/([^/]+)\/sent$/);
   if (request.method === "POST" && sentMatch) {
-    return markDeliverySent(env, sentMatch[1]);
+    return markDeliverySent(request, env, sentMatch[1]);
+  }
+
+  const emailOpenedMatch = url.pathname.match(/^\/api\/admin\/deliveries\/([^/]+)\/email-opened$/);
+  if (request.method === "POST" && emailOpenedMatch) {
+    return markDeliveryEmailOpened(request, env, emailOpenedMatch[1]);
   }
 
   const match = url.pathname.match(/^\/api\/admin\/invoices\/([^/]+)\/pdf$/);
@@ -809,10 +821,46 @@ async function revokeDelivery(env, deliveryId) {
   return json({ ok: true, deliveryId, revoked: Number(result.meta?.changes || 0) });
 }
 
-async function markDeliverySent(env, deliveryId) {
+async function markDeliverySent(request, env, deliveryId) {
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
   const now = new Date().toISOString();
-  const result = await env.DB.prepare("UPDATE deliveries SET status=CASE WHEN status='pending' THEN 'sent' ELSE status END, updated_at=?1 WHERE delivery_id=?2").bind(now, deliveryId).run();
+  const providerMessageId = normalizeProviderMessageId(payload.value.providerMessageId);
+  const result = await env.DB.prepare("UPDATE deliveries SET status=CASE WHEN status='pending' THEN 'sent' ELSE status END, provider_message_id=COALESCE(NULLIF(?1, ''), provider_message_id), updated_at=?2 WHERE delivery_id=?3").bind(providerMessageId, now, deliveryId).run();
   return json({ ok: true, deliveryId, updated: Number(result.meta?.changes || 0) });
+}
+
+async function markDeliveryEmailOpened(request, env, deliveryId) {
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
+  const openedAt = validEventDate(payload.value.openedAt) || new Date().toISOString();
+  const result = await env.DB.prepare(`UPDATE deliveries
+    SET email_opened_at=COALESCE(email_opened_at, ?1), email_status='opened', last_email_event_at=?1, updated_at=?1
+    WHERE delivery_id=?2`).bind(openedAt, deliveryId).run();
+  return json({ ok: true, deliveryId, updated: Number(result.meta?.changes || 0), emailOpenedAt: openedAt });
+}
+
+async function receiveEmailProviderWebhook(request, env, url) {
+  if (!env.ADMIN_API_KEY) return json({ ok: false, error: "WEBHOOK_NOT_CONFIGURED" }, 503);
+  const expected = await emailWebhookToken(env.ADMIN_API_KEY);
+  if (!(await timingSafeTextEqual(url.searchParams.get("token") || "", expected))) {
+    return json({ ok: false, error: "WEBHOOK_AUTH_REQUIRED" }, 401);
+  }
+  const payload = await readJson(request);
+  if (!payload.ok) return payload.response;
+  const event = String(payload.value.event || "").trim();
+  const providerMessageId = normalizeProviderMessageId(payload.value["message-id"] || payload.value.messageId || payload.value.message_id);
+  if (!event || !providerMessageId) return json({ ok: false, error: "INVALID_WEBHOOK_EVENT" }, 400);
+  const occurredAt = validEventDate(payload.value.date || payload.value.ts_event || payload.value.ts) || new Date().toISOString();
+  const opened = event === "opened" || event === "unique_opened";
+  const result = await env.DB.prepare(`UPDATE deliveries SET
+      email_status=?1,
+      email_opened_at=CASE WHEN ?2=1 THEN COALESCE(email_opened_at, ?3) ELSE email_opened_at END,
+      last_email_event_at=?3,
+      updated_at=?3
+    WHERE provider_message_id=?4`).bind(event, opened ? 1 : 0, occurredAt, providerMessageId).run();
+  console.log(JSON.stringify({ event: "email_delivery_event", type: event, matched: Number(result.meta?.changes || 0) }));
+  return json({ ok: true });
 }
 
 async function deliveryStatuses(request, env) {
@@ -1032,6 +1080,34 @@ function decodeBase64Pdf(value) {
 async function sha256Hex(value) {
   const digest = await crypto.subtle.digest("SHA-256", value);
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function emailWebhookToken(adminApiKey) {
+  return sha256Hex(new TextEncoder().encode(`email-open-webhook-v1:${adminApiKey}`));
+}
+
+async function timingSafeTextEqual(supplied, expected) {
+  const [suppliedHash, expectedHash] = await Promise.all([
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(supplied))),
+    crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(expected))),
+  ]);
+  const a = new Uint8Array(suppliedHash);
+  const b = new Uint8Array(expectedHash);
+  let difference = a.length ^ b.length;
+  for (let index = 0; index < Math.min(a.length, b.length); index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
+
+function normalizeProviderMessageId(value) {
+  return String(value || "").trim().replace(/^<|>$/g, "").slice(0, 500);
+}
+
+function validEventDate(value) {
+  const raw = String(value || "").trim();
+  if (/^\d{10}(?:\.\d+)?$/.test(raw)) return new Date(Number(raw) * 1000).toISOString();
+  if (/^\d{13}$/.test(raw)) return new Date(Number(raw)).toISOString();
+  const time = Date.parse(raw);
+  return Number.isFinite(time) ? new Date(time).toISOString() : "";
 }
 
 function createOpaqueToken() {
