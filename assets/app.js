@@ -76,7 +76,8 @@
     const bridgeNonce=[...crypto.getRandomValues(new Uint32Array(4))].map(x=>x.toString(16).padStart(8,'0')).join('');
     const frame=document.createElement('iframe');frame.name=requestId;frame.hidden=true;document.body.appendChild(frame);
     const form=document.createElement('form');form.method='POST';form.action=url;form.target=requestId;form.hidden=true;
-    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:state.settings.adminApiKey||'',systemPortalSessionToken:staffAuth?.systemPortalSessionToken||''};
+    const staffSession=staffAuth?.systemPortalSessionToken||'';
+    const fields={bridge:'1',requestId,bridgeNonce,action,payload:JSON.stringify(payload),authToken:staffSession?'':state.settings.adminApiKey||'',systemPortalSessionToken:staffSession};
     Object.entries(fields).forEach(([name,value])=>{const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.appendChild(input);});
     document.body.appendChild(form);
     return new Promise((resolve,reject)=>{
