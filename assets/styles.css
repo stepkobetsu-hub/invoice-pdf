@@ -200,3 +200,288 @@
   .invoice-detail-actions .button,.invoice-detail-actions summary.button{display:inline-flex;align-items:center;justify-content:center;height:38px;padding:0 12px;white-space:nowrap}
   .invoice-output-actions .button{padding:0 14px}
 }
+
+/* ================================================================
+   Modern SaaS application shell — 2026-08-12
+   UI chrome only. PDF output rules (.invoice-page / .receipt-page)
+   intentionally remain untouched above.
+   ================================================================ */
+:root{
+  --navy:#172033;
+  --blue:#4f46e5;
+  --blue-strong:#4338ca;
+  --blue-soft:#eef2ff;
+  --red:#dc2626;
+  --bg:#f6f8fc;
+  --line:#e2e8f0;
+  --text:#172033;
+  --muted:#64748b;
+  --green:#15803d;
+  --orange:#c2410c;
+  --danger:#dc2626;
+  --radius:12px;
+  color:var(--text);
+  background:var(--bg);
+}
+
+html{background:var(--bg)}
+body{min-width:320px;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font-family:inherit}
+
+/* Header */
+.topbar{
+  height:66px;
+  padding:0 24px;
+  border-bottom:1px solid #e8edf4;
+  background:rgba(255,255,255,.97);
+  box-shadow:0 1px 3px rgba(15,23,42,.05);
+  backdrop-filter:blur(10px);
+}
+.brand{gap:16px}
+.brand img{width:144px}
+.brand div{padding-left:16px;border-left:1px solid #e2e8f0;flex-direction:row;align-items:baseline;gap:8px}
+.brand strong{font-size:15px;letter-spacing:.01em}
+.brand span{font-size:11px;font-weight:700;letter-spacing:.08em}
+.brand-home:hover{opacity:1}
+.top-actions{gap:10px;color:#475569}
+.badge,.staff-login-link{border-radius:8px}
+.badge{padding:7px 10px;background:#f8fafc;color:#334155}
+.badge.warning{background:#fff7ed;color:#9a3412}
+.staff-login-link{padding:9px 13px;border:1px solid #cbd5e1;background:#fff;color:#334155;text-decoration:none;font-weight:700;transition:border-color .15s,box-shadow .15s,transform .15s}
+.staff-login-link:hover{border-color:#a5b4fc;box-shadow:0 4px 12px rgba(79,70,229,.09);transform:translateY(-1px)}
+
+/* Navigation */
+.app-shell{grid-template-columns:232px minmax(0,1fr);min-height:calc(100vh - 66px)}
+.sidebar{
+  position:sticky;
+  top:66px;
+  align-self:start;
+  height:calc(100vh - 66px);
+  padding:18px 12px;
+  overflow-y:auto;
+  border-right:1px solid #e5eaf1;
+  background:#fff;
+  gap:4px;
+}
+.nav-section-label{padding:16px 12px 6px;color:#94a3b8;font-size:10px;letter-spacing:.14em}
+.nav-item{
+  position:relative;
+  display:flex;
+  min-height:42px;
+  align-items:center;
+  gap:11px;
+  padding:9px 11px;
+  border-radius:9px;
+  color:#475569;
+  font-size:13px;
+  font-weight:650;
+  transition:background .15s,color .15s,transform .15s;
+}
+.nav-item::before{
+  content:'•';
+  display:grid;
+  width:24px;
+  height:24px;
+  flex:0 0 24px;
+  place-items:center;
+  border:1px solid #dbe3ee;
+  border-radius:7px;
+  background:#f8fafc;
+  color:#64748b;
+  font-size:10px;
+  font-weight:800;
+}
+.nav-item[data-view="create"]::before{content:'＋';font-size:16px}
+.nav-item[data-receipt-create]::before{content:'領'}
+.nav-item[data-view="invoices"]::before{content:'請'}
+.nav-item[data-view="receipts"]::before{content:'収'}
+.nav-item[data-view="partners"]::before{content:'取'}
+.nav-item[data-view="history"]::before{content:'履'}
+.nav-item[data-view="settings"]::before{content:'設'}
+.nav-item[data-view="mail"]::before{content:'〒'}
+.nav-item.nav-create{justify-content:flex-start}
+.nav-item.nav-create b{margin-left:auto;color:#94a3b8;font-size:16px}
+.nav-item:hover{background:#f5f7ff;color:#3730a3;transform:translateX(1px)}
+.nav-item.active{background:var(--blue-soft);color:var(--blue-strong);font-weight:800}
+.nav-item.active::after{content:'';position:absolute;left:-12px;top:9px;bottom:9px;width:3px;border-radius:0 4px 4px 0;background:#4f46e5}
+.nav-item:hover::before,.nav-item.active::before{border-color:#c7d2fe;background:#fff;color:#4f46e5}
+
+/* Main content and headings */
+.main{padding:30px clamp(20px,2.5vw,40px) 44px;background:var(--bg)}
+.page-heading,.invoice-workspace-heading{margin-bottom:18px}
+.page-heading h1,.invoice-workspace-heading h1{margin:0 0 6px;color:#111827;font-size:clamp(26px,2vw,30px);font-weight:800;letter-spacing:-.025em;line-height:1.25}
+.page-heading p{max-width:760px;color:#64748b;font-size:13px;line-height:1.7}
+.panel,.summary-card,.table-wrap{border-color:var(--line);border-radius:12px;background:#fff;box-shadow:0 1px 2px rgba(15,23,42,.025)}
+
+/* Buttons */
+.button{
+  min-height:42px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:9px 15px;
+  border-radius:9px;
+  font-size:13px;
+  font-weight:750;
+  line-height:1.2;
+  transition:transform .15s,box-shadow .15s,border-color .15s,background .15s;
+}
+.button:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 14px rgba(15,23,42,.09)}
+.button:focus-visible,.nav-item:focus-visible,.invoice-tab:focus-visible{outline:0;box-shadow:0 0 0 3px rgba(79,70,229,.16)}
+.button.primary{border-color:transparent;background:linear-gradient(135deg,#6557e8,#2878f0);color:#fff;box-shadow:0 4px 12px rgba(79,70,229,.2)}
+.button.secondary{border-color:#cbd5e1;background:#fff;color:#334155}
+.button.secondary:hover:not(:disabled){border-color:#a5b4fc;background:#fafaff;color:#3730a3}
+.button.success{background:#2563eb;color:#fff}
+.button.danger{background:#fff;border-color:#fecaca;color:#b91c1c}
+.demo-send-button{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.invoice-heading-actions{gap:8px}
+.invoice-detail-column>.invoice-heading-actions{min-height:58px;padding:8px 16px;border-bottom:1px solid var(--line);background:#fff}
+
+/* Search and form controls */
+.invoice-search-bar{
+  gap:12px;
+  margin-bottom:14px;
+  padding:14px 16px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 4px 16px rgba(15,23,42,.025);
+}
+.invoice-date-search{gap:8px}
+.invoice-date-search select,.invoice-date-search input,.invoice-free-search input,
+.form-grid input,.form-grid select,.form-grid textarea,.payment-date-field input,.payment-date-field textarea,
+.mail-review-field input,.mail-review-field textarea{
+  border:1px solid #cbd5e1;
+  border-radius:8px;
+  background:#fff;
+  color:#1f2937;
+  transition:border-color .15s,box-shadow .15s;
+}
+.invoice-date-search select,.invoice-date-search input,.invoice-free-search input,.form-grid input,.form-grid select{height:43px}
+.invoice-date-search select:focus,.invoice-date-search input:focus,.invoice-free-search input:focus,
+.form-grid input:focus,.form-grid select:focus,.form-grid textarea:focus,.payment-date-field input:focus,.payment-date-field textarea:focus,
+.mail-review-field input:focus,.mail-review-field textarea:focus{
+  outline:0;
+  border-color:#818cf8;
+  box-shadow:0 0 0 3px rgba(79,70,229,.12);
+}
+.form-grid label,.payment-date-field,.mail-review-field{color:#475569;font-size:12px}
+.invoice-free-search button{top:4px;right:4px;height:35px;border-left:1px solid #e2e8f0;border-radius:0 6px 6px 0;color:#475569}
+.invoice-free-search button:hover,.invoice-free-search button:focus{background:#f5f7ff;color:#4338ca}
+
+/* Invoice and receipt workspaces */
+.invoice-bulk-legacy{width:280px;margin-bottom:14px}
+.invoice-bulk-menu>summary{height:42px;padding:10px 40px 10px 13px;border:1px solid #cbd5e1;border-radius:9px;color:#64748b}
+.invoice-bulk-menu>summary:after{top:8px;color:#4f46e5}
+.invoice-bulk-menu-items{top:47px;border-color:#e2e8f0;border-radius:10px;box-shadow:0 14px 35px rgba(15,23,42,.12)}
+.invoice-workspace{
+  grid-template-columns:minmax(292px,340px) minmax(620px,1fr);
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 8px 30px rgba(15,23,42,.045);
+}
+.invoice-list-pane{border-right:1px solid var(--line);background:#f8fafc}
+.invoice-list-head{height:52px;padding:0 13px;border-bottom:1px solid var(--line);background:#fff}
+.invoice-list-row{margin:7px 8px;border:1px solid #e8edf4;border-radius:10px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.02)}
+.invoice-list-row.active{border-color:#c7d2fe;background:#eef2ff;box-shadow:0 0 0 1px rgba(79,70,229,.05)}
+.invoice-list-row .invoice-list-item{border-left:3px solid transparent;background:transparent}
+.invoice-list-row.active .invoice-list-item,.invoice-list-item.active{border-left-color:#4f46e5;background:#eef2ff}
+.invoice-list-item:hover{background:#f3f7ff}
+.invoice-list-name{color:#1f2937;font-weight:800}
+.invoice-list-subject{color:#64748b}
+.invoice-list-meta{color:#7c8a9d}
+.invoice-list-amount{color:#172033}
+.invoice-list-empty{margin:8px;padding:48px 18px;border:1px dashed #d9e1ec;border-radius:10px;background:#fff}
+.invoice-load-more{margin:8px;width:calc(100% - 16px);border:1px solid #dbe3ee;border-radius:8px;color:#4f46e5}
+input[type="checkbox"]{width:19px;height:19px;accent-color:#4f46e5;cursor:pointer}
+.invoice-list-select-all input{width:20px;height:20px}
+.invoice-list-check{padding-top:14px}
+.invoice-detail-column{background:#f8fafc}
+.invoice-detail-pane{padding:16px;background:#f8fafc}
+.invoice-detail-empty{min-height:430px;border:1px dashed #d9e1ec;border-radius:12px;background:#fff;color:#64748b}
+.invoice-detail-card{overflow:hidden;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:0 8px 30px rgba(15,23,42,.05)}
+.invoice-detail-title-row h2{color:#312e81;font-size:21px;font-weight:800;letter-spacing:-.01em}
+.invoice-detail-fields dt{color:#64748b}
+.invoice-detail-fields dd{color:#1f2937;font-weight:650}
+.campus-tag{border-color:#c7d2fe;border-radius:999px;background:#eef2ff;color:#4338ca}
+.invoice-detail-actions .button,.invoice-detail-actions summary.button{height:40px;min-height:40px;border-radius:8px}
+.invoice-output-actions .mail-button{background:#2563eb;color:#fff}
+.invoice-tabs{gap:0;padding-left:16px;border-bottom:1px solid var(--line)}
+.invoice-tab{padding:11px 21px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;color:#64748b}
+.invoice-tab.active{top:0;border-bottom-color:#4f46e5;background:transparent;color:#4338ca}
+.invoice-tab-panel{padding:16px}
+
+/* Status pills */
+.status,.payment-pill{border:1px solid transparent;border-radius:999px;font-weight:750}
+.status.unsent{border-color:#e2e8f0;background:#f1f5f9;color:#475569}
+.status.sending,.status.sent,.status.accessed,.status.downloaded{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}
+.status.failed{border-color:#fecaca;background:#fef2f2;color:#b91c1c}
+.status.expired{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.status.disabled{background:#e2e8f0;color:#475569}
+.payment-pill.unpaid,.payment-dropdown:not([data-status="入金済"]):not([data-status="未設定"]) summary{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.payment-pill.paid,.payment-dropdown[data-status="入金済"] summary{border-color:#bbf7d0;background:#f0fdf4;color:#15803d}
+.payment-pill.unset,.payment-dropdown[data-status="未設定"] summary{border-color:#e2e8f0;background:#f1f5f9;color:#64748b}
+
+/* Tables, settings and supporting surfaces */
+.view>.table-wrap,.view>.panel,.view>form.panel{box-shadow:0 5px 22px rgba(15,23,42,.035)}
+.view>.table-wrap table th,.panel table th{background:#f8fafc;color:#475569;font-weight:750}
+.view>.table-wrap table td,.panel table td{border-bottom-color:#edf1f5}
+.view>.table-wrap tbody tr:hover,.panel tbody tr:hover{background:#f8fbff}
+.summary-card{padding:16px}
+.summary-card strong{color:#111827}
+.settings-document-tabs button{min-height:43px;border-color:#cbd5e1;border-radius:9px;color:#475569}
+.settings-document-tabs button.active{border-color:#4f46e5;background:#eef2ff;color:#4338ca;box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.settings-document-heading{border-width:1px;border-radius:11px}
+.settings-document-heading.invoice{border-color:#c7d2fe;background:#f5f7ff;color:#3730a3}
+.settings-document-heading.receipt{border-color:#ddd6fe;background:#faf8ff;color:#5b21b6}
+.advanced-settings{border-color:var(--line);border-radius:10px;background:#f8fafc}
+.create-method{border-radius:9px}
+.create-method.active{border-color:#4f46e5;background:#eef2ff;color:#4338ca}
+.file-drop{border-color:#cbd5e1;border-radius:10px;background:#f8fafc}
+
+/* Dialogs and progress */
+dialog{border:1px solid rgba(226,232,240,.9);border-radius:14px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.2)}
+dialog::backdrop{background:rgba(15,23,42,.52);backdrop-filter:blur(3px)}
+.dialog-head{padding:16px 20px;border-bottom:1px solid var(--line);background:#fff}
+.dialog-head h2{color:#172033;font-size:19px;font-weight:800}
+.dialog-head button{display:grid;width:34px;height:34px;place-items:center;border-radius:8px;color:#64748b;line-height:1}
+.dialog-head button:hover{background:#f1f5f9;color:#1f2937}
+.dialog-actions{padding:14px 20px;border-top:1px solid var(--line);background:#f8fafc}
+.operation-overlay{background:rgba(246,248,252,.8);backdrop-filter:blur(4px)}
+.operation-overlay-card{min-width:220px;gap:15px;padding:22px 28px;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 18px 45px rgba(15,23,42,.13)}
+.operation-overlay-card strong{color:#172033;font-size:18px;letter-spacing:.01em}
+.operation-spinner{width:27px;height:27px;border:3px solid #e0e7ff;border-top-color:#4f46e5}
+.alert,.transfer-notice{border-radius:10px}
+
+/* Responsive application shell */
+@media(max-width:1150px){
+  .app-shell{grid-template-columns:210px minmax(0,1fr)}
+  .invoice-workspace{grid-template-columns:280px minmax(560px,1fr)}
+}
+@media(max-width:900px){
+  .app-shell{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;flex-direction:row;padding:9px 12px;overflow-x:auto;border-right:0;border-bottom:1px solid #e2e8f0}
+  .nav-section-label{display:none}
+  .nav-item{flex:0 0 auto;min-height:40px;padding:8px 10px;white-space:nowrap}
+  .nav-item.active::after{left:10px;right:10px;top:auto;bottom:-9px;width:auto;height:3px;border-radius:4px 4px 0 0}
+  .main{padding:22px 16px 36px}
+}
+@media(max-width:850px){
+  .invoice-workspace{display:block}
+  .invoice-list-pane{border-right:0;border-bottom:1px solid var(--line)}
+  .invoice-heading-actions{justify-content:flex-start}
+  .invoice-detail-actions{align-items:stretch}
+}
+@media(max-width:620px){
+  .topbar{height:auto;min-height:62px;padding:9px 14px;gap:10px}
+  .brand img{width:118px}
+  .top-actions{margin-left:auto}
+  #userLabel{display:none}
+  .staff-login-link{padding:8px 10px;font-size:11px}
+  .invoice-search-bar{padding:12px}
+  .invoice-date-search{display:grid;grid-template-columns:1fr 1fr}
+  .invoice-date-search select{grid-column:1/-1}
+  .invoice-date-search span{display:none}
+  .invoice-heading-actions .button{flex:1 1 140px}
+}
