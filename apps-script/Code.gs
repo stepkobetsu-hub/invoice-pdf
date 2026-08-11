@@ -335,6 +335,7 @@ function enqueueSend_(payload, requestAuth) {
     response={queued:results.length,items:results,batchId:batchId};
   } finally { lock.releaseLock(); }
   installQueueTrigger_();
+  scheduleQueueRun_();
   return response;
 }
 
@@ -623,5 +624,6 @@ function safeError_(err){return String(err&&err.message?err.message:err).replace
 function json_(obj){return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);}
 function bridgeResponse_(obj,requestId,bridgeNonce){const payload=JSON.stringify({requestId:String(requestId||''),bridgeNonce:String(bridgeNonce||''),result:obj}).replace(/</g,'\\u003c');return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><script>top.postMessage('+payload+',"https://stepkobetsu-hub.github.io");</script>').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);}
 function installQueueTrigger_(){if(!ScriptApp.getProjectTriggers().some(t=>t.getHandlerFunction()==='processSendQueue'))ScriptApp.newTrigger('processSendQueue').timeBased().everyMinutes(1).create();}
+function scheduleQueueRun_(){try{ScriptApp.newTrigger('processSendQueue').timeBased().after(1000).create();}catch(error){console.warn('送信キューの即時起動予約に失敗: '+safeError_(error));}}
 function recoverStuckQueue_(requestAuth){requirePermission_('メール送信', requestAuth);const sh=sheet_(STEP.SHEETS.QUEUE),t=table_(sh),cutoff=Date.now()-15*60000;let n=0;t.rows.forEach(r=>{if(r.values[t.map['状態']]==='送信中'&&new Date(r.values[t.map['開始日時']]).getTime()<cutoff){updateRow_(sh,r.rowNumber,t.map,{'状態':'送信待ち','エラー':'送信中タイムアウトから復旧'});n++;}});return {recovered:n};}
 function processPendingSends_(requestAuth){requirePermission_('メール送信', requestAuth);const recovered=recoverStuckQueue_(requestAuth).recovered;installQueueTrigger_();processSendQueue();const queue=table_(sheet_(STEP.SHEETS.QUEUE));return {recovered,pending:queue.rows.filter(r=>['送信待ち','送信中'].includes(String(r.values[queue.map['状態']]))).length,failed:queue.rows.filter(r=>String(r.values[queue.map['状態']])==='送信失敗').length};}

@@ -33,6 +33,7 @@ window.print = () => {};
 window.fetch = async(url, options={}) => {
   if(String(url).endsWith('/api/app/apps-script')){
     const request=JSON.parse(options.body),action=request.action,payload=request.payload||{};actions.push(action);let data={};
+    if(action === 'processPendingSends') return new Promise(() => {});
     if(action === 'getSupportData') data = {partners:window.StepInvoiceCore.DEMO_PARTNERS};
     if(action === 'savePdf') data = {pdfFileId:'pdf-test',pdfFileName:'test.pdf'};
     if(action === 'enqueueSend') data = {queued:payload.invoiceNumbers?.length || 0};
@@ -71,7 +72,7 @@ window.eval(fs.readFileSync(path.join(root, 'assets/app.js'), 'utf8'));
   await new Promise(resolve => window.setTimeout(resolve, 700));
 
   for(const action of ['saveInvoiceData','savePdf','enqueueSend']) assert.ok(actions.includes(action), `${action} was not called`);
-  assert.equal(actions.includes('processPendingSends'), false, 'send processing must not block the browser');
+  assert.equal(actions.includes('processPendingSends'), true, 'send processing must be started immediately in the background');
   assert.equal(actions.includes('getDashboard'), false, 'the browser must not wait for delivery confirmation');
   assert.equal(window.StepInvoiceApp.state.invoices.length, 1);
   assert.equal(window.StepInvoiceApp.state.invoices[0].sendStatus, '送信待ち');

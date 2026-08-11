@@ -182,7 +182,8 @@ async function main(){
   assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS\.includes\(String\(result\.permissionLevel\)\)/);
   assert.match(backend,/processPendingSends: \(\) => processPendingSends_\(requestAuth\)/);
-  assert.match(backend,/installQueueTrigger_\(\);\s*return response/);
+  assert.match(backend,/installQueueTrigger_\(\);\s*scheduleQueueRun_\(\);\s*return response/);
+  assert.match(backend,/function scheduleQueueRun_\(\)/);
   assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
   assert.match(backend,/STEP_SPREADSHEET_CACHE_/);
   assert.match(backend,/replaceDetailRows_\(ds,/);
