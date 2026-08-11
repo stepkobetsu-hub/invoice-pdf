@@ -19,8 +19,9 @@ assert.equal(C.nextInvoiceNumber('2026-08-09',[{invoiceNumber:'202609023'},{invo
 assert.equal(C.nextInvoiceNumber('2026-08-09',[{invoiceNumber:'202608999'},{invoiceNumber:'202609023'}]),'2026081000');
 assert.equal(C.buildManualInvoice({invoiceNumber:'7',subject:'任意番号',invoiceDate:'2026-08-09',dueDate:'2026-08-31'},[{name:'授業料',unitPrice:100,quantity:1,taxRate:10}],C.DEMO_PARTNERS[0]).invoiceNumber,'7');
 
-const headers=['csv_type(変更不可)','取引先名称','件名','請求日','お支払期限','請求書番号','売上計上日','メモ','タグ','小計','消費税','源泉徴収税','合計金額','取引先敬称','取引先郵便番号','取引先都道府県','取引先住所1','取引先住所2','取引先部署','取引先担当者役職','取引先担当者氏名','自社担当者氏名','備考','振込先','入金ステータス','メール送信ステータス','郵送ステータス','ダウンロードステータス','納品日','品名','品目コード','単価','数量','単位','納品書番号','詳細','金額','源泉徴収','品目消費税率'];
-const row=['40102','テスト太郎','2026年8月分','2026/7/10','2026/7/27','999999002','2026/8/1','検証','テスト','25045','2505','','27550','様','4870024','愛知県','春日井市テスト町1-2-3','','','','','TEST002','口座振替予定','','','','','','','8月分授業料','','22545','1','','','','22545','含まない','10%'];
+const detailHeaders=['納品日','品名','品目コード','単価','数量','単位','納品書番号','詳細','金額','源泉徴収','品目消費税率'];
+const headers=['csv_type(変更不可)','取引先名称','件名','請求日','お支払期限','請求書番号','売上計上日','メモ','タグ','小計','消費税','源泉徴収税','合計金額','取引先敬称','取引先郵便番号','取引先都道府県','取引先住所1','取引先住所2','取引先部署','取引先担当者役職','取引先担当者氏名','自社担当者氏名','備考','振込先','入金ステータス','メール送信ステータス','郵送ステータス','ダウンロードステータス',...detailHeaders,...detailHeaders];
+const row=['40102','テスト太郎','2026年8月分','2026/7/10','2026/7/27','999999002','2026/8/1','検証','テスト','25045','2505','','27550','様','4870024','愛知県','春日井市テスト町1-2-3','','','','','TEST002','口座振替予定','','','','','','','8月分授業料','','22545','1','','','','22545','含まない','10%','','8月分諸経費','','2500','1','','','','2500','含まない','10%'];
 const invoices=C.parseInvoiceRows([headers,row]);
 assert.equal(invoices.length,1);
 assert.equal(invoices[0].invoiceNumber,'999999002');
@@ -28,6 +29,17 @@ assert.equal(invoices[0].total,27550);
 assert.equal(invoices[0].tax,2505);
 assert.equal(invoices[0].invoiceDate,'2026/07/10');
 assert.equal(invoices[0].postal,'487-0024');
+assert.deepEqual(invoices[0].details.map(detail=>detail.name),['8月分授業料','8月分諸経費']);
+assert.deepEqual(invoices[0].details.map(detail=>detail.amount),[22545,2500]);
+
+const importedAt='2026-08-12T01:02:03.000Z';
+const ordered=[
+  {invoiceNumber:'202609090',customerCode:'90',createdAt:'2026-08-11T23:59:59.000Z'},
+  {invoiceNumber:'202609110',customerCode:'110',createdAt:importedAt},
+  {invoiceNumber:'202609130',customerCode:'130',createdAt:importedAt},
+  {invoiceNumber:'202609120',customerCode:'120',createdAt:importedAt}
+].sort(C.compareInvoiceListOrder);
+assert.deepEqual(ordered.map(invoice=>invoice.customerCode),['130','120','110','90']);
 
 const partnerHeader=C.PARTNER_HEADERS;
 const partnerRow=['TEST002','テスト太郎','テスト タロウ','様','','','','4870024','愛知県','春日井市テスト町1-2-3','','','','','','sample@example.com','cc@example.com','','',''];
