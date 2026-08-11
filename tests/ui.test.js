@@ -194,6 +194,8 @@ async function main(){
   assert.match(styles,/\.invoice-page \.section-box\{[\s\S]*?white-space:pre-wrap;[\s\S]*?overflow-wrap:anywhere;/);
   assert.match(styles,/@media\(min-width:851px\)\{[\s\S]*?\.invoice-list-pane\{display:flex;flex-direction:column\}[\s\S]*?\.invoice-list\{flex:0 1 auto;min-height:0;max-height:960px;overflow:auto\}/);
   assert.match(styles,/\.invoice-list-statuses \.status,\.invoice-list-statuses \.payment-pill\{padding:2px 6px;font-size:10px\}/);
+  assert.match(styles,/\.invoice-detail-fields\{grid-template-columns:auto minmax\(0,1fr\) auto minmax\(0,1fr\);[^}]*margin:8px 0 0/);
+  assert.match(styles,/\.invoice-detail-actions\{align-items:center;flex-direction:row;margin-top:10px/);
   console.log('ui tests passed');
 }
 
