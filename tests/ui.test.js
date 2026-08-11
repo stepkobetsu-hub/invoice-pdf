@@ -199,6 +199,9 @@ async function main(){
   assert.match(backend,/student-partner:' \+ code\.toLowerCase\(\)/);
   document.querySelector('#studentImportDialog').close();
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
+  const indexSource=fs.readFileSync(path.join(root,'index.html'),'utf8');
+  assert.match(indexSource,/assets\/styles\.css\?v=20260812-open-levels/);
+  assert.match(indexSource,/assets\/app\.js\?v=20260812-open-levels/);
   assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
   assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));
