@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Re-run 2026-08-11: PDF dialog cleanup + DL state + partner-master refresh.
 index = Path('index.html')
 app = Path('assets/app.js')
 
@@ -15,7 +16,7 @@ js = app.read_text(encoding='utf-8')
 js = js.replace("a.download=`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}${preview?'_プレビュー':''}.pdf`;", "a.download=`${inv.invoiceNumber}_${inv.partnerName}${inv.honorific||'様'}.pdf`;")
 old_prepare = "async function prepareSingleInvoice(){setSingleDefaults();if(state.dashboardLoaded){updateSingleLivePreview();return;}try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
 new_prepare = "async function prepareSingleInvoice(){setSingleDefaults();await refreshSupportData();if(state.dashboardLoaded){renderPartnerOptions();updateSingleLivePreview();return;}try{const data=await cloudApi('/api/app/dashboard');if(Array.isArray(data.invoices)){state.invoices=data.invoices;state.history=data.history||[];state.dashboardLoaded=true;renderCreate();renderHistory();renderPartnerOptions();setSingleDefaults(true);}}catch(e){alert(`保存済み請求書の確認に失敗しました：${e.message}`,'error');}finally{updateSingleLivePreview();}}"
-if old_prepare not in js:
+if old_prepare not in js and new_prepare not in js:
     raise SystemExit('prepareSingleInvoice pattern not found')
 js = js.replace(old_prepare, new_prepare)
 old_handler = "$('#downloadSelectedInvoice').onclick=()=>state.preview&&createPdf(state.preview,{save:true}).catch(e=>alert(e.message,'error'));\n  $('#printSelectedInvoice').onclick=()=>{if(!state.preview)return;$('#invoicePdfDialog').close();showInvoicePreview(state.preview);setTimeout(printPreview,50);};"
