@@ -383,7 +383,7 @@ function processBrevoQueueBatch_(pending,queueSheet,queueTable,settings,startedA
     let url=takeCachedDownloadUrl_(deliveryId);if(!url)url=rotateCloudflareDelivery_(deliveryId,d[dm['トークン有効期限']]).downloadUrl;
     if(!/^https:\/\//.test(url)||/script\.google\.com|drive\.google\.com/i.test(url))throw new Error(number+': Cloudflare配信URLを発行できませんでした。');
     const displayNumber=isReceipt?number.slice(1):number,values={'取引先名':d[dm['宛名']],'敬称':source['敬称']||'様','顧客コード':d[dm['顧客コード']],'対象年月':source[isReceipt?'件名':'対象年月']||'','請求書番号':displayNumber,'請求金額':Number(source[isReceipt?'合計金額':'請求金額']||0).toLocaleString('ja-JP')+'円','支払期限':source['支払期限']||'','有効日数':settings.validDays||180,'有効期限':formatDate_(d[dm['トークン有効期限']]),'ダウンロードURL':url,'事業者名':'個別指導ステップ','電話番号':'0568-41-8937','返信先メールアドレス':settings.replyTo||'stepkobetsu@gmail.com'};
-    let subject=merge_(settings.subject||d[dm['メール件名']],values),body=merge_(settings.body||defaultMailBody_(),values);
+    let subject=merge_(settings.subject||d[dm['メール件名']],values),body=merge_(settings.body||defaultMailBody_(),values);if(subject.indexOf(displayNumber)<0)subject+='【No. '+displayNumber+'】';
     if(isReceipt){subject=subject.replace(/請求書/g,'領収書');body=body.replace(/次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。/,'領収書を送付いたしますので、ご確認ください。').replace(/請求書/g,'領収書');}
     const version={to:[{email:String(recipient),name:String(d[dm['宛名']]||'')}],subject:subject,htmlContent:'<!doctype html><html><body style="font-family:sans-serif;white-space:pre-wrap">'+htmlEscape_(body).replace(/\n/g,'<br>')+'</body></html>'};
     const cc=[d[dm['CCメールアドレス']],settings.enableAdminCc==='true'?settings.adminCc:''].filter(Boolean).map(email=>({email:String(email)}));if(cc.length)version.cc=cc;
