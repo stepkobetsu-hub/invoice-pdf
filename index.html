@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>STEP請求書PDF作成・配信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260810-settings-combobox">
+  <link rel="stylesheet" href="assets/styles.css?v=20260811-ui-restored">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260810-settings-combobox" defer></script>
+  <script src="assets/app.js?v=20260811-ui-restored" defer></script>
   <script src="assets/receipts.js?v=20260810-settings-combobox" defer></script>
 </head>
 <body>
@@ -61,7 +61,7 @@
               <div class="single-invoice-editor-fields">
                 <div class="individual-heading"><div><h2>請求書を1件作成</h2><p>左側で入力し、右側のプレビューで仕上がりを確認できます。</p></div><button id="loadDemoPartners" class="button secondary" type="button">ダミー取引先4件を再表示</button></div>
                 <div class="form-grid">
-                  <label><span class="field-label-row"><span>取引先<span class="required">必須</span></span><button id="goPartnerCreate" class="mini-link" type="button">取引先マスタ登録へ</button></span><span id="singlePartnerCombo" class="partner-combobox"><input id="singlePartnerSearch" type="text" role="combobox" aria-expanded="false" aria-controls="singlePartnerResults" autocomplete="off" placeholder="名称・顧客コード・メールで検索"><button type="button" aria-label="取引先一覧を開く">▼</button><span id="singlePartnerResults" class="partner-combobox-results hidden" role="listbox"></span></span><input id="singlePartner" name="partnerCode" type="hidden"></label>
+                  <label><span class="field-label-row"><span>取引先<span class="required">必須</span></span><span class="single-partner-links"><button id="openStudentImportFromSingle" class="mini-link" type="button">生徒マスタから取込</button><button id="goPartnerCreate" class="mini-link" type="button">取引先マスタ登録へ</button></span></span><span id="singlePartnerCombo" class="partner-combobox"><input id="singlePartnerSearch" type="text" role="combobox" aria-expanded="false" aria-controls="singlePartnerResults" autocomplete="off" placeholder="名称・顧客コード・メールで検索"><button type="button" aria-label="取引先一覧を開く">▼</button><span id="singlePartnerResults" class="partner-combobox-results hidden" role="listbox"></span></span><input id="singlePartner" name="partnerCode" type="hidden"></label>
                   <label>請求書番号<span class="required">自動作成</span><input name="invoiceNumber" inputmode="numeric" pattern="[0-9]{9,}" readonly required></label>
                   <label>件名<span class="required">必須</span><input name="subject" placeholder="例：2026年8月分" required></label>
                   <label>請求日<span class="required">必須</span><input name="invoiceDate" type="date" required></label>
@@ -76,7 +76,7 @@
                 <div class="individual-detail-actions"><button id="addSingleDetail" class="button secondary" type="button">明細行を追加</button></div>
                 <div class="individual-total"><span>税抜小計 <strong id="singleSubtotal">0円</strong></span><span>消費税 <strong id="singleTax">0円</strong></span><span>請求金額 <strong id="singleTotal">0円</strong></span></div>
                 <p id="singleSaveStatus" class="mail-submit-status hidden" role="status" aria-live="polite"></p>
-                <div class="actions single-save-actions"><button id="previewSingleInvoice" class="button secondary" type="button">大きくプレビュー</button><button id="saveSingleInvoice" class="button primary" type="submit">保存して発行リストへ追加</button></div>
+                <div class="actions single-save-actions"><button id="saveSingleInvoice" class="button primary" type="submit">保存</button></div>
               </div>
               <aside class="single-invoice-live-preview" aria-label="請求書プレビュー">
                 <div class="document-editor-preview-label">プレビュー</div>
@@ -86,10 +86,11 @@
           </form>
         </div>
         <div id="invoiceImportSummary" class="summary-grid hidden"></div>
+        <div class="create-table-toolbar" aria-label="CSV読込行の一括操作"><span id="createSelectedCountTop">0／0件を選択</span><button id="removeSelectedCreateRowsTop" class="button create-delete-button create-delete-button-top" type="button" data-remove-create-rows disabled>選択した行を削除</button><button id="addToSendTop" class="button success create-save-button-top" type="button" data-save-imported-invoices disabled>保存して請求書を作成</button></div>
         <div class="table-wrap">
-          <table id="createTable"><thead><tr><th>選択</th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>件名</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
+          <table id="createTable"><thead><tr><th><label><input id="createSelectAll" type="checkbox" aria-label="すべて選択"> すべて</label></th><th>請求書番号</th><th>顧客コード</th><th>宛名</th><th>件名</th><th>請求金額</th><th>メール</th><th>CC</th><th>PDF状態</th><th>警告</th><th>プレビュー</th></tr></thead><tbody><tr class="empty"><td colspan="11">請求書CSVを読み込んでください。</td></tr></tbody></table>
         </div>
-        <div class="actions"><button id="addToSend" class="button success" disabled>発行リストを請求書一覧で確認</button></div>
+        <div class="actions create-list-actions"><span id="createSelectedCount">0／0件を選択</span><button id="removeSelectedCreateRows" class="button create-delete-button" type="button" data-remove-create-rows disabled>選択した行を削除</button><button id="addToSend" class="button success" type="button" data-save-imported-invoices disabled>保存して請求書を作成</button></div>
       </section>
 
       <section id="view-invoices" class="view active">
