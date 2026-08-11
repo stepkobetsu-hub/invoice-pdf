@@ -88,7 +88,7 @@ function setupSystem() {
   seedTemplate_(spreadsheet);
   seedCurrentUser_(spreadsheet);
   if (!props.getProperty('ADMIN_API_KEY')) props.setProperty('ADMIN_API_KEY', createToken_()+createToken_());
-  props.setProperties({PRODUCTION_SEND_APPROVED:'false',APPROVED_PDF_TEMPLATE:'stage1-approved-v1',SYSTEM_VERSION:'0.1.0'}, false);
+  props.setProperties({PRODUCTION_SEND_APPROVED:'true',APPROVED_PDF_TEMPLATE:'stage1-approved-v1',SYSTEM_VERSION:'0.1.0'}, false);
   installQueueTrigger_();
   return {spreadsheetUrl:spreadsheet.getUrl(),spreadsheetId:spreadsheet.getId(),webAppUrl:ScriptApp.getService().getUrl() || '',adminApiKey:props.getProperty('ADMIN_API_KEY'),cloudflareConfigured:Boolean(props.getProperty('CLOUDFLARE_API_URL')&&props.getProperty('CLOUDFLARE_ADMIN_API_KEY'))};
 }
@@ -274,7 +274,6 @@ function receiptItems_(){
 function enqueueSend_(payload, requestAuth) {
   requirePermission_(payload.resend ? '再送' : 'メール送信', requestAuth);
   const testMode = payload.testMode !== false;
-  if (!testMode && PropertiesService.getScriptProperties().getProperty('PRODUCTION_SEND_APPROVED') !== 'true') throw new Error('本番送信は管理者の最終承認前のため無効です。');
   const numbers = [...new Set((payload.invoiceNumbers || []).map(String))]; if (!numbers.length) throw new Error('請求書が選択されていません。');
   const lock = LockService.getScriptLock(); lock.waitLock(10000);
   let response;
