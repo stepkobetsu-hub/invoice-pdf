@@ -307,7 +307,6 @@
   $$('[data-settings-document]').forEach(button=>button.onclick=()=>selectSettingsDocument(button.dataset.settingsDocument));
   $('#settingsForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'settings');};
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
-  $('#sendTest').onclick=()=>alert('請求書を1件選択して、請求書一覧からテスト送信してください。');
   $('#loadSample').onclick=()=>{state.invoices=C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners);renderCreate();activateStep(2);};
   $('#staffLoginLink').href=STAFF_LOGIN_URL;
   window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox};
