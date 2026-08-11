@@ -182,6 +182,8 @@ async function main(){
   assert.match(backend,/AUTH_PERMISSION_LEVELS:\['2','3','4'\]/);
   assert.match(backend,/AUTH_PERMISSION_LEVELS\.includes\(String\(result\.permissionLevel\)\)/);
   assert.match(backend,/processPendingSends: \(\) => processPendingSends_\(requestAuth\)/);
+  assert.match(backend,/prepared\.length===1\?buildBrevoSinglePayload_/);
+  assert.match(backend,/function buildBrevoSinglePayload_\(/);
   assert.match(backend,/installQueueTrigger_\(\);\s*scheduleQueueRun_\(\);\s*return response/);
   assert.match(backend,/function scheduleQueueRun_\(\)/);
   assert.doesNotMatch(backend,/if\(payload\.preflight!==true\)processSendQueue\(\)/);
