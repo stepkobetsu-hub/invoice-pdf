@@ -311,7 +311,7 @@
   $('#staffLoginLink').href=STAFF_LOGIN_URL;
   window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox};
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
-  restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
+  restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView('invoices');
   const initialLoad=state.settings.apiUrl&&(state.settings.adminApiKey||localStorage.getItem(STAFF_AUTH_KEY))?refreshAll(false):Promise.resolve();
   Promise.resolve(initialLoad).finally(hideOperationOverlay);
 })();
