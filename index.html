@@ -11,7 +11,7 @@
   <script src="assets/core.js?v=20260810-payment-memo" defer></script>
   <script src="assets/invoice-pdf.js?v=20260810-payment-settings" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260811-real-recipient" defer></script>
+  <script src="assets/app.js?v=20260811-production-mail-ui" defer></script>
   <script src="assets/receipts.js?v=20260810-settings-combobox" defer></script>
 </head>
 <body>
@@ -23,7 +23,7 @@
   </div>
   <header class="topbar">
     <div class="brand"><img src="assets/step-logo.png?v=20260802-logo" alt="個別指導ステップ"><div><strong>STEP請求書</strong><span>PDF作成・配信システム</span></div></div>
-    <div class="top-actions"><span id="modeBadge" class="badge warning">テスト送信モード</span><span id="userLabel">未接続</span><a id="staffLoginLink" class="staff-login-link" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログイン</a></div>
+    <div class="top-actions"><span id="modeBadge" class="badge">通常送信</span><span id="userLabel">未接続</span><a id="staffLoginLink" class="staff-login-link" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログイン</a></div>
   </header>
   <div class="app-shell">
     <nav class="sidebar" aria-label="メインメニュー">
@@ -149,9 +149,9 @@
       </section>
 
       <section id="view-mail" class="view">
-        <div class="page-heading"><div><h1>メール設定</h1><p>本番送信は管理者の最終承認まで有効化できません。</p></div></div>
+        <div class="page-heading"><div><h1>メール設定</h1><p>請求書の送信元・返信先・本文などを設定します。</p></div></div>
         <form id="mailForm" class="form-grid panel">
-          <label>送信者表示名<input name="senderName" value="個別指導ステップ【請求書】"></label><label>送信元メール<input name="senderEmail" value="invoice@step-edu.net"></label><label>返信先<input name="replyTo" value="stepkobetsu@gmail.com"></label><label>管理者CC<input name="adminCc" value="stepkobetsu@gmail.com"></label><label>BCC<input name="bcc"></label><label>有効日数<input name="validDays" type="number" min="1" value="180"></label><label>1時間あたり送信上限<input name="hourlyLimit" type="number" min="1" value="50"></label><label>1回の処理件数<input name="batchSize" type="number" min="1" max="20" value="5"></label><label>テスト送信先<input name="testRecipient" value="stepkobetsu@gmail.com"></label><label>再送時の旧URL<select name="invalidateOld"><option value="true" selected>無効化</option><option value="false">併用</option></select></label><label class="span-2">件名<input name="subject" value="【請求書】送付のご案内（個別指導ステップから）"></label><label class="span-2">本文<textarea name="body" rows="17">{{取引先名}} {{敬称}}
+          <label>送信者表示名<input name="senderName" value="個別指導ステップ【請求書】"></label><label>送信元メール<input name="senderEmail" value="invoice@step-edu.net"></label><label>返信先<input name="replyTo" value="stepkobetsu@gmail.com"></label><label>管理者CC<input name="adminCc" value="stepkobetsu@gmail.com"></label><label>BCC<input name="bcc"></label><label>有効日数<input name="validDays" type="number" min="1" value="180"></label><label>1時間あたり送信上限<input name="hourlyLimit" type="number" min="1" value="50"></label><label>1回の処理件数<input name="batchSize" type="number" min="1" max="20" value="5"></label><input name="testRecipient" type="hidden" value=""><label>再送時の旧URL<select name="invalidateOld"><option value="true" selected>無効化</option><option value="false">併用</option></select></label><label class="span-2">件名<input name="subject" value="【請求書】送付のご案内（個別指導ステップから）"></label><label class="span-2">本文<textarea name="body" rows="17">{{取引先名}} {{敬称}}
 
 お世話になっております。
 次月分の請求書を送付いたしますので、ご査収の程よろしくお願いいたします。
