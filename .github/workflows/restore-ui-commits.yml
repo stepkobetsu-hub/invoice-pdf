@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore invoice list checkboxes and bulk selection
-        run: python scripts/restore_invoice_list_checkboxes.py
+      - name: Fix partner master loading fallback
+        run: python scripts/fix_partner_fallback.py
       - name: Verify syntax
         run: |
           git diff --check
           node --check assets/app.js
-      - name: Commit restored UI
+      - name: Commit partner master fix
         run: |
           git config user.name "stepkobetsu-hub"
           git config user.email "stepkobetsu@gmail.com"
-          git add index.html assets/app.js assets/styles.css
-          git commit -m "Restore invoice list checkboxes and bulk selection"
+          git add index.html assets/app.js
+          git commit -m "Fix partner master loading fallback"
           git push origin HEAD:main
-# run-20260811-invoice-checkboxes
+# run-20260811-partner-fallback
