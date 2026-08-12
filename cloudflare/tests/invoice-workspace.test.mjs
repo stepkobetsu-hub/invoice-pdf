@@ -23,6 +23,7 @@ assert.match(source, /authorization/);
 assert.match(source, /payload\.value\.createOnly === true/);
 assert.match(source, /assignAvailableInvoiceNumber/);
 assert.match(source, /if \(!\/\^\\d\+\$\/\.test\(invoiceNumber\)\)/);
+assert.match(source, /created_at=excluded\.created_at, updated_at=excluded\.updated_at/, "reimported invoice batches move to the top of the invoice list");
 assert.match(source, /APP_ORIGIN/);
 assert.match(openLevelMigration, /ALTER TABLE invoices ADD COLUMN app_downloaded_at TEXT/);
 assert.match(source, /appDownloadMatch/);
