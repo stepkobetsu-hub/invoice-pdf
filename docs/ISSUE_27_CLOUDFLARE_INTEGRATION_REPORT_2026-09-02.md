@@ -77,7 +77,7 @@
 
 ## 本番移行前に残る確認
 
-ローカル実行環境にはCloudflare API tokenが渡されていないため、リモートD1のexport、件数・金額集計、migration適用は実施していない。PRマージ前に既存GitHub Actions secretを使う保護された工程で次を行う。
+ローカル実行環境にはCloudflare API tokenが渡されていないため、リモートD1のexport、件数・金額集計、migration適用は実施していない。GitHub ActionsはPRではテストだけを実行し、mainへのpush時だけD1 export（非公開artifact、7日保持）→migration適用→Worker deployの順で実行するよう更新した。PRマージ前後の保護された工程で次を行う。
 
 1. D1 exportを非公開artifactへ保存
 2. Google Sheetを管理者権限でバックアップ
@@ -90,4 +90,3 @@
 ## ロールバック
 
 WorkerはCloudflareの直前versionへrollbackする。D1は事前exportから復元し、画面は直前Git commitへ戻す。Google Sheetは照合・一時mirrorとして残しているため、D1データを削除せず読取切替で復旧する。本番メール送信は別承認まで有効化しない。
-

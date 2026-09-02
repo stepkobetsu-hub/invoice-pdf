@@ -1,6 +1,17 @@
 name: Deploy Cloudflare Worker
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "cloudflare/**"
+      - "assets/**"
+      - "index.html"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-cloudflare-worker.yml"
   push:
     branches:
       - main
@@ -43,7 +54,33 @@ jobs:
       - name: Run syntax checks
         run: npm run check
 
+      - name: Back up production D1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b9c6ad3a2120ec9739fdf37dfdf8ed81
+          command: d1 export step-invoice-db --remote --output backups/step-invoice-before-${{ github.sha }}.sql --config cloudflare/wrangler.jsonc
+
+      - name: Store encrypted-access workflow backup
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: step-invoice-d1-before-${{ github.sha }}
+          path: backups/step-invoice-before-${{ github.sha }}.sql
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Apply D1 migrations
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: b9c6ad3a2120ec9739fdf37dfdf8ed81
+          command: d1 migrations apply step-invoice-db --remote --config cloudflare/wrangler.jsonc
+
       - name: Deploy Worker
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
