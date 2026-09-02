@@ -20,6 +20,8 @@ assert.match(source, /\/api\/app\/adjustments/);
 assert.match(source, /\/api\/app\/migrations\/dry-run/);
 assert.match(source, /isAdministrator\(auth\.user\)/);
 assert.match(source, /wroteBusinessData: false/);
+assert.match(source, /ensureIssue27Schema/);
+assert.match(source, /ISSUE_27_SCHEMA_READY/);
 assert.match(app, /cloudApi\('\/api\/app\/partners'/);
 assert.match(app, /cloudApi\('\/api\/app\/settings'/);
 assert.match(html, /料金特別調整/);
