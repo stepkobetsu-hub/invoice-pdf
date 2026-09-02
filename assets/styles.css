@@ -263,7 +263,7 @@ button,input,select,textarea{font-family:inherit}
 .staff-login-link:hover{border-color:#a5b4fc;box-shadow:0 4px 12px rgba(79,70,229,.09);transform:translateY(-1px)}
 
 /* Navigation */
-.app-shell{grid-template-columns:232px minmax(0,1fr);min-height:calc(100vh - 66px)}
+.app-shell{--sidebar-width:232px;grid-template-columns:var(--sidebar-width) 0 minmax(0,1fr);min-height:calc(100vh - 66px)}
 .sidebar{
   position:sticky;
   top:66px;
@@ -275,6 +275,13 @@ button,input,select,textarea{font-family:inherit}
   background:#fff;
   gap:4px;
 }
+.column-resizer{position:relative;z-index:15;width:0;cursor:col-resize;touch-action:none;outline:0}
+.column-resizer::before{content:'';position:absolute;top:0;bottom:0;left:-5px;width:10px;background:transparent;transition:background .15s,box-shadow .15s}
+.column-resizer::after{content:'';position:absolute;top:50%;left:-2px;width:4px;height:42px;transform:translateY(-50%);border-radius:999px;background:#cbd5e1;box-shadow:0 0 0 1px #fff;transition:background .15s,height .15s}
+.column-resizer:hover::before,.column-resizer:focus-visible::before,.column-resizer.dragging::before{background:rgba(79,70,229,.08);box-shadow:0 0 0 1px rgba(79,70,229,.14)}
+.column-resizer:hover::after,.column-resizer:focus-visible::after,.column-resizer.dragging::after{height:58px;background:#4f46e5}
+.sidebar-resizer{height:calc(100vh - 66px);position:sticky;top:66px;align-self:start}
+body.resizing-columns{user-select:none;cursor:col-resize}
 .nav-section-label{padding:16px 12px 6px;color:#94a3b8;font-size:10px;letter-spacing:.14em}
 .nav-item{
   position:relative;
@@ -393,6 +400,8 @@ button,input,select,textarea{font-family:inherit}
   background:#fff;
   box-shadow:0 8px 30px rgba(15,23,42,.045);
 }
+.invoice-workspace.resizable-workspace{--invoice-list-width:320px;grid-template-columns:var(--invoice-list-width) 0 minmax(560px,1fr)}
+.invoice-list-resizer{height:100%}
 .invoice-list-pane{border-right:1px solid var(--line);background:#f8fafc}
 .invoice-list-head{height:52px;padding:0 13px;border-bottom:1px solid var(--line);background:#fff}
 .invoice-list-row{margin:7px 8px;border:1px solid #e8edf4;border-radius:10px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.02)}
@@ -404,7 +413,8 @@ button,input,select,textarea{font-family:inherit}
 .invoice-list-subject{color:#64748b}
 .invoice-list-subject .invoice-app-downloaded{display:inline-flex;margin-left:6px;padding:1px 4px;font-size:9px;line-height:1.2;vertical-align:middle}
 .invoice-list-meta{color:#7c8a9d}
-.invoice-list-amount{color:#172033}
+.invoice-list-statuses{justify-content:flex-start}
+.invoice-list-amount{margin-left:5px;color:#172033}
 .invoice-list-empty{margin:8px;padding:48px 18px;border:1px dashed #d9e1ec;border-radius:10px;background:#fff}
 .invoice-load-more{margin:8px;width:calc(100% - 16px);border:1px solid #dbe3ee;border-radius:8px;color:#4f46e5}
 input[type="checkbox"]{width:19px;height:19px;accent-color:#4f46e5;cursor:pointer}
@@ -473,11 +483,13 @@ dialog::backdrop{background:rgba(15,23,42,.52);backdrop-filter:blur(3px)}
 
 /* Responsive application shell */
 @media(max-width:1150px){
-  .app-shell{grid-template-columns:210px minmax(0,1fr)}
+  .app-shell{--sidebar-width:210px}
   .invoice-workspace{grid-template-columns:280px minmax(560px,1fr)}
+  .invoice-workspace.resizable-workspace{grid-template-columns:var(--invoice-list-width) 0 minmax(560px,1fr)}
 }
 @media(max-width:900px){
   .app-shell{grid-template-columns:1fr}
+  .column-resizer{display:none}
   .sidebar{position:static;height:auto;flex-direction:row;padding:9px 12px;overflow-x:auto;border-right:0;border-bottom:1px solid #e2e8f0}
   .nav-section-label{display:none}
   .nav-item{flex:0 0 auto;min-height:40px;padding:8px 10px;white-space:nowrap}

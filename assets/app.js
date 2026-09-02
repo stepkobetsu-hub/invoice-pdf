@@ -46,6 +46,49 @@
     }catch(_){}
     return 'navigate';
   }
+  function setupColumnResizer({handle,target,property,storageKey,min,max,defaultValue}){
+    const grip=$(handle),container=$(target);
+    if(!grip||!container)return;
+    const clamp=value=>Math.min(max,Math.max(min,Math.round(Number(value)||defaultValue)));
+    let current=clamp(localStorage.getItem(storageKey)||defaultValue),drag=null;
+    const apply=(value,persist=true)=>{
+      current=clamp(value);
+      container.style.setProperty(property,`${current}px`);
+      grip.setAttribute('aria-valuenow',String(current));
+      if(persist)localStorage.setItem(storageKey,String(current));
+    };
+    apply(current,false);
+    grip.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;
+      drag={pointerId:event.pointerId,startX:event.clientX,startWidth:current};
+      grip.setPointerCapture?.(event.pointerId);
+      grip.classList.add('dragging');
+      document.body.classList.add('resizing-columns');
+      event.preventDefault();
+    });
+    grip.addEventListener('pointermove',event=>{
+      if(!drag||event.pointerId!==drag.pointerId)return;
+      apply(drag.startWidth+event.clientX-drag.startX);
+    });
+    const finish=event=>{
+      if(!drag||event.pointerId!==drag.pointerId)return;
+      drag=null;
+      grip.classList.remove('dragging');
+      document.body.classList.remove('resizing-columns');
+    };
+    grip.addEventListener('pointerup',finish);
+    grip.addEventListener('pointercancel',finish);
+    grip.addEventListener('dblclick',()=>apply(defaultValue));
+    grip.addEventListener('keydown',event=>{
+      const step=event.shiftKey?20:10;
+      if(event.key==='ArrowLeft')apply(current-step);
+      else if(event.key==='ArrowRight')apply(current+step);
+      else if(event.key==='Home')apply(min);
+      else if(event.key==='End')apply(max);
+      else return;
+      event.preventDefault();
+    });
+  }
   function setCreateMethod(method){$$('[data-create-method]').forEach(button=>{const active=button.dataset.createMethod===method;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active));});$('#createCsvPane').classList.toggle('active',method==='csv');$('#createSinglePane').classList.toggle('active',method==='single');if(method==='single')return prepareSingleInvoice();}
   function setSingleDefaults(force=false){const form=$('#singleInvoiceForm'),date=form.elements.invoiceDate;if(!date.value)date.value=localIso(new Date());if(force||!form.elements.dueDate.value)form.elements.dueDate.value=plusDays(date.value,21);if(force||!form.elements.invoiceNumber.value)form.elements.invoiceNumber.value=C.nextInvoiceNumber(date.value,state.invoices);if(force||!form.elements.subject.value){const [year,month]=date.value.split('-');form.elements.subject.value=`${year}年${Number(month)}月分`;}if(force||!form.elements.bank.value)form.elements.bank.value=state.settings.defaultBank||'';if(force||!form.elements.note.value)form.elements.note.value=state.settings.defaultNote||'';updateSingleLivePreview();}
   function updateSingleFromDate(){const form=$('#singleInvoiceForm'),date=form.elements.invoiceDate.value;if(!date)return;form.elements.dueDate.value=plusDays(date,21);form.elements.invoiceNumber.value=C.nextInvoiceNumber(date,state.invoices);const [year,month]=date.split('-');form.elements.subject.value=`${year}年${Number(month)}月分`;updateSingleLivePreview();}
@@ -382,6 +425,8 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#loadSample').onclick=()=>{state.importInvoices=prepareImportInvoices(C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners));state.createSelected=new Set(state.importInvoices.map((_,index)=>index));renderCreate();activateStep(2);};
   $('#staffLoginLink').href=STAFF_LOGIN_URL;
+  setupColumnResizer({handle:'#sidebarResizer',target:'.app-shell',property:'--sidebar-width',storageKey:'stepInvoiceSidebarWidth',min:150,max:280,defaultValue:232});
+  setupColumnResizer({handle:'#invoiceListResizer',target:'#invoiceWorkspace',property:'--invoice-list-width',storageKey:'stepInvoiceListWidth',min:220,max:420,defaultValue:320});
   window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox,invoiceOpenBadge};
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));
