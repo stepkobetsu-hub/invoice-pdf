@@ -1,6 +1,34 @@
 (function(global){
   'use strict';
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const PDF_LIBRARY_URLS={
+    html2canvas:'assets/lib/html2canvas-1.4.1.min.js',
+    jspdf:'assets/lib/jspdf-2.5.1.umd.min.js'
+  };
+  let pdfLibrariesPromise=null;
+  function loadScriptOnce(src,isReady){
+    if(isReady())return Promise.resolve();
+    const absoluteUrl=new URL(src,document.baseURI).href;
+    const existing=Array.from(document.scripts).find(script=>script.src===absoluteUrl);
+    return new Promise((resolve,reject)=>{
+      const script=existing||document.createElement('script');
+      const done=()=>isReady()?resolve():reject(new Error(`PDF生成ライブラリを読み込めません: ${src}`));
+      script.addEventListener('load',done,{once:true});
+      script.addEventListener('error',()=>reject(new Error(`PDF生成ライブラリを読み込めません: ${src}`)),{once:true});
+      if(!existing){script.src=src;script.async=true;document.head.appendChild(script);}
+      else if(isReady())resolve();
+    });
+  }
+  function ensurePdfLibraries(){
+    if(global.html2canvas&&global.jspdf)return Promise.resolve();
+    if(!pdfLibrariesPromise){
+      pdfLibrariesPromise=Promise.all([
+        loadScriptOnce(PDF_LIBRARY_URLS.html2canvas,()=>Boolean(global.html2canvas)),
+        loadScriptOnce(PDF_LIBRARY_URLS.jspdf,()=>Boolean(global.jspdf))
+      ]).catch(error=>{pdfLibrariesPromise=null;throw error;});
+    }
+    return pdfLibrariesPromise;
+  }
   function pageHtml(inv,options={}){
     const allDetails=Array.isArray(inv.details)&&inv.details.length?inv.details:[{name:'',unitPrice:0,quantity:0,amount:0}];
     const detailPages=[],remaining=allDetails.slice();
@@ -42,7 +70,7 @@
     }).join('');
   }
   async function toBlob(element){
-    if(!global.html2canvas||!global.jspdf)throw new Error('PDF生成ライブラリを読み込めません。通信環境を確認してください。');
+    try{await ensurePdfLibraries();}catch(error){throw new Error('PDF生成ライブラリを読み込めません。通信環境を確認してください。',{cause:error});}
     const pages=element.matches?.('.invoice-page,.receipt-page')?[element]:Array.from(element.querySelectorAll('.invoice-page,.receipt-page'));
     if(!pages.length)throw new Error('PDFに出力するページが見つかりません。');
     const pdf=new global.jspdf.jsPDF({orientation:'portrait',unit:'pt',format:'a4',compress:true});
@@ -79,5 +107,5 @@
     observer.observe(document.body,{childList:true,subtree:true,characterData:true});
   }
 
-  global.StepInvoicePdf={pageHtml,toBlob};
+  global.StepInvoicePdf={pageHtml,toBlob,ensurePdfLibraries};
 })(window);
