@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - "cloudflare/**"
+      - "tests/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/deploy-cloudflare-worker.yml"
   workflow_dispatch:
 
