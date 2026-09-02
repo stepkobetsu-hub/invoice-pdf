@@ -423,6 +423,19 @@ input[type="checkbox"]{width:19px;height:19px;accent-color:#4f46e5;cursor:pointe
 .invoice-detail-column{background:#f8fafc}
 .invoice-detail-pane{padding:16px;background:#f8fafc}
 .invoice-detail-empty{min-height:430px;border:1px dashed #d9e1ec;border-radius:12px;background:#fff;color:#64748b}
+.app-shell.sidebar-compact .sidebar{padding-right:8px;padding-left:8px}
+.app-shell.sidebar-compact .sidebar .nav-section-label,.app-shell.sidebar-compact .sidebar .nav-item.nav-create b{display:none}
+.app-shell.sidebar-compact .sidebar .nav-item{justify-content:center;padding:9px 0;font-size:0}
+.app-shell.sidebar-compact .sidebar .nav-item::before{width:28px;height:28px;flex-basis:28px;font-size:11px}
+.app-shell.sidebar-compact .sidebar .nav-item[data-view="create"]::before{font-size:17px}
+.app-shell.sidebar-compact .sidebar .nav-item.active::after{left:-8px}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-head{padding:0;justify-content:center}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-visible-count{display:none}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-row{grid-template-columns:30px minmax(0,1fr);margin-right:4px;margin-left:4px}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-check{padding-top:11px}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-item{min-width:0;overflow:hidden;padding:12px 4px}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-meta,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-subject,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-statuses{display:none}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-name{margin:0;overflow:hidden;white-space:nowrap;text-overflow:clip}
 .invoice-detail-card{overflow:visible;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:0 8px 30px rgba(15,23,42,.05)}
 .invoice-detail-top{position:relative;z-index:3}
 .invoice-detail-top .payment-dropdown{z-index:60}

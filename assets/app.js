@@ -46,7 +46,7 @@
     }catch(_){}
     return 'navigate';
   }
-  function setupColumnResizer({handle,target,property,storageKey,min,max,defaultValue}){
+  function setupColumnResizer({handle,target,property,storageKey,min,max,defaultValue,compactClass='',compactAt=0}){
     const grip=$(handle),container=$(target);
     if(!grip||!container)return;
     const clamp=value=>Math.min(max,Math.max(min,Math.round(Number(value)||defaultValue)));
@@ -54,6 +54,7 @@
     const apply=(value,persist=true)=>{
       current=clamp(value);
       container.style.setProperty(property,`${current}px`);
+      if(compactClass)container.classList.toggle(compactClass,current<=compactAt);
       grip.setAttribute('aria-valuenow',String(current));
       if(persist)localStorage.setItem(storageKey,String(current));
     };
@@ -425,8 +426,8 @@
   $('#mailForm').onsubmit=e=>{e.preventDefault();saveForm(e.target,'mail');};
   $('#loadSample').onclick=()=>{state.importInvoices=prepareImportInvoices(C.matchPartners([{partnerName:'テスト太郎',subject:'2026年8月分',invoiceDate:'2026/07/10',dueDate:'2026/07/27',invoiceNumber:'999999001',subtotal:25955,sourceTax:2595,sourceTotal:28550,tax:2595,total:28550,honorific:'様',postal:'487-0024',prefecture:'愛知県',address1:'春日井市テスト町1-2-3',address2:'',customerCode:'TEST001',note:'これは検証用の架空データです。',details:[{name:'8月分授業料',unitPrice:23455,quantity:1,amount:23455},{name:'8月分諸経費',unitPrice:2500,quantity:1,amount:2500}],pdfStatus:'未作成',sendStatus:'未送信',dlStatus:'未取得',warnings:[]}],state.partners));state.createSelected=new Set(state.importInvoices.map((_,index)=>index));renderCreate();activateStep(2);};
   $('#staffLoginLink').href=STAFF_LOGIN_URL;
-  setupColumnResizer({handle:'#sidebarResizer',target:'.app-shell',property:'--sidebar-width',storageKey:'stepInvoiceSidebarWidth',min:150,max:280,defaultValue:232});
-  setupColumnResizer({handle:'#invoiceListResizer',target:'#invoiceWorkspace',property:'--invoice-list-width',storageKey:'stepInvoiceListWidth',min:220,max:420,defaultValue:320});
+  setupColumnResizer({handle:'#sidebarResizer',target:'.app-shell',property:'--sidebar-width',storageKey:'stepInvoiceSidebarWidth',min:64,max:280,defaultValue:232,compactClass:'sidebar-compact',compactAt:120});
+  setupColumnResizer({handle:'#invoiceListResizer',target:'#invoiceWorkspace',property:'--invoice-list-width',storageKey:'stepInvoiceListWidth',min:100,max:420,defaultValue:320,compactClass:'invoice-list-compact',compactAt:160});
   window.StepInvoiceApp={state,api,alert,showView,initialViewForNavigation,refreshAll,renderInvoices,renderCreate,showOperationOverlay,hideOperationOverlay,localIso,invoiceDefaultPeriod,plusDays,esc,inputDate,blobToBase64,createPdf,createPartnerCombobox,invoiceOpenBadge};
   singlePartnerCombo=createPartnerCombobox({root:'#singlePartnerCombo',input:'#singlePartnerSearch',results:'#singlePartnerResults',hidden:'#singlePartner',onSelect:partner=>{if(partner)applyPartnerDocumentDefaults($('#singleInvoiceForm'),partner);saveSingleDraft();updateSingleLivePreview();}});
   restoreForms();selectSettingsDocument('invoice');restoreInvoiceFilters();renderPartners();renderPartnerOptions();addSingleDetail();setSingleDefaults();restoreSingleDraft();renderCreate();renderInvoices();renderHistory();showView(initialViewForNavigation(browserNavigationType()));

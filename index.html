@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>請求書作成＆送信システム</title>
-  <link rel="stylesheet" href="assets/styles.css?v=20260902-resizable-columns">
+  <link rel="stylesheet" href="assets/styles.css?v=20260902-compact-columns">
   <script src="assets/lib/html2canvas-1.4.1.min.js" defer></script>
   <script src="assets/lib/jspdf-2.5.1.umd.min.js" defer></script>
   <script src="assets/core.js?v=20260812-monthly-invoice-number" defer></script>
   <script src="assets/invoice-pdf.js?v=20260812-pdf-block-packing" defer></script>
   <script src="assets/receipt-pdf.js?v=20260810-receipts" defer></script>
-  <script src="assets/app.js?v=20260902-resizable-columns" defer></script>
+  <script src="assets/app.js?v=20260902-compact-columns" defer></script>
   <script src="assets/receipts.js?v=20260811-duplicate-partner" defer></script>
 </head>
 <body>
@@ -39,7 +39,7 @@
       <button class="nav-item" data-view="settings">基本設定</button>
       <button class="nav-item" data-view="mail">メール設定</button>
     </nav>
-    <div id="sidebarResizer" class="column-resizer sidebar-resizer" role="separator" aria-label="左メニューの幅を調整" aria-orientation="vertical" aria-valuemin="150" aria-valuemax="280" aria-valuenow="232" tabindex="0" title="左右にドラッグして左メニューの幅を調整"></div>
+    <div id="sidebarResizer" class="column-resizer sidebar-resizer" role="separator" aria-label="左メニューの幅を調整" aria-orientation="vertical" aria-valuemin="64" aria-valuemax="280" aria-valuenow="232" tabindex="0" title="左右にドラッグして左メニューの幅を調整"></div>
     <main class="main">
       <div id="globalAlert" class="alert hidden" role="alert"></div>
       <div id="transferNotice" class="transfer-notice hidden" role="status" aria-live="polite"></div>
@@ -124,7 +124,7 @@
         </div>
         <div id="invoiceWorkspace" class="invoice-workspace resizable-workspace">
           <aside class="invoice-list-pane" aria-label="請求書一覧"><div class="invoice-list-head"><label class="invoice-list-select-all" title="表示中の請求書を全選択・全解除"><input id="invoiceSelectAllVisible" type="checkbox" aria-label="表示中の請求書を全選択・全解除"></label><strong class="invoice-visible-count" id="invoiceListCount">0件を表示</strong></div><div id="invoiceList" class="invoice-list"><p class="invoice-list-empty">請求書がありません。</p></div></aside>
-          <div id="invoiceListResizer" class="column-resizer invoice-list-resizer" role="separator" aria-label="請求書一覧の幅を調整" aria-orientation="vertical" aria-valuemin="220" aria-valuemax="420" aria-valuenow="320" tabindex="0" title="左右にドラッグして請求書一覧の幅を調整"></div>
+          <div id="invoiceListResizer" class="column-resizer invoice-list-resizer" role="separator" aria-label="請求書一覧の幅を調整" aria-orientation="vertical" aria-valuemin="100" aria-valuemax="420" aria-valuenow="320" tabindex="0" title="左右にドラッグして請求書一覧の幅を調整"></div>
           <div class="invoice-detail-column"><div class="invoice-heading-actions"><button id="createDemoInvoiceFromList" class="button demo-send-button" type="button">デモ送信</button><label class="button secondary">CSV一括追加<input id="invoiceCsvFromList" type="file" accept=".csv,text/csv" hidden></label><button id="createInvoiceFromList" class="button primary" type="button">請求書を作成</button><button id="refreshInvoices" class="button secondary" type="button">最新状態を取得</button></div><section id="invoiceDetailPanel" class="invoice-detail-pane"><div class="invoice-detail-empty">左の一覧から請求書を選択してください。</div></section></div>
         </div>
       </section>
