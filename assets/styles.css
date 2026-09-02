@@ -411,7 +411,9 @@ body.resizing-columns{user-select:none;cursor:col-resize}
 .invoice-list-row .invoice-list-item{border-left:3px solid transparent;background:transparent}
 .invoice-list-row.active .invoice-list-item,.invoice-list-item.active{border-left-color:#4f46e5;background:#eef2ff}
 .invoice-list-item:hover{background:#f3f7ff}
-.invoice-list-name{color:#1f2937;font-weight:800}
+.invoice-list-name-row{display:flex;align-items:baseline;gap:6px;min-width:0;margin:7px 0 5px}
+.invoice-list-name{flex:1;min-width:0;margin:0;color:#1f2937;font-weight:800;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.invoice-list-number{flex:none;margin-left:auto;color:#7c8a9d;font-size:10px;white-space:nowrap;text-align:right}
 .invoice-list-subject{color:#64748b}
 .invoice-list-subject .invoice-app-downloaded{display:inline-flex;margin-left:6px;padding:1px 4px;font-size:9px;line-height:1.2;vertical-align:middle}
 .invoice-list-meta{color:#7c8a9d}
@@ -436,7 +438,8 @@ input[type="checkbox"]{width:19px;height:19px;accent-color:#4f46e5;cursor:pointe
 .invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-row{grid-template-columns:30px minmax(0,1fr);margin-right:4px;margin-left:4px}
 .invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-check{padding-top:11px}
 .invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-item{min-width:0;overflow:hidden;padding:12px 4px}
-.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-meta,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-subject,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-statuses{display:none}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-meta,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-subject,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-statuses,.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-number{display:none}
+.invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-name-row{display:block;min-width:0;margin:0}
 .invoice-workspace.invoice-list-compact .invoice-list-pane .invoice-list-name{margin:0;overflow:hidden;white-space:nowrap;text-overflow:clip}
 .invoice-detail-card{overflow:visible;border:1px solid var(--line);border-radius:13px;background:#fff;box-shadow:0 8px 30px rgba(15,23,42,.05)}
 .invoice-detail-top{position:relative;z-index:3}
