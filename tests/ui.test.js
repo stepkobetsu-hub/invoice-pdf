@@ -228,6 +228,8 @@ async function main(){
   assert.match(styles,/\.pdf-render-host\{[^}]*height:auto;[^}]*overflow:visible/);
   assert.match(styles,/\.invoice-inline-preview:has\(\.invoice-page\+\.invoice-page\)::before\{content:'複数ページあります/);
   assert.match(styles,/\.invoice-inline-preview \.invoice-page\+\.invoice-page\{margin-top:28px\}/);
+  assert.match(styles,/\.invoice-inline-preview\{max-height:none;overflow-x:auto;overflow-y:visible\}/);
+  assert.match(styles,/\.invoice-inline-preview:has\(\.invoice-page\+\.invoice-page\)\{max-height:1225px;overflow:auto\}/);
   assert.match(styles,/\.invoice-page \.detail tbody tr:nth-child\(even\) td\{background:#f6f8fb!important\}/);
   assert.match(styles,/\.invoice-page \.page-number\{left:0;top:auto;bottom:26px;width:100%;text-align:center\}/);
   assert.match(styles,/\.invoice-continuation-page \.detail\{top:72px\}/);
