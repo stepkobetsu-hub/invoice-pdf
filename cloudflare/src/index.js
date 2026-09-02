@@ -69,8 +69,53 @@ async function serveAppRequest(request, env, url) {
   if (!auth.ok) return appJson(request, env, { ok: false, error: auth.error }, auth.status);
 
   if (request.method === "GET" && url.pathname === "/api/app/dashboard") {
-    const data = await loadInvoiceDashboard(env);
-    return appJson(request, env, { ok: true, data: { ...data, user: auth.user.name || auth.user.email || "接続済み" } });
+    const [data, support] = await Promise.all([loadInvoiceDashboard(env), loadCloudSupportData(env)]);
+    return appJson(request, env, { ok: true, data: { ...data, ...support, user: auth.user.name || auth.user.email || "接続済み" } });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/app/support") {
+    return appJson(request, env, { ok: true, data: await loadCloudSupportData(env) });
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/app/partners") {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    return appJson(request, env, { ok: true, data: await upsertPartners(env, payload.value.partners, auth.user) });
+  }
+
+  const partnerMatch = url.pathname.match(/^\/api\/app\/partners\/([^/]+)$/);
+  if (request.method === "DELETE" && partnerMatch) {
+    const deleted = await softDeletePartner(env, decodeURIComponent(partnerMatch[1]), auth.user);
+    return appJson(request, env, { ok: true, data: { deleted } });
+  }
+
+  if (request.method === "PUT" && url.pathname === "/api/app/settings") {
+    if (!isAdministrator(auth.user)) return appJson(request, env, { ok: false, error: "ADMIN_REQUIRED" }, 403);
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    return appJson(request, env, { ok: true, data: await saveCloudSettings(env, payload.value, auth.user) });
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/app/adjustments") {
+    return appJson(request, env, { ok: true, data: { adjustments: await listAdjustments(env, url) } });
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/app/adjustments") {
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    return appJson(request, env, { ok: true, data: await saveAdjustment(env, payload.value, auth.user) });
+  }
+
+  const adjustmentMatch = url.pathname.match(/^\/api\/app\/adjustments\/([0-9a-f-]{36})$/i);
+  if (request.method === "DELETE" && adjustmentMatch) {
+    return appJson(request, env, { ok: true, data: await cancelAdjustment(env, adjustmentMatch[1], auth.user) });
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/app/migrations/dry-run") {
+    if (!isAdministrator(auth.user)) return appJson(request, env, { ok: false, error: "ADMIN_REQUIRED" }, 403);
+    const payload = await readJson(request);
+    if (!payload.ok) return withAppCors(payload.response, request, env);
+    return appJson(request, env, { ok: true, data: await migrationDryRun(env, payload.value, auth.user) });
   }
 
   const transferMatch = url.pathname.match(/^\/api\/app\/transfers\/([0-9a-f-]{36})$/i);
@@ -289,6 +334,143 @@ async function verifyStaffSession(request, env) {
   const user = { name: String(result?.name || result?.data?.name || ""), email: String(result?.email || result?.data?.email || ""), permissionLevel };
   await cache.put(cacheKey, new Response(JSON.stringify(user), { headers: { "content-type": "application/json", "cache-control": "max-age=120" } }));
   return { ok: true, user };
+}
+
+function isAdministrator(user) {
+  return String(user?.permissionLevel || "") === "4";
+}
+
+async function loadCloudSupportData(env) {
+  const [partnersResult, settingsResult] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM partners WHERE deleted_at IS NULL ORDER BY customer_code`).all(),
+    env.DB.prepare(`SELECT setting_key, setting_value FROM settings WHERE is_secret=0 ORDER BY setting_key`).all(),
+  ]);
+  const partners = (partnersResult.results || []).map(row => ({
+    "顧客コード": row.customer_code || "", "名称": row.name || "", "名称(カナ)": row.name_kana || "",
+    "敬称": row.honorific || "様", "支払い期限(月)": row.payment_due_months ?? 1, "支払い期限(日)": row.payment_due_day ?? "",
+    "土日祝日": row.weekend_policy || "", "郵便番号": row.postal_code || "", "都道府県": row.prefecture || "",
+    "住所1": row.address1 || "", "住所2": row.address2 || "", "担当者部署": row.department || "",
+    "担当者役職": row.contact_title || "", "担当者氏名": row.contact_name || "", "電話番号": row.phone || "",
+    "メールアドレス": row.email || "", "CCメールアドレス": row.cc_email || "", "自社担当者名": row.internal_owner || "",
+    "Peppol ID": row.peppol_id || "", "メモ": row.memo || "", "学年": row.grade || "", "教室": row.classroom || "",
+  }));
+  const settings = Object.fromEntries((settingsResult.results || []).map(row => [row.setting_key, row.setting_value]));
+  return { partners, settings, storage: "cloudflare-d1" };
+}
+
+async function upsertPartners(env, input, actor) {
+  const partners = Array.isArray(input) ? input.slice(0, 500) : [];
+  if (!partners.length) throw new Error("取引先データがありません。");
+  const now = new Date().toISOString();
+  const actorName = String(actor?.name || actor?.email || "staff").slice(0, 200);
+  const statements = [];
+  for (const raw of partners) {
+    const code = String(raw["顧客コード"] ?? raw.customerCode ?? "").trim();
+    const name = String(raw["名称"] ?? raw.name ?? "").trim();
+    if (!code || !name) throw new Error("顧客コードと名称は必須です。");
+    statements.push(env.DB.prepare(`INSERT INTO partners (
+      partner_id,customer_code,name,name_kana,honorific,payment_due_months,payment_due_day,weekend_policy,
+      postal_code,prefecture,address1,address2,department,contact_title,contact_name,phone,email,cc_email,
+      internal_owner,peppol_id,memo,grade,classroom,delivery_suspended,created_at,updated_at,deleted_at
+    ) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,0,?24,?24,NULL)
+    ON CONFLICT(customer_code) DO UPDATE SET name=excluded.name,name_kana=excluded.name_kana,honorific=excluded.honorific,
+      payment_due_months=excluded.payment_due_months,payment_due_day=excluded.payment_due_day,weekend_policy=excluded.weekend_policy,
+      postal_code=excluded.postal_code,prefecture=excluded.prefecture,address1=excluded.address1,address2=excluded.address2,
+      department=excluded.department,contact_title=excluded.contact_title,contact_name=excluded.contact_name,phone=excluded.phone,
+      email=excluded.email,cc_email=excluded.cc_email,internal_owner=excluded.internal_owner,peppol_id=excluded.peppol_id,
+      memo=excluded.memo,grade=excluded.grade,classroom=excluded.classroom,updated_at=excluded.updated_at,deleted_at=NULL`).bind(
+      crypto.randomUUID(), code, name, String(raw["名称(カナ)"] || ""), String(raw["敬称"] || "様"),
+      Number(raw["支払い期限(月)"] || 1), raw["支払い期限(日)"] === "" ? null : Number(raw["支払い期限(日)"]),
+      String(raw["土日祝日"] || ""), String(raw["郵便番号"] || ""), String(raw["都道府県"] || ""),
+      String(raw["住所1"] || ""), String(raw["住所2"] || ""), String(raw["担当者部署"] || ""),
+      String(raw["担当者役職"] || ""), String(raw["担当者氏名"] || ""), String(raw["電話番号"] || ""),
+      String(raw["メールアドレス"] || ""), String(raw["CCメールアドレス"] || ""), String(raw["自社担当者名"] || ""),
+      String(raw["Peppol ID"] || ""), String(raw["メモ"] || ""), String(raw["学年"] || ""), String(raw["教室"] || ""), now));
+  }
+  statements.push(operationLogStatement(env, actorName, "取引先D1保存", "partners", now, { count: partners.length }));
+  await env.DB.batch(statements);
+  return { count: partners.length, authoritative: "D1" };
+}
+
+async function softDeletePartner(env, customerCode, actor) {
+  const code = String(customerCode || "").trim();
+  if (!code) return 0;
+  const inUse = await env.DB.prepare("SELECT 1 AS found FROM invoices WHERE customer_code=?1 AND deleted_at IS NULL LIMIT 1").bind(code).first();
+  if (inUse) throw new Error("請求書で使用中の取引先は削除できません。");
+  const now = new Date().toISOString();
+  const result = await env.DB.prepare("UPDATE partners SET deleted_at=?1,updated_at=?1 WHERE customer_code=?2 AND deleted_at IS NULL").bind(now, code).run();
+  await operationLogStatement(env, String(actor?.name || actor?.email || "staff"), "取引先取消", code, now).run();
+  return Number(result.meta?.changes || 0);
+}
+
+async function saveCloudSettings(env, values, actor) {
+  const allowed = new Set(["businessName","businessPostal","businessAddress","businessPhone","rounding","nameDisplay","amountDisplay","defaultBank","defaultNote","receiptBusinessName","receiptBusinessPostal","receiptBusinessAddress","receiptBusinessPhone","receiptPurpose","receiptDefaultNote","senderName","senderEmail","replyTo","adminCc","enableAdminCc","bcc","validDays","hourlyLimit","batchSize","invalidateOld","subject","body"]);
+  const entries = Object.entries(values || {}).filter(([key]) => allowed.has(key));
+  const now = new Date().toISOString();
+  const statements = entries.map(([key, value]) => env.DB.prepare(`INSERT INTO settings(setting_key,setting_value,description,is_secret,updated_at)
+    VALUES(?1,?2,'請求システム共通設定',0,?3) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at`).bind(key, String(value ?? ""), now));
+  statements.push(operationLogStatement(env, String(actor?.name || actor?.email || "staff"), "D1設定変更", "settings", now, { count: entries.length }));
+  await env.DB.batch(statements);
+  return { saved: entries.length, authoritative: "D1" };
+}
+
+async function listAdjustments(env, url) {
+  const month = String(url.searchParams.get("month") || "").trim();
+  const customerCode = String(url.searchParams.get("customerCode") || "").trim();
+  let sql = "SELECT * FROM billing_adjustments WHERE cancelled_at IS NULL";
+  const values = [];
+  if (month) { values.push(month); sql += ` AND subject_month=?${values.length}`; }
+  if (customerCode) { values.push(customerCode); sql += ` AND customer_code=?${values.length}`; }
+  sql += " ORDER BY subject_month DESC, updated_at DESC LIMIT 500";
+  return (await env.DB.prepare(sql).bind(...values).all()).results || [];
+}
+
+async function saveAdjustment(env, raw, actor) {
+  const now = new Date().toISOString();
+  const id = String(raw.adjustmentId || crypto.randomUUID());
+  const idempotencyKey = String(raw.idempotencyKey || "").trim();
+  const month = String(raw.subjectMonth || "").trim();
+  const customerCode = String(raw.customerCode || "").trim();
+  if (!idempotencyKey || !/^\d{4}-\d{2}$/.test(month) || !customerCode) throw new Error("料金調整の必須項目が不足しています。");
+  const actorName = String(actor?.name || actor?.email || "staff").slice(0, 200);
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO billing_adjustments(adjustment_id,idempotency_key,subject_month,customer_code,adjustment_type,amount,quantity,tax_rate,description,created_by,updated_by,created_at,updated_at)
+      VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?10,?11,?11)
+      ON CONFLICT(idempotency_key) DO UPDATE SET adjustment_type=excluded.adjustment_type,amount=excluded.amount,quantity=excluded.quantity,tax_rate=excluded.tax_rate,description=excluded.description,updated_by=excluded.updated_by,updated_at=excluded.updated_at`).bind(
+      id,idempotencyKey,month,customerCode,String(raw.adjustmentType || "調整"),signedMoney(raw.amount),positiveQuantity(raw.quantity),positiveTaxRate(raw.taxRate),String(raw.description || "料金調整"),actorName,now),
+    operationLogStatement(env, actorName, "料金調整保存", id, now, { month, customerCode }),
+  ]);
+  return { adjustmentId: id, idempotencyKey };
+}
+
+async function cancelAdjustment(env, adjustmentId, actor) {
+  const now = new Date().toISOString();
+  const actorName = String(actor?.name || actor?.email || "staff");
+  const result = await env.DB.prepare("UPDATE billing_adjustments SET cancelled_at=?1,updated_at=?1,updated_by=?2 WHERE adjustment_id=?3 AND cancelled_at IS NULL").bind(now, actorName, adjustmentId).run();
+  await operationLogStatement(env, actorName, "料金調整取消", adjustmentId, now).run();
+  return { cancelled: Number(result.meta?.changes || 0) };
+}
+
+async function migrationDryRun(env, input, actor) {
+  const source = String(input.source || "google-sheet").slice(0, 100);
+  const records = Array.isArray(input.records) ? input.records.slice(0, 5000) : [];
+  const keys = new Set();
+  let duplicates = 0, invalid = 0, amountTotal = 0;
+  for (const row of records) {
+    const key = String(row.naturalKey || row.invoiceNumber || row.customerCode || "").trim();
+    if (!key) { invalid += 1; continue; }
+    if (keys.has(key)) duplicates += 1; else keys.add(key);
+    const amount = Number(row.total ?? row.amount ?? 0);
+    if (Number.isFinite(amount)) amountTotal += Math.round(amount);
+  }
+  const now = new Date().toISOString();
+  const idempotencyKey = String(input.idempotencyKey || crypto.randomUUID());
+  const summary = { sourceCount: records.length, uniqueCount: keys.size, duplicateCount: duplicates, invalidCount: invalid, amountTotal };
+  await env.DB.prepare(`INSERT INTO migration_runs(migration_run_id,source_name,idempotency_key,mode,status,source_count,duplicate_count,invalid_count,source_amount_total,summary_json,created_by,started_at,completed_at)
+    VALUES(?1,?2,?3,'dry-run','complete',?4,?5,?6,?7,?8,?9,?10,?10)
+    ON CONFLICT(idempotency_key) DO UPDATE SET summary_json=excluded.summary_json,completed_at=excluded.completed_at`).bind(
+    crypto.randomUUID(),source,idempotencyKey,records.length,duplicates,invalid,amountTotal,JSON.stringify(summary),String(actor?.name || actor?.email || "staff"),now).run();
+  return { ...summary, idempotencyKey, mode: "dry-run", wroteBusinessData: false };
 }
 
 async function loadInvoiceDashboard(env) {

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "test": "node tests/core.test.js && node tests/ui.test.js && node tests/invoice-workspace.test.js && node tests/invoice-pdf-pagination.test.js && node tests/receipt.test.js && node tests/demo-save-send.test.js && node tests/resend-link-retention.test.js && node tests/transfer.test.mjs && node cloudflare/tests/foundation.test.mjs && node cloudflare/tests/invoice-workspace.test.mjs && node cloudflare/tests/security.test.mjs",
+    "test": "node tests/core.test.js && node tests/ui.test.js && node tests/invoice-workspace.test.js && node tests/invoice-pdf-pagination.test.js && node tests/receipt.test.js && node tests/demo-save-send.test.js && node tests/resend-link-retention.test.js && node tests/transfer.test.mjs && node cloudflare/tests/foundation.test.mjs && node cloudflare/tests/invoice-workspace.test.mjs && node cloudflare/tests/security.test.mjs && node cloudflare/tests/complete-integration.test.mjs",
     "check": "node --check assets/core.js && node --check assets/invoice-pdf.js && node --check assets/receipt-pdf.js && node --check assets/app.js && node --check assets/receipts.js && node --check cloudflare/src/index.js"
   },
   "devDependencies": {
