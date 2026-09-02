@@ -99,7 +99,7 @@ window.eval(fs.readFileSync(path.join(root,'assets/receipts.js'),'utf8'));
   assert.match(styles,/\.invoice-workspace\.resizable-workspace\{--invoice-list-width:320px;/);
   assert.match(styles,/\.invoice-list-amount\{margin-left:5px;/);
   assert.match(styles,/\.app-shell\.sidebar-compact \.sidebar \.nav-item\{[^}]*font-size:0/);
-  assert.match(styles,/\.invoice-workspace\.invoice-list-compact[\s\S]*?\.invoice-list-statuses\{display:none\}/);
+  assert.match(styles,/\.invoice-workspace\.invoice-list-compact \.invoice-list-pane \.invoice-list-meta,[^{]*\.invoice-workspace\.invoice-list-compact \.invoice-list-pane \.invoice-list-statuses,[^{]*\{display:none\}/);
   document.querySelector('[data-invoice-action="duplicate_invoice"]').click();
   assert.equal(document.querySelector('#documentEditorDialog').open,true);
   assert.match(document.querySelector('#documentEditorTitle').textContent,/請求書を複製/);
