@@ -34,6 +34,7 @@
       <button class="nav-item active" data-view="invoices">請求書一覧</button>
       <button class="nav-item" data-view="receipts">領収書一覧</button>
       <div class="nav-section-label">管理</div>
+      <button class="nav-item" data-view="adjustments">料金特別調整</button>
       <button class="nav-item" data-view="partners">取引先マスタ</button>
       <button class="nav-item" data-view="history">配信履歴</button>
       <button class="nav-item" data-view="settings">基本設定</button>
@@ -139,6 +140,21 @@
           <aside class="invoice-list-pane" aria-label="領収書一覧"><div class="invoice-list-head"><strong id="receiptListCount">0件</strong><span>最新順</span></div><div id="receiptList" class="invoice-list"><p class="invoice-list-empty">領収書がありません。</p></div></aside>
           <div class="invoice-detail-column"><div class="invoice-heading-actions"><button class="button demo-send-button" type="button" onclick="window.StepReceipts.openDemoReceipt()">デモ送信</button><button class="button primary" type="button" data-receipt-create>領収書を作成</button><button id="refreshReceipts" class="button secondary" type="button">最新状態を取得</button></div><section id="receiptDetailPanel" class="invoice-detail-pane"><div class="invoice-detail-empty">左の一覧から領収書を選択してください。</div></section></div>
         </div>
+      </section>
+
+      <section id="view-adjustments" class="view">
+        <div class="page-heading"><div><h1>料金特別調整</h1><p>割引・教材費などを対象年月と生徒／取引先へ登録し、請求書へ一度だけ反映します。</p></div><div class="heading-actions"><button id="refreshAdjustments" class="button secondary" type="button">最新状態を取得</button></div></div>
+        <form id="adjustmentForm" class="form-grid panel">
+          <label>対象年月<input name="subjectMonth" type="month" required></label>
+          <label>顧客コード<input name="customerCode" required></label>
+          <label>調整種別<select name="adjustmentType"><option>割引</option><option>教材費</option><option>追加料金</option><option>その他</option></select></label>
+          <label>金額<input name="amount" type="number" step="1" required><small>割引は負数で入力</small></label>
+          <label>数量<input name="quantity" type="number" min="0.01" step="0.01" value="1" required></label>
+          <label>税率<select name="taxRate"><option value="0.1">10%</option><option value="0.08">8%</option><option value="0">0%</option></select></label>
+          <label class="span-2">摘要<input name="description" required></label>
+          <div class="span-2 actions"><button class="button primary" type="submit">D1へ登録</button></div>
+        </form>
+        <div class="table-wrap wide"><table id="adjustmentTable"><thead><tr><th>対象年月</th><th>顧客コード</th><th>種別</th><th>摘要</th><th>数量</th><th>金額</th><th>適用状態</th><th>操作</th></tr></thead><tbody><tr class="empty"><td colspan="8">料金調整がありません。</td></tr></tbody></table></div>
       </section>
 
       <section id="view-partners" class="view">

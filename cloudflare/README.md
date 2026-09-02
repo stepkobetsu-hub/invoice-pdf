@@ -1,7 +1,7 @@
 # Cloudflare foundation
 
 This directory contains the Cloudflare implementation for STEP invoices.
-Invoice list/save/edit/payment/delete operations use D1 directly. Apps Script remains only for staff-session verification, partner/settings compatibility, PDF generation orchestration, and the existing mail queue. PDF files never use Google Drive.
+Invoice list/save/edit/payment/delete, partners, settings, billing adjustments, migration runs and delivery-job state use D1 directly. Apps Script remains only as a temporary compatibility mirror, shared student-master lookup and the existing mail-provider bridge until the protected D1 outbox consumer is approved. PDF files never use Google Drive.
 
 ## Production storage and download service
 
@@ -28,7 +28,7 @@ Required Worker secrets:
 - `ADMIN_API_KEY`
 - `TOKEN_PEPPER`
 
-`BREVO_API_KEY` is not used. Mail delivery remains in the existing Apps Script queue; only PDF storage and recipient downloads use Cloudflare.
+`BREVO_API_KEY` is not exposed to the browser or committed. Production delivery remains blocked until the separate administrator approval step; D1 owns delivery job and event state.
 
 ## D1 direct invoice workspace
 
