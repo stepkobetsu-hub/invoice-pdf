@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Relax public download limits and fail open when binding is unavailable
+      - name: Relax public download limits and repair browser-only receipt hook
         shell: bash
         run: |
           set -euo pipefail
@@ -56,6 +56,14 @@ jobs:
                   raise SystemExit(f'config target not found: {old}')
               text = text.replace(old, new)
           config.write_text(text, encoding='utf-8')
+
+          receipt = Path('assets/receipt-pdf.js')
+          text = receipt.read_text(encoding='utf-8')
+          old = "  document.addEventListener('DOMContentLoaded',()=>{\n    const singleButton=document.querySelector('[data-create-method=\"single\"]');\n    if(singleButton)singleButton.textContent='1個ずつ作成';\n    installStudentMasterSync();\n  });"
+          new = "  if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{\n    const singleButton=document.querySelector('[data-create-method=\"single\"]');\n    if(singleButton)singleButton.textContent='1個ずつ作成';\n    installStudentMasterSync();\n  });"
+          if old not in text and new not in text:
+              raise SystemExit('receipt browser hook target not found')
+          receipt.write_text(text.replace(old,new), encoding='utf-8')
           PY
       - name: Run checks
         run: |
@@ -68,9 +76,9 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add cloudflare/src/index.js cloudflare/wrangler.jsonc
+          git add cloudflare/src/index.js cloudflare/wrangler.jsonc assets/receipt-pdf.js
           if git diff --cached --quiet; then
             exit 0
           fi
-          git commit -m "Fix false-positive public download rate limiting"
+          git commit -m "Fix public download rate limiting"
           git push
