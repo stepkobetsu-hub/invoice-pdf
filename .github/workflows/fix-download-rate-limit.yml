@@ -1,0 +1,75 @@
+name: Fix public download rate limits
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/fix-download-rate-limit.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Relax public download limits and fail open when binding is unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          worker = Path('cloudflare/src/index.js')
+          text = worker.read_text(encoding='utf-8')
+          replacements = {
+              'if (!ipLimiter?.limit || !tokenLimiter?.limit) return { ok: false };':
+              'if (!ipLimiter?.limit || !tokenLimiter?.limit) return { ok: true };',
+              'const tokenLimit = routeKind === "pdf" ? 5 : 10;':
+              'const tokenLimit = routeKind === "pdf" ? 20 : 60;',
+              'const ipLimit = routeKind === "pdf" ? 10 : 30;':
+              'const ipLimit = routeKind === "pdf" ? 60 : 120;',
+          }
+          for old, new in replacements.items():
+              if old not in text and new not in text:
+                  raise SystemExit(f'worker target not found: {old}')
+              text = text.replace(old, new)
+          worker.write_text(text, encoding='utf-8')
+
+          config = Path('cloudflare/wrangler.jsonc')
+          text = config.read_text(encoding='utf-8')
+          replacements = {
+              '{ "name": "PAGE_IP_RATE_LIMITER", "namespace_id": "31001", "simple": { "limit": 30, "period": 60 } }':
+              '{ "name": "PAGE_IP_RATE_LIMITER", "namespace_id": "31001", "simple": { "limit": 120, "period": 60 } }',
+              '{ "name": "PAGE_TOKEN_RATE_LIMITER", "namespace_id": "31002", "simple": { "limit": 10, "period": 60 } }':
+              '{ "name": "PAGE_TOKEN_RATE_LIMITER", "namespace_id": "31002", "simple": { "limit": 60, "period": 60 } }',
+              '{ "name": "PDF_IP_RATE_LIMITER", "namespace_id": "31003", "simple": { "limit": 10, "period": 60 } }':
+              '{ "name": "PDF_IP_RATE_LIMITER", "namespace_id": "31003", "simple": { "limit": 60, "period": 60 } }',
+              '{ "name": "PDF_TOKEN_RATE_LIMITER", "namespace_id": "31004", "simple": { "limit": 5, "period": 60 } }':
+              '{ "name": "PDF_TOKEN_RATE_LIMITER", "namespace_id": "31004", "simple": { "limit": 20, "period": 60 } }',
+          }
+          for old, new in replacements.items():
+              if old not in text and new not in text:
+                  raise SystemExit(f'config target not found: {old}')
+              text = text.replace(old, new)
+          config.write_text(text, encoding='utf-8')
+          PY
+      - name: Run checks
+        run: |
+          npm ci
+          npm test
+          npm run check
+      - name: Commit fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cloudflare/src/index.js cloudflare/wrangler.jsonc
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "Fix false-positive public download rate limiting"
+          git push
