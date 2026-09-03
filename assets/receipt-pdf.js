@@ -68,6 +68,7 @@
     document.addEventListener('submit',event=>{
       const form=event.target;
       if(form?.id!=='singleInvoiceForm')return;
+      if(form.dataset.skipEmailHydration==='1'){delete form.dataset.skipEmailHydration;return;}
       const code=String(form.elements?.partnerCode?.value||''),partner=partnerForCode(code);
       if(!partner||validEmail(partner['メールアドレス']))return;
       const submitter=event.submitter,sendAfterSave=submitter?.id==='saveAndSendSingleInvoice';
@@ -77,7 +78,7 @@
       if(status){status.textContent='生徒マスタからメールアドレスを確認しています…';status.className='mail-submit-status working';}
       void hydratePartnerEmail(code).then(()=>form.requestSubmit(submitter||undefined)).catch(error=>{
         if(status){status.textContent=`メールアドレスを読み込めませんでした：${error.message}`;status.className='mail-submit-status error';}
-        if(!sendAfterSave)form.requestSubmit(submitter||undefined);
+        if(!sendAfterSave){form.dataset.skipEmailHydration='1';form.requestSubmit(submitter||undefined);}
         else window.StepInvoiceApp?.alert?.(`送信できません。${error.message}`,'error');
       });
     },true);
