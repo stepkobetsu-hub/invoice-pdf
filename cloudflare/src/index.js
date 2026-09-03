@@ -1216,7 +1216,7 @@ async function enforceRateLimit(request, env, token, routeKind) {
 
   const ipLimiter = routeKind === "pdf" ? env.PDF_IP_RATE_LIMITER : env.PAGE_IP_RATE_LIMITER;
   const tokenLimiter = routeKind === "pdf" ? env.PDF_TOKEN_RATE_LIMITER : env.PAGE_TOKEN_RATE_LIMITER;
-  if (!ipLimiter?.limit || !tokenLimiter?.limit) return { ok: false };
+  if (!ipLimiter?.limit || !tokenLimiter?.limit) return { ok: true };
 
   const [ipResult, tokenResult] = await Promise.all([
     ipLimiter.limit({ key: ipKey }),
@@ -1230,8 +1230,8 @@ async function enforceKnownDeliveryRate(request, env, token, routeKind) {
   const bucket = now.toISOString().slice(0, 16);
   const expiresAt = new Date(now.getTime() + 120_000).toISOString();
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
-  const tokenLimit = routeKind === "pdf" ? 5 : 10;
-  const ipLimit = routeKind === "pdf" ? 10 : 30;
+  const tokenLimit = routeKind === "pdf" ? 20 : 60;
+  const ipLimit = routeKind === "pdf" ? 60 : 120;
   const [tokenSubject, ipSubject] = await Promise.all([
     hashOpaqueToken(`${env.TOKEN_PEPPER}|exact-token|${token}`),
     hashOpaqueToken(`${env.TOKEN_PEPPER}|exact-ip|${ip}`),

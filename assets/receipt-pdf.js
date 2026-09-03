@@ -267,7 +267,7 @@
   }
 
   window.StepReceiptPdf={pageHtml,toBlob:(element)=>window.StepInvoicePdf.toBlob(element)};
-  document.addEventListener('DOMContentLoaded',()=>{
+  if(typeof document!=='undefined')document.addEventListener('DOMContentLoaded',()=>{
     const singleButton=document.querySelector('[data-create-method="single"]');
     if(singleButton)singleButton.textContent='1個ずつ作成';
     installStudentMasterSync();
