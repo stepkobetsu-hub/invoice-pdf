@@ -69,9 +69,10 @@ R2 usage is checked in **Cloudflare Dashboard > R2 Object Storage > Overview > U
 
 ## Abuse and cost controls
 
-- Parent guide page: 30 requests/minute per IP hash and 10/minute per token hash.
-- Parent PDF: 10 requests/minute per IP hash and 5/minute per token hash.
-- Cloudflare Rate Limiting rejects traffic before D1/R2. A fixed-row, one-minute D1 aggregate counter additionally gives exact limits only after a token is proven valid; invalid tokens never create counter rows and repeated requests do not create per-request logs.
+- Parent guide page: 120 requests/minute per IP hash and 60/minute per token hash.
+- Parent PDF: 60 requests/minute per IP hash and 20/minute per token hash.
+- Cloudflare Rate Limiting rejects excessive traffic before D1/R2. A fixed-row, one-minute D1 aggregate counter additionally gives exact limits only after a token is proven valid; invalid tokens never create counter rows and repeated requests do not create per-request logs.
+- If the Cloudflare rate-limit binding is temporarily unavailable, a valid parent link is not rejected solely because that binding is unavailable; known valid deliveries remain protected by the exact D1 counter and the total/daily PDF limits.
 - Parent PDF limit: 20 total and 10 per UTC day, configurable through protected settings.
 - Invalid, expired, revoked, and unknown tokens return the same public response and never read R2.
 - `PUBLIC_DOWNLOAD_ENABLED`, `PDF_UPLOAD_ENABLED`, `ADMIN_API_ENABLED`, and `EMERGENCY_STOP` are independent operational gates.
