@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[char]));
+  const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
   const yen=value=>`${Math.round(Number(value)||0).toLocaleString('ja-JP')} 円`;
   const date=value=>{const raw=String(value||'');if(!raw)return '―';const normalized=raw.replace(/\//g,'-').slice(0,10),parts=normalized.split('-');return parts.length===3?`${parts[0]}/${parts[1]}/${parts[2]}`:raw;};
   function pageHtml(receipt){
@@ -65,6 +65,22 @@
       if(!option)return;
       setTimeout(()=>{void hydratePartnerEmail(option.dataset.partnerCode).catch(error=>window.StepInvoiceApp?.alert?.(`メールアドレスを生徒マスタから読み込めませんでした：${error.message}`,'error'));},0);
     });
+    document.addEventListener('submit',event=>{
+      const form=event.target;
+      if(form?.id!=='singleInvoiceForm')return;
+      const code=String(form.elements?.partnerCode?.value||''),partner=partnerForCode(code);
+      if(!partner||validEmail(partner['メールアドレス']))return;
+      const submitter=event.submitter,sendAfterSave=submitter?.id==='saveAndSendSingleInvoice';
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const status=document.querySelector('#singleSaveStatus');
+      if(status){status.textContent='生徒マスタからメールアドレスを確認しています…';status.className='mail-submit-status working';}
+      void hydratePartnerEmail(code).then(()=>form.requestSubmit(submitter||undefined)).catch(error=>{
+        if(status){status.textContent=`メールアドレスを読み込めませんでした：${error.message}`;status.className='mail-submit-status error';}
+        if(!sendAfterSave)form.requestSubmit(submitter||undefined);
+        else window.StepInvoiceApp?.alert?.(`送信できません。${error.message}`,'error');
+      });
+    },true);
     const dialog=document.querySelector('#invoiceMailDialog');
     if(!dialog)return;
     new MutationObserver(()=>{
