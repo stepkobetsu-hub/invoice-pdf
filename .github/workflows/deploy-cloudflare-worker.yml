@@ -1,5 +1,6 @@
 name: Deploy Cloudflare Worker
 
+# Central delivery failure manager deployment trigger: 2026-09-04
 on:
   pull_request:
     branches:
