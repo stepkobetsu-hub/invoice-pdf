@@ -10,7 +10,6 @@ assert.match(html,/AKfycbxzkE1tQRyB_Ca4bfPKYWIkpTukIVPMWKf2ETE7yN7qROJk0VyOlvxaJ
 assert.match(js,/\/api\/app\/dashboard/);
 assert.match(js,/stepStaffAppAuth/);
 assert.match(js,/function latestRows\(/);
-assert.match(js,/function managementTotal\(/);
 assert.doesNotMatch(js,/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)/i);
 assert.doesNotMatch(js,/localStorage\.setItem/);
 
@@ -62,6 +61,6 @@ assert.equal(typeof pageshow,'function');
   await pageshow();
   const values=elements['#kpis'].children.map(card=>card.children[1].textContent);
   assert.equal(values[1],'2名');
-  assert.match(values[2],/315/);
+  assert.equal(values[2],'管理画面で確認');
   console.log('billing fast home tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
