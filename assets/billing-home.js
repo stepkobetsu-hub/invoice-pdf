@@ -14,9 +14,19 @@
   }
   function monthLabel(key){const parts=String(key).split('-');return parts.length===2?parts[0]+'年'+Number(parts[1])+'月分':key;}
   function uniqueCount(rows,predicate){return new Set(rows.filter(predicate).map(row=>String(row.customerCode||row.invoiceNumber||''))).size;}
+  function latestRows(rows){
+    const byCustomer=new Map();
+    rows.forEach((row,index)=>{
+      const key=String(row.customerCode||'').trim()||String(row.customerName||'').trim()||String(row.invoiceNumber||'').trim()||'__row_'+index;
+      const previous=byCustomer.get(key);
+      const changedAt=value=>{const time=Date.parse(value.updatedAt||value.createdAt||'');return Number.isFinite(time)?time:0;};
+      if(!previous||changedAt(row)>=changedAt(previous))byCustomer.set(key,row);
+    });
+    return [...byCustomer.values()];
+  }
   function render(){
     const selected=$('#monthSelect').value;
-    const rows=invoices.filter(invoice=>monthKey(invoice)===selected);
+    const rows=latestRows(invoices.filter(invoice=>monthKey(invoice)===selected));
     const itemText=invoice=>(invoice.details||[]).map(item=>String(item.name||'')).join(' ');
     const paid=rows.filter(row=>row.paymentStatus==='入金済').length;
     const sent=rows.filter(row=>!['','未送信','送信待ち','送信前'].includes(String(row.sendStatus||''))).length;
