@@ -24,16 +24,6 @@
     });
     return [...byCustomer.values()];
   }
-  function managementTotal(row){
-    const details=Array.isArray(row.details)?row.details:[];
-    const canRebuild=details.length>0&&details.every(item=>Number.isFinite(Number(item.amount))&&Number.isFinite(Number.parseFloat(String(item.taxRate||'0'))));
-    if(canRebuild){
-      const subtotal=details.reduce((sum,item)=>sum+Number(item.amount),0);
-      const sourceTax=details.reduce((sum,item)=>sum+Math.round(Number(item.amount)*Number.parseFloat(String(item.taxRate||'0'))/100),0);
-      return subtotal+sourceTax;
-    }
-    return Number(row.total||0);
-  }
   function render(){
     const selected=$('#monthSelect').value;
     const rows=latestRows(invoices.filter(invoice=>monthKey(invoice)===selected));
@@ -43,7 +33,7 @@
     const warning=rows.filter(row=>(row.warnings||[]).length>0).length;
     const values=[
       ['対象請求月',monthLabel(selected)],['請求対象人数',rows.length+'名'],
-      ['請求合計金額',yen(rows.reduce((sum,row)=>sum+managementTotal(row),0))],
+      ['請求合計金額','管理画面で確認'],
       ['入金済み',paid+'件'],['未入金',Math.max(0,rows.length-paid)+'件'],['配信済み・進行中',sent+'件'],
       ['兄弟割引対象',uniqueCount(rows,row=>/兄弟姉妹?割引/.test(itemText(row)))+'名'],
       ['教材請求',uniqueCount(rows,row=>/教材/.test(itemText(row)))+'名'],
