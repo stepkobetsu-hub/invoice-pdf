@@ -31,10 +31,10 @@ const elements={
 };
 let pageshow;
 const duplicateInvoices=[
-  {customerCode:'A',subject:'2026年10月分',subtotal:90,tax:5,total:100,updatedAt:'2026-09-01T00:00:00Z',details:[]},
-  {customerCode:'A',subject:'2026年10月分',subtotal:100,tax:5,total:110,updatedAt:'2026-09-02T00:00:00Z',details:[]},
-  {customerCode:'B',subject:'2026年10月分',subtotal:180,tax:15,total:200,updatedAt:'2026-09-01T00:00:00Z',details:[]},
-  {customerCode:'B',subject:'2026年10月分',subtotal:200,tax:10,total:210,updatedAt:'2026-09-02T00:00:00Z',details:[]}
+  {customerCode:'A',subject:'2026年10月分',subtotal:90,tax:10,total:100,updatedAt:'2026-09-01T00:00:00Z',details:[{amount:91,taxRate:'10%'}]},
+  {customerCode:'A',subject:'2026年10月分',subtotal:95,tax:15,total:110,updatedAt:'2026-09-02T00:00:00Z',details:[{amount:95,taxRate:'10%'}]},
+  {customerCode:'B',subject:'2026年10月分',subtotal:180,tax:20,total:200,updatedAt:'2026-09-01T00:00:00Z',details:[{amount:182,taxRate:'10%'}]},
+  {customerCode:'B',subject:'2026年10月分',subtotal:191,tax:19,total:210,updatedAt:'2026-09-02T00:00:00Z',details:[{amount:191,taxRate:'10%'}]}
 ];
 const context={
   document:{
