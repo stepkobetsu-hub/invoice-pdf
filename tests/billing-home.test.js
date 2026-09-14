@@ -10,6 +10,7 @@ assert.match(html,/AKfycbxzkE1tQRyB_Ca4bfPKYWIkpTukIVPMWKf2ETE7yN7qROJk0VyOlvxaJ
 assert.match(js,/\/api\/app\/dashboard/);
 assert.match(js,/stepStaffAppAuth/);
 assert.match(js,/function latestRows\(/);
+assert.match(js,/function managementTotal\(/);
 assert.doesNotMatch(js,/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)/i);
 assert.doesNotMatch(js,/localStorage\.setItem/);
 
@@ -30,10 +31,10 @@ const elements={
 };
 let pageshow;
 const duplicateInvoices=[
-  {customerCode:'A',subject:'2026年10月分',total:100,updatedAt:'2026-09-01T00:00:00Z',details:[]},
-  {customerCode:'A',subject:'2026年10月分',total:110,updatedAt:'2026-09-02T00:00:00Z',details:[]},
-  {customerCode:'B',subject:'2026年10月分',total:200,updatedAt:'2026-09-01T00:00:00Z',details:[]},
-  {customerCode:'B',subject:'2026年10月分',total:210,updatedAt:'2026-09-02T00:00:00Z',details:[]}
+  {customerCode:'A',subject:'2026年10月分',subtotal:90,tax:5,total:100,updatedAt:'2026-09-01T00:00:00Z',details:[]},
+  {customerCode:'A',subject:'2026年10月分',subtotal:100,tax:5,total:110,updatedAt:'2026-09-02T00:00:00Z',details:[]},
+  {customerCode:'B',subject:'2026年10月分',subtotal:180,tax:15,total:200,updatedAt:'2026-09-01T00:00:00Z',details:[]},
+  {customerCode:'B',subject:'2026年10月分',subtotal:200,tax:10,total:210,updatedAt:'2026-09-02T00:00:00Z',details:[]}
 ];
 const context={
   document:{
@@ -61,6 +62,6 @@ assert.equal(typeof pageshow,'function');
   await pageshow();
   const values=elements['#kpis'].children.map(card=>card.children[1].textContent);
   assert.equal(values[1],'2名');
-  assert.match(values[2],/320/);
+  assert.match(values[2],/315/);
   console.log('billing fast home tests passed');
 })().catch(error=>{console.error(error);process.exitCode=1;});
