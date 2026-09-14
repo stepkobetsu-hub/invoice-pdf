@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0f3158">
+  <title>請求システム 高速ホーム</title>
+  <style>
+    :root{font-family:"Noto Sans JP","Yu Gothic",Meiryo,sans-serif;color:#102d4c;background:#eef4fa}
+    *{box-sizing:border-box}body{margin:0}.top{background:#fff;border-bottom:1px solid #d7e3ef;padding:14px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;position:sticky;top:0;z-index:2}
+    h1{font-size:22px;margin:0}.badge{background:#e6f7ef;color:#14734a;border:1px solid #b9ead4;border-radius:999px;padding:5px 10px;font-weight:700;font-size:13px}
+    .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;border:1px solid #b8cce0;border-radius:10px;padding:9px 13px;background:#fff;color:#153a62;text-decoration:none;font-weight:700;cursor:pointer}
+    .btn.primary{background:#1769e0;color:#fff;border-color:#1769e0}.btn:disabled{opacity:.55;cursor:wait}
+    main{max-width:1180px;margin:22px auto;padding:0 16px}.notice{background:#fff;border:1px solid #d7e3ef;border-radius:14px;padding:14px 16px;margin-bottom:16px;line-height:1.7}
+    .status{font-weight:700}.status.busy{color:#9a6200}.status.ok{color:#137246}.status.error{color:#b3261e}
+    .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:16px 0}.toolbar select{font:inherit;font-weight:700;border:1px solid #9fb8d3;border-radius:10px;padding:9px 12px;background:#fff}
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}.kpi{background:#fff;border:1px solid #d7e3ef;border-radius:16px;padding:16px;min-height:112px;box-shadow:0 5px 16px rgba(19,58,98,.06)}
+    .kpi span{display:block;color:#59728d;font-size:13px;font-weight:700}.kpi strong{display:block;margin-top:10px;font-size:27px;letter-spacing:.01em}.details{margin-top:18px;background:#fff;border:1px solid #d7e3ef;border-radius:16px;padding:18px}
+    .details h2{font-size:18px;margin:0 0 10px}.details p{margin:6px 0;color:#4b6580}.login{display:none;background:#fff7e6;border:1px solid #efcf8b;border-radius:14px;padding:18px;margin-top:16px}.login.show{display:block}
+    @media(max-width:640px){.top{padding:12px}.actions{margin-left:0;width:100%}.actions .btn{flex:1 1 46%}h1{font-size:19px}.kpi strong{font-size:23px}}
+  </style>
+  <script src="assets/billing-home.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <h1>請求システム 高速ホーム</h1>
+    <span class="badge">閲覧専用・Cloudflare D1</span>
+    <div class="actions">
+      <button class="btn primary" id="reloadButton" type="button">再読込</button>
+      <a class="btn" href="https://script.google.com/macros/s/AKfycbxzkE1tQRyB_Ca4bfPKYWIkpTukIVPMWKf2ETE7yN7qROJk0VyOlvxaJ9GGI5p-6pGb/exec">請求管理を開く</a>
+      <a class="btn" href="./#invoices">請求書・PDF配信</a>
+      <a class="btn" href="./#adjustments">料金特別調整</a>
+    </div>
+  </header>
+  <main>
+    <section class="notice">
+      <div id="status" class="status busy" role="status">Cloudflareから最新状態を読み込んでいます…</div>
+      <div id="userLine">この画面では保存・請求作成・送信を行いません。</div>
+    </section>
+    <section id="loginPanel" class="login">
+      <strong>スタッフログインが必要です。</strong>
+      <p>スタッフ用アプリで一度ログインした後、このページの「再読込」を押してください。</p>
+      <a class="btn primary" href="https://stepkobetsu-hub.github.io/seiseki-kanri/">スタッフログインを開く</a>
+    </section>
+    <div class="toolbar">
+      <label for="monthSelect"><strong>表示する請求月</strong></label>
+      <select id="monthSelect" disabled><option>読込中</option></select>
+    </div>
+    <section id="kpis" class="kpis" aria-live="polite"></section>
+    <section class="details">
+      <h2>この高速ホームについて</h2>
+      <p>Cloudflare D1に保存済みの請求書を読み取り、月別の人数・金額・入金・配信状態を表示します。</p>
+      <p id="updatedLine">最終更新：確認中</p>
+      <p>請求内容の作成や変更は、上部の「請求管理を開く」から従来の管理画面を利用してください。</p>
+    </section>
+  </main>
+</body>
+</html>

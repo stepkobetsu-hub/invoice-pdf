@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const html=fs.readFileSync('billing-home.html','utf8');
+const js=fs.readFileSync('assets/billing-home.js','utf8');
+assert.match(html,/高速ホーム/);
+assert.match(html,/閲覧専用/);
+assert.match(html,/AKfycbxzkE1tQRyB_Ca4bfPKYWIkpTukIVPMWKf2ETE7yN7qROJk0VyOlvxaJ9GGI5p-6pGb/);
+assert.match(js,/\/api\/app\/dashboard/);
+assert.match(js,/stepStaffAppAuth/);
+assert.doesNotMatch(js,/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)/i);
+assert.doesNotMatch(js,/localStorage\.setItem/);
+console.log('billing fast home tests passed');
