@@ -25,9 +25,14 @@
     return [...byCustomer.values()];
   }
   function managementTotal(row){
-    const hasSubtotal=row.subtotal!==null&&row.subtotal!==undefined&&row.subtotal!=='';
-    const hasTax=row.tax!==null&&row.tax!==undefined&&row.tax!=='';
-    return hasSubtotal&&hasTax?Number(row.subtotal)+Number(row.tax):Number(row.total||0);
+    const details=Array.isArray(row.details)?row.details:[];
+    const canRebuild=details.length>0&&details.every(item=>Number.isFinite(Number(item.amount))&&Number.isFinite(Number.parseFloat(String(item.taxRate||'0'))));
+    if(canRebuild){
+      const subtotal=details.reduce((sum,item)=>sum+Number(item.amount),0);
+      const sourceTax=details.reduce((sum,item)=>sum+Math.round(Number(item.amount)*Number.parseFloat(String(item.taxRate||'0'))/100),0);
+      return subtotal+sourceTax;
+    }
+    return Number(row.total||0);
   }
   function render(){
     const selected=$('#monthSelect').value;
