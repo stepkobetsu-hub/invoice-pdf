@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           node <<'NODE'
-          const fs = require("fs");
+          const fs = await import("node:fs");
           const account = process.env.CLOUDFLARE_ACCOUNT_ID;
           const token = process.env.CLOUDFLARE_API_TOKEN;
           const base = "https://api.cloudflare.com/client/v4";
