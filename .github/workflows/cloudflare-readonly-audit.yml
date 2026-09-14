@@ -1,0 +1,115 @@
+name: Temporary Cloudflare Readonly Audit
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/cloudflare-readonly-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: b9c6ad3a2120ec9739fdf37dfdf8ed81
+    steps:
+      - uses: actions/checkout@v6
+      - name: Collect sanitized Cloudflare inventory
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const account = process.env.CLOUDFLARE_ACCOUNT_ID;
+          const token = process.env.CLOUDFLARE_API_TOKEN;
+          const base = "https://api.cloudflare.com/client/v4";
+          async function get(path) {
+            try {
+              const response = await fetch(base + path, {
+                headers: { Authorization: "Bearer " + token }
+              });
+              const body = await response.json().catch(() => ({}));
+              return { http_status: response.status, body };
+            } catch (error) {
+              return { http_status: 0, body: { success: false, errors: [{ message: String(error) }] } };
+            }
+          }
+          function errors(x) {
+            return (x.body.errors || []).map(e => ({ code: e.code ?? null, message: e.message ?? "unknown" }));
+          }
+          const out = { collected_at: new Date().toISOString(), account_id: account };
+          const verify = await get("/user/tokens/verify");
+          out.token = { http_status: verify.http_status, success: !!verify.body.success, status: verify.body.result?.status || null, errors: errors(verify) };
+
+          const workers = await get(`/accounts/${account}/workers/scripts`);
+          out.workers = {
+            http_status: workers.http_status,
+            success: !!workers.body.success,
+            items: Array.isArray(workers.body.result) ? workers.body.result.map(x => ({
+              name: x.id || x.name || null,
+              created_on: x.created_on || null,
+              modified_on: x.modified_on || null,
+              last_deployed_from: x.last_deployed_from || null
+            })) : [],
+            errors: errors(workers)
+          };
+
+          const deployments = await get(`/accounts/${account}/workers/scripts/step-invoice-api/deployments`);
+          const deploymentItems = Array.isArray(deployments.body.result)
+            ? deployments.body.result
+            : (deployments.body.result?.deployments || []);
+          out.invoice_worker_deployments = {
+            http_status: deployments.http_status,
+            success: !!deployments.body.success,
+            items: deploymentItems.slice(0, 20).map(x => ({
+              id: x.id || null,
+              created_on: x.created_on || null,
+              source: x.source || null,
+              strategy: x.strategy || null
+            })),
+            errors: errors(deployments)
+          };
+
+          const d1 = await get(`/accounts/${account}/d1/database`);
+          out.d1 = {
+            http_status: d1.http_status,
+            success: !!d1.body.success,
+            items: Array.isArray(d1.body.result) ? d1.body.result.map(x => ({
+              uuid: x.uuid || null,
+              name: x.name || null,
+              version: x.version || null,
+              created_at: x.created_at || null,
+              num_tables: x.num_tables ?? null,
+              file_size: x.file_size ?? null
+            })) : [],
+            errors: errors(d1)
+          };
+
+          const r2 = await get(`/accounts/${account}/r2/buckets`);
+          const bucketItems = Array.isArray(r2.body.result)
+            ? r2.body.result
+            : (r2.body.result?.buckets || []);
+          out.r2 = {
+            http_status: r2.http_status,
+            success: !!r2.body.success,
+            items: bucketItems.map(x => ({
+              name: x.name || null,
+              creation_date: x.creation_date || null,
+              location: x.location || x.location_hint || null,
+              storage_class: x.storage_class || null
+            })),
+            errors: errors(r2)
+          };
+
+          fs.writeFileSync("cloudflare-audit.json", JSON.stringify(out, null, 2));
+          console.log("Sanitized audit artifact created.");
+          NODE
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-readonly-audit
+          path: cloudflare-audit.json
+          retention-days: 1
