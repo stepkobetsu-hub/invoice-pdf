@@ -119,7 +119,7 @@
   function applyPartnerDocumentDefaults(form,partner){if(!form||!partner)return;const defaults=C.partnerDocumentDefaults(partner);form.elements.memo.value=defaults.memo;form.elements.tags.value=defaults.tags;}
   async function api(action,payload={}){
     const savingInvoice=action==='saveInvoiceData';if(savingInvoice)showOperationOverlay('保存中');
-    const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?20000:45000;
+    const timeoutMs=action==='saveInvoiceData'?120000:action==='getDashboard'?60000:action==='findStudentForPartner'?60000:45000;
     try{
       const data=await cloudApi('/api/app/apps-script',{method:'POST',body:{action,payload},timeoutMs});
       if(action==='getDeliveryDiagnostics'&&data?.emailOpenedAt){const invoice=state.invoices.find(item=>String(item.invoiceNumber)===String(payload.invoiceNumber));if(invoice&&!invoice.emailOpenedAt){invoice.emailOpenedAt=data.emailOpenedAt;renderInvoices();}}
