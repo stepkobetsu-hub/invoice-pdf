@@ -201,7 +201,7 @@ async function main(){
   const styles=fs.readFileSync(path.join(root,'assets/styles.css'),'utf8');
   const indexSource=fs.readFileSync(path.join(root,'index.html'),'utf8');
   assert.match(indexSource,/assets\/styles\.css\?v=20260902-number-by-name/);
-  assert.match(indexSource,/assets\/app\.js\?v=20260902-number-by-name/);
+  assert.match(indexSource,/assets\/app\.js\?v=20260925-recipient-timeout-fix/);
   assert.match(styles,/\.student-code-note\{color:var\(--blue\);font-size:12px;font-weight:700\}/);
   assert.ok(styles.lastIndexOf('.invoice-page .issuer{left:520px')>styles.lastIndexOf('.invoice-page .issuer{left:555px'));
   assert.ok(styles.includes('.invoice-page .totals{top:calc(535px + var(--detail-count) * 34px)}'));
