@@ -1125,7 +1125,12 @@ async function createDeliveryBatch(request, env, url) {
     ON CONFLICT(delivery_id) DO UPDATE SET token_hash=excluded.token_hash, issued_at=excluded.issued_at,
       expires_at=excluded.expires_at, status='pending', revoked_at=NULL, updated_at=excluded.updated_at
   `).bind(item.deliveryId, item.invoiceId, String(item.input.recipientEmail || ""), String(item.input.ccEmail || ""), item.tokenHash, now, item.expiresAt, String(item.input.createdBy || "apps-script")));
-  await env.DB.batch(statements);
+  try {
+    await env.DB.batch(statements);
+  } catch (batchError) {
+    console.warn(JSON.stringify({ event: "delivery_batch_fallback", count: statements.length, error: String(batchError?.message || batchError) }));
+    for (const statement of statements) await statement.run();
+  }
   if (payload.value.revokeExisting === true) {
     const ids = prepared.map(item => item.invoiceId);
     const newDeliveryIds = prepared.map(item => item.deliveryId);
