@@ -174,20 +174,35 @@ async function serveAppRequest(request, env, url) {
     if (!env.INVOICE_API_URL) return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
     const authorization = request.headers.get("authorization") || "";
     const sessionToken = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    const upstreamBody = JSON.stringify({ action, payload: payload.value.payload || {}, systemPortalSessionToken: sessionToken });
     let upstream;
     try {
       upstream = await fetch(env.INVOICE_API_URL, {
         method: "POST",
         headers: { "content-type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action, payload: payload.value.payload || {}, systemPortalSessionToken: sessionToken }),
-        redirect: "follow",
+        body: upstreamBody,
+        redirect: "manual",
       });
+      if (upstream.status >= 300 && upstream.status < 400) {
+        const redirectedTo = upstream.headers.get("location");
+        if (!redirectedTo) return appJson(request, env, { ok: false, error: "INVOICE_API_REDIRECT_WITHOUT_LOCATION" }, 502);
+        upstream = await fetch(redirectedTo, {
+          method: "POST",
+          headers: { "content-type": "text/plain;charset=utf-8" },
+          body: upstreamBody,
+          redirect: "follow",
+        });
+      }
     } catch (_error) {
       return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
     }
+    const upstreamText = await upstream.text();
     let result;
-    try { result = await upstream.json(); } catch (_error) { result = null; }
-    if (!upstream.ok || !result?.ok) return appJson(request, env, { ok: false, error: String(result?.error || "INVOICE_API_INVALID_RESPONSE") }, upstream.ok ? 400 : 502);
+    try { result = JSON.parse(upstreamText); } catch (_error) { result = null; }
+    if (!upstream.ok || !result?.ok) {
+      const fallbackError = result?.error || (upstreamText.trim().startsWith("<") ? "INVOICE_API_RETURNED_HTML" : "INVOICE_API_INVALID_RESPONSE");
+      return appJson(request, env, { ok: false, error: String(fallbackError) }, upstream.ok ? 400 : 502);
+    }
     return appJson(request, env, result);
   }
 
