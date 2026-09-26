@@ -12,6 +12,29 @@ export default {
         await ensureIssue27Schema(env);
         return json({ ok: true, service: "step-invoice-api", storage: "cloudflare-r2" });
       }
+      if (request.method === "GET" && url.pathname === "/health/invoice-upstream") {
+        if (!env.INVOICE_API_URL) return json({ ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
+        let upstream;
+        try {
+          upstream = await fetch(env.INVOICE_API_URL, {
+            method: "POST",
+            headers: { "content-type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({ action: "findStudentForPartner", payload: { studentCode: "1332" }, systemPortalSessionToken: "" }),
+            redirect: "follow",
+          });
+        } catch (error) {
+          return json({ ok: false, error: "FETCH_FAILED", detail: String(error?.message || error) }, 502);
+        }
+        const textBody = await upstream.text();
+        return json({
+          ok: true,
+          status: upstream.status,
+          redirected: upstream.redirected,
+          finalUrlHost: (() => { try { return new URL(upstream.url).host; } catch (_) { return ""; } })(),
+          contentType: upstream.headers.get("content-type") || "",
+          bodyPrefix: textBody.slice(0, 300).replace(/\s+/g, " "),
+        });
+      }
 
       if (env.EMERGENCY_STOP === "true") {
         return url.pathname.startsWith("/api/")
