@@ -97,3 +97,6 @@ jobs:
           set -euo pipefail
           response="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 https://step-invoice-api.stepkobetsu.workers.dev/health)"
           node -e 'const value=JSON.parse(process.argv[1]); if(value.ok!==true||value.service!=="step-invoice-api") process.exit(1)' "$response"
+          upstream="$(curl --fail --silent --show-error --retry 6 --retry-delay 5 https://step-invoice-api.stepkobetsu.workers.dev/health/invoice-upstream)"
+          echo "Apps Script upstream diagnostic: $upstream"
+          node -e 'const value=JSON.parse(process.argv[1]); if(value.ok!==true||value.status!==200||!String(value.contentType||"").includes("application/json")) process.exit(1)' "$upstream"
