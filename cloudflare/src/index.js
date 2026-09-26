@@ -204,18 +204,8 @@ async function serveAppRequest(request, env, url) {
         method: "POST",
         headers: { "content-type": "text/plain;charset=utf-8" },
         body: upstreamBody,
-        redirect: "manual",
+        redirect: "follow",
       });
-      if (upstream.status >= 300 && upstream.status < 400) {
-        const redirectedTo = upstream.headers.get("location");
-        if (!redirectedTo) return appJson(request, env, { ok: false, error: "INVOICE_API_REDIRECT_WITHOUT_LOCATION" }, 502);
-        upstream = await fetch(redirectedTo, {
-          method: "POST",
-          headers: { "content-type": "text/plain;charset=utf-8" },
-          body: upstreamBody,
-          redirect: "follow",
-        });
-      }
     } catch (_error) {
       return appJson(request, env, { ok: false, error: "INVOICE_API_UNAVAILABLE" }, 503);
     }
