@@ -133,7 +133,7 @@
       setTimeout(()=>refreshAll(false),65000);
     });
   }
-  function staffSessionToken(){try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
+  function staffSessionToken(){/* 明示的ログアウト以外ではstepStaffAppAuthを削除しない。通信失敗時も保持する。 */try{return String(JSON.parse(localStorage.getItem(STAFF_AUTH_KEY)||'null')?.systemPortalSessionToken||'');}catch(_){return '';}}
   async function cloudApi(path,{method='GET',body,timeoutMs=15000}={}){
     const token=staffSessionToken();if(!token)throw new Error('スタッフログインが必要です。');
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
