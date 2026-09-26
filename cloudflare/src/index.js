@@ -1056,7 +1056,11 @@ async function uploadInvoice(request, env, ctx) {
   if (pdfBytes.byteLength > 10 * 1024 * 1024) return json({ ok: false, error: "PDF_TOO_LARGE" }, 413);
 
   const now = new Date().toISOString();
-  const partnerId = `partner:${customerCode}`;
+  // Partners created through the D1 workspace use UUID partner_id values.
+  // Reusing a synthetic partner:<code> id for an existing customer breaks the
+  // invoices.partner_id foreign key when the customer_code already exists.
+  const existingPartner = await env.DB.prepare("SELECT partner_id FROM partners WHERE customer_code = ?1 LIMIT 1").bind(customerCode).first();
+  const partnerId = String(existingPartner?.partner_id || `partner:${customerCode}`);
   const invoiceId = `invoice:${invoiceNumber}`;
   const objectKey = `${documentType === "receipt" ? "receipts" : "invoices"}/${displayNumber.slice(0, 4)}/${displayNumber.slice(4, 6)}/${invoiceNumber}-${crypto.randomUUID()}.pdf`;
   const old = await env.DB.prepare("SELECT r2_object_key FROM invoices WHERE invoice_number = ?1 LIMIT 1").bind(invoiceNumber).first();
